@@ -1,0 +1,12 @@
+# Build output (binaries embed local file paths)
+MenuBar/build/
+/usage
+/tests/outlook
+/tests/errors
+
+# macOS
+.DS_Store
+
+# Local usage data, never commit
+usage-snapshot.json
+*.label.png
