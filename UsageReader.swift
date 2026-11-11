@@ -1,7 +1,7 @@
 // UsageReader.swift
 // Reads Claude subscription usage without a browser cookie.
 //
-// Source 1 (primary):  Claude Code's OAuth token from the macOS Keychain
+// Source 1 (primary):  Claude Code's OAuth token from the macOS Keychain (read via /usr/bin/security)
 //                      -> GET https://api.anthropic.com/api/oauth/usage (undocumented)
 // Source 2 (fallback): snapshot file written by a Claude Code status-line script
 //                      (~/.claude/usage-snapshot.json, from the documented `rate_limits` field)
@@ -332,17 +332,19 @@ public final class UsageReader {
 
     struct Credentials { let accessToken: String; let expiresAt: Date? }
 
+    /// Reads Claude Code's credentials the way Claude Code itself does: through Apple's `security`
+    /// tool, which the item trusts because Claude Code writes it with that tool. Asking the Keychain
+    /// directly would show a password dialog after every rebuild of this app and every token refresh
+    /// (each rewrite of the item resets its list of allowed apps). Falls back to the direct read
+    /// only if the tool itself can't run.
     func readCredentials() throws -> Credentials {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: Self.keychainService,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne,
-        ]
-        var item: CFTypeRef?
-        guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
-              let data = item as? Data,
-              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+        let data: Data
+        switch Self.readWithSecurityTool() {
+        case .found(let d): data = d
+        case .notFound: throw UsageError.noCredentials
+        case .toolFailed: data = try Self.readWithKeychainAPI()
+        }
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let oauth = root["claudeAiOauth"] as? [String: Any],
               let token = oauth["accessToken"] as? String, !token.isEmpty
         else { throw UsageError.noCredentials }
@@ -350,6 +352,56 @@ public final class UsageReader {
         var expires: Date?
         if let ms = oauth["expiresAt"] as? Double { expires = Date(timeIntervalSince1970: ms / 1000) }
         return Credentials(accessToken: token, expiresAt: expires)
+    }
+
+    enum ToolRead { case found(Data), notFound, toolFailed }
+
+    /// `security find-generic-password -s <service> -w`: prints the secret on stdout (exit 44: no such item).
+    /// The output goes straight from the pipe into memory; it is never written anywhere.
+    static func readWithSecurityTool(timeout: TimeInterval = 60) -> ToolRead {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/usr/bin/security")
+        p.arguments = ["find-generic-password", "-s", keychainService, "-w"]
+        let out = Pipe()
+        p.standardOutput = out
+        p.standardError = FileHandle.nullDevice
+        // A locked keychain makes the tool ask to unlock it; don't wait forever.
+        // (The output is a few KB, well within the pipe's buffer, so it's read after the exit.)
+        let done = DispatchSemaphore(value: 0)
+        p.terminationHandler = { _ in done.signal() }
+        do { try p.run() } catch { return .toolFailed }
+        if done.wait(timeout: .now() + timeout) == .timedOut { p.terminate(); return .toolFailed }
+        let data = out.fileHandleForReading.readDataToEndOfFile()
+        switch p.terminationStatus {
+        case 0: break
+        case 44: return .notFound
+        default: return .toolFailed
+        }
+        var text = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        // Secrets that aren't plain text are printed as hex.
+        if !text.hasPrefix("{"), text.count % 2 == 0, text.allSatisfy(\.isHexDigit) {
+            var bytes = [UInt8](); bytes.reserveCapacity(text.count / 2)
+            var i = text.startIndex
+            while i < text.endIndex {
+                let j = text.index(i, offsetBy: 2)
+                bytes.append(UInt8(text[i..<j], radix: 16)!); i = j
+            }
+            text = String(decoding: bytes, as: UTF8.self)
+        }
+        return text.isEmpty ? .notFound : .found(Data(text.utf8))
+    }
+
+    static func readWithKeychainAPI() throws -> Data {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+        var item: CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess, let data = item as? Data
+        else { throw UsageError.noCredentials }
+        return data
     }
 
     public func fetchOAuth() async throws -> UsageSnapshot {

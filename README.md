@@ -77,8 +77,11 @@ window, and are held back for the first 15% of a window (45 minutes of the
    - The token is read on every fetch, never stored, logged or sent anywhere else.
    - It is **never refreshed** by this app, because that would rotate Claude Code's refresh token
      and could sign Claude Code out. If it has expired, run `claude` in Terminal once.
-   - macOS asks once whether the app may read that Keychain item: choose **Always Allow**.
-     Ad-hoc signed builds count as a new app after every rebuild, so it asks again then.
+   - It reads the item the same way Claude Code does, through Apple's `security` tool, which the
+     item already trusts. So there's no Keychain password dialog, not after a rebuild and not after
+     Claude Code refreshes its token. (Asking the Keychain directly would prompt each time, because
+     every rewrite of the item resets its list of allowed apps.) This doesn't open anything new:
+     any program running as you can read the item this way, because that's how Claude Code stores it.
 2. **Claude Code status line (fallback).** If the token can't be used, the app reads
    `~/.claude/usage-snapshot.json`, written by [`statusline-snapshot.sh`](statusline-snapshot.sh)
    from the documented `rate_limits` field Claude Code passes to status-line commands.

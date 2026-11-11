@@ -10,7 +10,7 @@ func show(_ s: UsageSnapshot) {
         if let hit = w.projectedLimitAt() { extra += "  ⚠️ limit ~\(df.string(from: hit))" }
         else if w.resetsAt != nil && w.percent > 0 && !w.isTooEarlyToProject() { extra += "  ok until reset" }
         let name = w.key.padding(toLength: max(w.key.count, 18), withPad: " ", startingAt: 0)
-        if let sp = w.spend { extra += "\(sp.used.formatted) of \(sp.limit.formatted)" }
+        if let sp = w.spend { extra += "  \(sp.used.formatted) of \(sp.limit.formatted)" }
         if let sev = s.severity[w.key] { extra += "  [\(sev)]" }
         print("  \(name) \(String(format: "%5.1f%%", w.percent))  \(extra)")
         print("  \(String(repeating: " ", count: name.count))        → \(w.outlook())")
