@@ -61,16 +61,16 @@ extension UsageHistory {
             let weekStart = weekReset.addingTimeInterval(-7 * 86400)
             let times = stride(from: start, through: now, by: step).map { $0 }
             let rates = times.map { working($0) ? wobble() : 0 }
-            let inWindow = zip(times, rates).filter { $0.0 >= weekStart }.map(\.1).reduce(0, +)
+            let inWindow = zip(times, rates).filter { $0.0.isAtOrAfter(weekStart) }.map(\.1).reduce(0, +)
             let perUnit = week.percent / max(inWindow, 1)
             let before = zip(times, rates).filter { $0.0 < weekStart }.map(\.1).reduce(0, +)
             let perUnitBefore = 30 / max(before, 1)   // previous week: 55% → 85% by its reset
             // Before this week's window began, the previous week was already at 55% and rising.
             var weekAcc = 55.0, session = 0.0, sessionEnd = Date.distantPast, inThisWeek = false
             for (t, r) in zip(times, rates) {
-                if t >= weekStart && !inThisWeek { inThisWeek = true; weekAcc = 0 }   // weekly reset
+                if t.isAtOrAfter(weekStart) && !inThisWeek { inThisWeek = true; weekAcc = 0 }   // weekly reset
                 weekAcc += r * (inThisWeek ? perUnit : perUnitBefore)
-                if t >= sessionEnd { session = 0; if r > 0 { sessionEnd = t.addingTimeInterval(5 * 3600) } }
+                if t.isAtOrAfter(sessionEnd) { session = 0; if r > 0 { sessionEnd = t.addingTimeInterval(5 * 3600) } }
                 session += r * 2.2
                 pts.append(HistoryPoint(t: t, key: "seven_day", percent: min(weekAcc, 100)))
                 pts.append(HistoryPoint(t: t, key: "five_hour", percent: min(session, 100)))
@@ -92,7 +92,7 @@ extension UsageHistory {
         for p in full where p.key == "extra_usage" && p.t < cutoff {
             if let u = p.usedMinor { if u > last { weights.append(UsageWeight(t: p.t, weight: Double(u - last))) }; last = u }
         }
-        return (UsageHistory(points: full.filter { $0.key != "extra_usage" || $0.t >= cutoff }), weights)
+        return (UsageHistory(points: full.filter { $0.key != "extra_usage" || $0.t.isAtOrAfter(cutoff) }), weights)
     }
 }
 
@@ -225,7 +225,7 @@ final class UsageModel: ObservableObject {
             let found = await Task.detached(priority: .utility) { ClaudeCodeLogs.weights(from: from, to: to) }.value
             let covered = logsCovered
             let new = found.filter { w in !covered.contains { $0.contains(w.t) } }
-            logWeights = (logWeights + new).filter { $0.t >= period.start }.sorted { $0.t < $1.t }
+            logWeights = (logWeights + new).filter { $0.t.isAtOrAfter(period.start) }.sorted { $0.t < $1.t }
             logsCovered.append(from...to)
             readingLogs = false
         }

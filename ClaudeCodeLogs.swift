@@ -35,7 +35,7 @@ public enum ClaudeCodeLogs {
                       let usage = msg["usage"] as? [String: Any],
                       let ts = o["timestamp"] as? String,
                       let t = iso.date(from: ts) ?? isoPlain.date(from: ts),
-                      t >= from, t <= to else { continue }
+                      t.isAtOrAfter(from), t.isAtOrBefore(to) else { continue }
                 // Streaming writes the same response on several lines: count each once.
                 let id = "\(msg["id"] as? String ?? "")|\(o["requestId"] as? String ?? "")"
                 if id != "|" { guard seen.insert(id).inserted else { continue } }

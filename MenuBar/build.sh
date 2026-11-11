@@ -14,6 +14,12 @@ swiftc -O -swift-version 5 -parse-as-library \
     -o "$APP/Contents/MacOS/UsageMeter" \
     ../UsageReader.swift ../History.swift ../ClaudeCodeLogs.swift Sources/*.swift
 
+# Date >= / <= can compile to Foundation symbols macOS lacks (see Date.isAtOrAfter in UsageReader.swift).
+if nm -u "$APP/Contents/MacOS/UsageMeter" | grep -qE 'DateV2(ge|le)oiy'; then
+    echo "error: the binary uses Date >= or <=; use isAtOrAfter / isAtOrBefore" >&2
+    exit 1
+fi
+
 codesign --force --sign - "$APP"
 echo "Built $APP"
 

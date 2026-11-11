@@ -36,7 +36,7 @@ public struct UsageHistory: Equatable, Sendable {
         for w in snap.windows {
             let last = points.last { $0.key == w.key }
             if let last {
-                if t <= last.t { continue }
+                if t.isAtOrBefore(last.t) { continue }
                 let dropped = w.percent < last.percent - 0.5
                 if !dropped && t.timeIntervalSince(last.t) < Self.minSpacing { continue }
             }
@@ -52,7 +52,7 @@ public struct UsageHistory: Equatable, Sendable {
 
     /// Points for one window between two times, oldest first.
     public func series(_ key: String, from: Date, to: Date = .distantFuture) -> [HistoryPoint] {
-        points.filter { $0.key == key && $0.t >= from && $0.t <= to }
+        points.filter { $0.key == key && $0.t.isAtOrAfter(from) && $0.t.isAtOrBefore(to) }
     }
 
     // MARK: Storage
@@ -145,7 +145,7 @@ extension UsageHistory {
         guard !gaps.isEmpty, !weights.isEmpty, let key = pts.first?.key else { return pts }
         var out = pts
         for g in gaps {
-            let inGap = weights.filter { $0.t > g.start && $0.t <= g.end }
+            let inGap = weights.filter { $0.t > g.start && $0.t.isAtOrBefore(g.end) }
             let total = inGap.reduce(0) { $0 + $1.weight }
             guard total > 0 else { continue }
             let span = Double(g.toMinor - g.fromMinor)
@@ -159,7 +159,7 @@ extension UsageHistory {
             if g.fromMinor == 0 && g.start == periodStart { out.append(point(g.start, 0)) }
             var t = g.start.addingTimeInterval(step)
             while t < g.end {
-                while i < inGap.count && inGap[i].t <= t { acc += inGap[i].weight; i += 1 }
+                while i < inGap.count && inGap[i].t.isAtOrBefore(t) { acc += inGap[i].weight; i += 1 }
                 out.append(point(t, acc))
                 t = t.addingTimeInterval(step)
             }

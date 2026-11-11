@@ -351,12 +351,12 @@ private struct DailySpendBars: View {
         let spend = window.spend!
         let code = spend.limit.currency
         let scale = pow(10, Double(spend.limit.exponent))
-        let shown = days.filter { $0.day >= start && $0.day < end }
+        let shown = days.filter { $0.day.isAtOrAfter(start) && $0.day < end }
         let top = niceCeil((shown.map { Double($0.usedMinor) / scale }.max() ?? 0) * 1.15)
         let tint = ChartInk.series1(scheme)
         let mids = shown.map { $0.day.addingTimeInterval(43200) }
         let active = activeHover(hovered, preview: previewHover, times: mids)
-        let today = shown.last { $0.day <= now }
+        let today = shown.last { $0.day.isAtOrBefore(now) }
 
         Chart {
             ForEach(shown, id: \.day) { d in

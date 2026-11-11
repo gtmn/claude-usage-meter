@@ -561,3 +561,12 @@ public final class UsageReader {
         return f.date(from: s)
     }
 }
+
+extension Date {
+    // Use these instead of `>=` / `<=` on dates. Some Xcode SDKs (seen with Xcode 27.2 on
+    // macOS 27.2) compile those two operators to Foundation symbols that macOS doesn't export,
+    // so the binary crashes (or won't launch) the first time one runs. `<` is unaffected.
+    // MenuBar/build.sh and test.sh refuse to produce binaries that reference them.
+    public func isAtOrAfter(_ other: Date) -> Bool { !(self < other) }
+    public func isAtOrBefore(_ other: Date) -> Bool { !(other < self) }
+}
