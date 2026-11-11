@@ -80,8 +80,11 @@ struct UsageRows: View {
                 TimelineView(.periodic(from: .now, by: 60)) { ctx in
                     VStack(alignment: .leading, spacing: 10) {
                         ForEach(model.orderedWindows) { w in
-                            WindowRow(window: w, severity: model.snapshot?.severity[w.key], now: ctx.date)
+                            WindowRow(window: w, severity: model.snapshot?.severity[w.key],
+                                      budgetOnly: model.snapshot?.isBudgetOnly ?? false, now: ctx.date)
                         }
+                        HistoryChart(model: model, now: ctx.date)
+                            .padding(.top, 2)
                     }
                 }
                 if let pace = model.snapshot?.serverPace {
@@ -121,12 +124,14 @@ struct UsageRows: View {
 struct WindowRow: View {
     let window: UsageWindow
     let severity: String?
+    var budgetOnly = false
     let now: Date
 
     private var runsOut: Bool { window.projectedLimitAt(now: now) != nil }
 
     private var tint: Color {
-        if window.percent >= 90 || (severity.map { $0 != "normal" } ?? false) { return .red }
+        if window.percent >= 90 || (window.spend?.limitReached ?? false)
+            || (severity.map { $0 != "normal" } ?? false) { return .red }
         if runsOut || window.percent >= 70 { return .orange }
         return .green
     }
@@ -134,19 +139,32 @@ struct WindowRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(alignment: .firstTextBaseline) {
-                Text(window.title).font(.system(size: 11, weight: .semibold))
+                Text(window.title(budgetOnly: budgetOnly)).font(.system(size: 11, weight: .semibold))
                 Spacer()
                 Text("\(Int(window.percent.rounded()))%")
                     .font(.system(size: 12, weight: .semibold)).monospacedDigit()
             }
             PaceBar(percent: window.percent, pace: window.expectedPercent(now: now), tint: tint)
                 .padding(.vertical, 2)
+            if let spend = window.spend {
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text(spend.used.formatted).font(.system(size: 13, weight: .semibold))
+                    Text("used of \(spend.limit.formatted)").font(.system(size: 11)).foregroundStyle(.secondary)
+                    Spacer()
+                    Text("\(spend.remaining.formatted) left").font(.system(size: 11)).foregroundStyle(.secondary)
+                }
+                .monospacedDigit()
+            }
             Text(window.outlook(now: now))
                 .font(.system(size: 11))
                 .foregroundStyle(runsOut ? Color.orange : Color.primary)
                 .fixedSize(horizontal: false, vertical: true)
             if let reset = window.resetsAt {
                 Text(caption(reset)).font(.system(size: 10)).foregroundStyle(.secondary)
+                    .help(window.resetIsAssumed
+                          ? "Claude's usage data doesn't say when this budget resets, so 00:00 UTC on the 1st is assumed. "
+                            + "Set up statusline-snapshot.sh (see README) and use Claude Code once to get the real date."
+                          : "")
             }
         }
     }
@@ -154,6 +172,7 @@ struct WindowRow: View {
     private func caption(_ reset: Date) -> String {
         let f = DateFormatter(); f.locale = HumanTime.en; f.dateFormat = "EEE d MMM, HH:mm"
         var s = "Resets \(f.string(from: reset))"
+        if window.resetIsAssumed { s += " (assumed)" }
         if let pace = window.expectedPercent(now: now) { s += " · \(Int(pace.rounded()))% of time used" }
         return s
     }

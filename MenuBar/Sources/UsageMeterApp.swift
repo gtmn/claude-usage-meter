@@ -3,14 +3,16 @@ import SwiftUI
 @main
 struct UsageMeterApp: App {
     @StateObject private var model = UsageModel(
-        preview: CommandLine.arguments.contains("--sample") ? .sample : nil
+        preview: CommandLine.arguments.contains("--sample")
+            ? (CommandLine.arguments.contains("enterprise") ? .sampleEnterprise : .sample) : nil
     )
 
     init() {
-        // `UsageMeter --render-preview out.png [live] [offline]`: render the panel rows to a PNG and exit.
+        // `UsageMeter --render-preview out.png [live] [offline] [enterprise] [hover] [light] [daily]`: render the panel rows to a PNG and exit.
         let args = CommandLine.arguments
         if let i = args.firstIndex(of: "--render-preview"), i + 1 < args.count {
-            PreviewRenderer.run(output: args[i + 1], live: args.contains("live"), offline: args.contains("offline"))
+            PreviewRenderer.run(output: args[i + 1], live: args.contains("live"), offline: args.contains("offline"),
+                                enterprise: args.contains("enterprise"))
         }
     }
 
@@ -27,7 +29,7 @@ struct UsageMeterApp: App {
 /// Renders the data rows to an image for checking the layout without clicking the menu bar.
 @MainActor
 enum PreviewRenderer {
-    static func run(output: String, live: Bool, offline: Bool) -> Never {
+    static func run(output: String, live: Bool, offline: Bool, enterprise: Bool = false) -> Never {
         let snap: UsageSnapshot
         if live {
             let sem = DispatchSemaphore(value: 0)
@@ -40,15 +42,24 @@ enum PreviewRenderer {
             guard let r = result else { fputs("live fetch failed\n", stderr); exit(1) }
             snap = r
         } else {
-            snap = .sample
+            snap = enterprise ? .sampleEnterprise : .sample
         }
-        let model = UsageModel(preview: snap, problem: offline ? "Offline" : nil)
+        // Live numbers get the real recorded history; samples get a made-up one.
+        let light = CommandLine.arguments.contains("light")
+        var logs: [UsageWeight]?
+        if live, let period = UsageModel.budgetPeriod(snap) { logs = ClaudeCodeLogs.weights(from: period.start, to: Date()) }
+        let model = UsageModel(preview: snap, problem: offline ? "Offline" : nil,
+                               history: live ? UsageHistory.load() : nil, logWeights: logs)
         writeLabelPreview(model: model, output: output)
         let view = UsageRows(model: model)
             .padding(UsagePanel.padding)
             .frame(width: UsagePanel.width)
             .background(Color(nsColor: .windowBackgroundColor))
-            .environment(\.colorScheme, .dark)
+            .environment(\.colorScheme, light ? .light : .dark)
+            .environment(\.previewHover, CommandLine.arguments.contains("hover") ? 0.4 : nil)
+            .environment(\.previewBudgetMode, CommandLine.arguments.contains("daily") ? "daily" : nil)
+        // AppKit colours (window background, label colours) follow the drawing appearance.
+        NSApplication.shared.appearance = NSAppearance(named: light ? .aqua : .darkAqua)
         let renderer = ImageRenderer(content: view)
         renderer.scale = 2
         guard let cg = renderer.cgImage,

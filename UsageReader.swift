@@ -12,16 +12,90 @@
 import Foundation
 import Security
 
+/// An amount of money in minor units (cents), as the usage endpoint reports it.
+public struct Money: Equatable {
+    public let minor: Int64
+    public let exponent: Int        // 2 → minor units are cents
+    public let currency: String     // ISO code, e.g. "USD"
+
+    public var amount: Double { Double(minor) / pow(10, Double(exponent)) }
+
+    /// "$116.88", "€1,000.00", "CHF 50.00" (en_US grouping, the currency's own symbol).
+    public var formatted: String {
+        let f = NumberFormatter()
+        f.locale = Locale(identifier: "en_US")
+        f.numberStyle = .currency
+        f.currencyCode = currency
+        f.minimumFractionDigits = exponent
+        f.maximumFractionDigits = exponent
+        return f.string(from: NSNumber(value: amount)) ?? String(format: "%.\(exponent)f \(currency)", amount)
+    }
+}
+
+/// A monthly spend budget: the main limit on Enterprise/Team seats, "extra usage" on Pro/Max.
+public struct Spend: Equatable {
+    public let used: Money
+    public let limit: Money
+    public var limitReached = false
+    /// "monthly", "weekly" or "daily" when Claude Code reports it (status line); nil means monthly.
+    public var period: String? = nil
+
+    public var periodLength: TimeInterval? {
+        switch period { case "daily": return 86400; case "weekly": return 7 * 86400; default: return nil }
+    }
+
+    /// The usage endpoint gives no reset time for the budget. Unless the status line or a
+    /// `limits` row confirms one, the app assumes the calendar month in UTC: 00:00 UTC on the 1st.
+    public static func assumedReset(after now: Date) -> Date {
+        let start = utc.date(from: utc.dateComponents([.year, .month], from: now))!
+        return utc.date(byAdding: .month, value: 1, to: start)!
+    }
+
+    static let utc: Calendar = {
+        var c = Calendar(identifier: .gregorian); c.timeZone = TimeZone(identifier: "UTC")!; return c
+    }()
+
+    /// A share of the limit as an estimate, rounded to a whole 10 above 100 units: "about $490".
+    func approx(percent p: Double) -> String {
+        let units = limit.amount * p / 100
+        let rounded = units >= 100 ? (units / 10).rounded() * 10 : units.rounded()
+        let f = NumberFormatter()
+        f.locale = Locale(identifier: "en_US"); f.numberStyle = .currency; f.currencyCode = limit.currency
+        f.maximumFractionDigits = 0
+        return f.string(from: NSNumber(value: rounded)) ?? "\(Int(rounded)) \(limit.currency)"
+    }
+    public var remaining: Money {
+        Money(minor: max(limit.minor - used.minor, 0), exponent: limit.exponent, currency: limit.currency)
+    }
+    public var percent: Double { limit.minor > 0 ? Double(used.minor) / Double(limit.minor) * 100 : 0 }
+}
+
 public struct UsageWindow: Equatable {
-    public let key: String          // e.g. "five_hour", "seven_day", "seven_day_opus"
+    public let key: String          // e.g. "five_hour", "seven_day", "seven_day_opus", "extra_usage"
     public let percent: Double      // 0...100
     public let resetsAt: Date?
+    /// Money amounts for a spend budget (the "extra_usage" window); nil for 5 h / 7 d windows.
+    public var spend: Spend? = nil
+    /// True when `resetsAt` is the app's guess (the monthly budget), not the server's.
+    public var resetIsAssumed = false
 
-    /// Window length, inferred from the key ("five_hour" → 5h, "seven_day*" → 7d).
+    /// Window length, inferred from the key ("five_hour" → 5h, "seven_day*" → 7d,
+    /// "extra_usage" → the budget period, by default the calendar month that ends at `resetsAt`).
     public var duration: TimeInterval? {
         if key.hasPrefix("five_hour") { return 5 * 3600 }
         if key.hasPrefix("seven_day") { return 7 * 86400 }
+        if key == "extra_usage", let reset = resetsAt {
+            if let length = spend?.periodLength { return length }
+            if let start = Spend.utc.date(byAdding: .month, value: -1, to: reset) { return reset.timeIntervalSince(start) }
+        }
         return nil
+    }
+
+    /// The same window with a different reset (and assumed-flag).
+    func withReset(_ reset: Date?, assumed: Bool, period: String? = nil) -> UsageWindow {
+        var s = spend
+        if let period { s?.period = period }
+        return UsageWindow(key: key, percent: percent, resetsAt: reset, spend: s, resetIsAssumed: assumed)
     }
 
     /// Share of the window that has elapsed, as a percentage (the "pace" line).
@@ -63,8 +137,14 @@ public struct UsageWindow: Equatable {
     /// or "Lasts until the reset at 03:20 — on track for about 45%".
     public func outlook(now: Date = Date(), calendar: Calendar = .current) -> String {
         guard let reset = resetsAt else { return String(format: "%.0f%% used", percent) }
-        if percent >= 100 {
-            return "Limit reached — resets \(HumanTime.moment(reset, now: now, calendar: calendar))"
+        // A monthly reset falls around midnight, which `moment` would call "the night before"
+        // ("resets on 30 Nov" for 00:00 on 1 Dec), so it's named by its date instead.
+        let resetMoment = spend == nil
+            ? HumanTime.moment(reset, now: now, calendar: calendar)
+            : HumanTime.onDay(reset, now: now, calendar: calendar)
+        if percent >= 100 || (spend?.limitReached ?? false) {
+            let what = spend == nil ? "Limit reached" : "Budget used up"
+            return "\(what) — resets \(resetMoment)"
         }
         if let hit = projectedLimitAt(now: now) {
             let early = HumanTime.span(reset.timeIntervalSince(hit))
@@ -76,13 +156,14 @@ public struct UsageWindow: Equatable {
         if percent > 0, isTooEarlyToProject(now: now) {
             let when = reset.timeIntervalSince(now) < 12 * 3600
                 ? "at \(HumanTime.clock(reset, calendar.timeZone))"
-                : HumanTime.moment(reset, now: now, calendar: calendar)
+                : resetMoment
             return "Too early to project — resets \(when)"
         }
         let resetText = reset.timeIntervalSince(now) < 12 * 3600
             ? "the reset at \(HumanTime.clock(reset, calendar.timeZone))"
             : "\(HumanTime.dayName(reset, now: now, calendar: calendar, possessive: true)) reset"
         if let end = projectedPercentAtReset(now: now), percent > 0 {
+            if let spend { return "Lasts until \(resetText) — on track for about \(spend.approx(percent: end))" }
             return String(format: "Lasts until %@ — on track for about %.0f%%", resetText, (end / 5).rounded() * 5)
         }
         return "Lasts until \(resetText)"
@@ -133,6 +214,12 @@ enum HumanTime {
         }
         guard possessive else { return name }
         return (0...6).contains(days) ? "\(name)'s" : "the \(name)"   // "the 15 Nov reset"
+    }
+
+    /// "today", "tomorrow", "on Tuesday", "on 1 Dec": the day only, no part of day.
+    static func onDay(_ d: Date, now: Date, calendar: Calendar) -> String {
+        let name = dayName(d, now: now, calendar: calendar)
+        return name == "today" || name == "tomorrow" ? name : "on \(name)"
     }
 
     /// "tonight", "this afternoon", "tomorrow morning", "Tuesday night", "on 14 Nov".
@@ -266,7 +353,24 @@ public final class UsageReader {
     }
 
     public func fetchOAuth() async throws -> UsageSnapshot {
-        try Self.parseOAuth(try await fetchOAuthRaw())
+        let snap = try Self.parseOAuth(try await fetchOAuthRaw())
+        // The status-line file may be old for usage numbers, but a reset still in the future is valid.
+        return Self.confirmingBudgetReset(snap, from: try? readSnapshot())
+    }
+
+    /// Replaces an assumed budget reset with the one Claude Code passed to the status line
+    /// (`rate_limits.spend_limit.resets_at`, from the server's overage-reset header),
+    /// as long as that reset hasn't passed yet.
+    static func confirmingBudgetReset(_ snap: UsageSnapshot, from statusLine: UsageSnapshot?,
+                                      now: Date = Date()) -> UsageSnapshot {
+        guard let i = snap.windows.firstIndex(where: { $0.key == "extra_usage" && $0.resetIsAssumed }),
+              let seen = statusLine?.window("extra_usage"), let reset = seen.resetsAt, reset > now
+        else { return snap }
+        var windows = snap.windows
+        windows[i] = windows[i].withReset(reset, assumed: false, period: seen.spend?.period)
+        return UsageSnapshot(source: snap.source, capturedAt: snap.capturedAt, windows: windows,
+                             serverPace: snap.serverPace, serverIndicator: snap.serverIndicator,
+                             severity: snap.severity)
     }
 
     /// Raw response body (usage data only; contains no credentials).
@@ -298,20 +402,61 @@ public final class UsageReader {
             windows.append(UsageWindow(key: key, percent: util,
                                        resetsAt: (obj["resets_at"] as? String).flatMap(parseISO)))
         }
+        if let i = windows.firstIndex(where: { $0.key == "extra_usage" }), let spend = parseSpend(root) {
+            let w = windows[i]
+            // A `limits` row of kind "spend" carries the real reset and period (gateway spec);
+            // prefer the active one when there are several.
+            let rows = (root["limits"] as? [[String: Any]] ?? []).filter { $0["kind"] as? String == "spend" }
+            let row = rows.first { $0["is_active"] as? Bool == true } ?? rows.first
+            let rowReset = (row?["resets_at"] as? String).flatMap(parseISO)
+            var s = spend
+            if let group = row?["group"] as? String { s.period = group }
+            let real = w.resetsAt ?? rowReset
+            windows[i] = UsageWindow(key: w.key, percent: w.percent, resetsAt: real ?? Spend.assumedReset(after: now),
+                                     spend: s, resetIsAssumed: real == nil)
+        }
         guard !windows.isEmpty else {
             throw UsageError.badResponse("no utilization fields (keys: \(root.keys.sorted()))")
         }
         var snap = UsageSnapshot(source: .oauth, capturedAt: now, windows: windows.sorted { $0.key < $1.key })
+        if let sev = (root["spend"] as? [String: Any])?["severity"] as? String { snap.severity["extra_usage"] = sev }
         snap.serverPace = root["pace"].flatMap { $0 is NSNull ? nil : $0 }
         snap.serverIndicator = root["indicator"].flatMap { $0 is NSNull ? nil : $0 }
         let kindToKey = ["session": "five_hour", "weekly_all": "seven_day",
-                         "weekly_opus": "seven_day_opus", "weekly_sonnet": "seven_day_sonnet"]
+                         "weekly_opus": "seven_day_opus", "weekly_sonnet": "seven_day_sonnet",
+                         "spend": "extra_usage"]
         for limit in root["limits"] as? [[String: Any]] ?? [] {
             if let kind = limit["kind"] as? String, let sev = limit["severity"] as? String {
                 snap.severity[kindToKey[kind] ?? kind] = sev
             }
         }
         return snap
+    }
+
+    /// Reads `spend.used` / `spend.limit` ({amount_minor, currency, exponent}); falls back to
+    /// `extra_usage.used_credits` / `monthly_limit` (minor units, `decimal_places`, `currency`).
+    static func parseSpend(_ root: [String: Any]) -> Spend? {
+        func money(_ any: Any?, currency fallback: String?) -> Money? {
+            guard let o = any as? [String: Any],
+                  let minor = (o["amount_minor"] as? NSNumber)?.int64Value,
+                  let currency = (o["currency"] as? String) ?? fallback else { return nil }
+            return Money(minor: minor, exponent: (o["exponent"] as? NSNumber)?.intValue ?? 2, currency: currency)
+        }
+        let extra = root["extra_usage"] as? [String: Any]
+        let reached = (extra?["spend_limit_reached"] as? Bool) ?? false
+        if let s = root["spend"] as? [String: Any],
+           let used = money(s["used"], currency: nil),
+           let limit = money(s["limit"], currency: used.currency), limit.minor > 0 {
+            return Spend(used: used, limit: limit, limitReached: reached)
+        }
+        guard let extra,
+              let used = (extra["used_credits"] as? NSNumber)?.doubleValue,
+              let limit = (extra["monthly_limit"] as? NSNumber)?.doubleValue, limit > 0,
+              let currency = extra["currency"] as? String else { return nil }
+        let exp = (extra["decimal_places"] as? NSNumber)?.intValue ?? 2
+        return Spend(used: Money(minor: Int64(used.rounded()), exponent: exp, currency: currency),
+                     limit: Money(minor: Int64(limit.rounded()), exponent: exp, currency: currency),
+                     limitReached: reached)
     }
 
     // MARK: Source 2 — status-line snapshot
@@ -338,6 +483,18 @@ public final class UsageReader {
                   let pct = (obj["used_percentage"] as? NSNumber)?.doubleValue else { continue }
             let reset = ((obj["resets_at"] ?? obj["reset_at"]) as? NSNumber)
                 .map { Date(timeIntervalSince1970: $0.doubleValue) }
+            if key == "spend_limit" {
+                // {used_percentage, resets_at, used_usd?, limit_usd?, period?}; amounts are USD only.
+                var spend: Spend?
+                if let used = (obj["used_usd"] as? NSNumber)?.doubleValue,
+                   let limit = (obj["limit_usd"] as? NSNumber)?.doubleValue, limit > 0 {
+                    spend = Spend(used: Money(minor: Int64((used * 100).rounded()), exponent: 2, currency: "USD"),
+                                  limit: Money(minor: Int64((limit * 100).rounded()), exponent: 2, currency: "USD"),
+                                  limitReached: pct >= 100, period: obj["period"] as? String)
+                }
+                windows.append(UsageWindow(key: "extra_usage", percent: pct, resetsAt: reset, spend: spend))
+                continue
+            }
             windows.append(UsageWindow(key: key, percent: pct, resetsAt: reset))
         }
         guard !windows.isEmpty else { throw UsageError.badResponse("snapshot rate_limits empty") }

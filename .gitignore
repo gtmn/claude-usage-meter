@@ -3,6 +3,7 @@ MenuBar/build/
 /usage
 /tests/outlook
 /tests/errors
+/tests/history
 
 # macOS
 .DS_Store

@@ -12,7 +12,7 @@ cp Info.plist "$APP/Contents/"
 swiftc -O -swift-version 5 -parse-as-library \
     -target "$(uname -m)-apple-macos14.0" \
     -o "$APP/Contents/MacOS/UsageMeter" \
-    ../UsageReader.swift Sources/*.swift
+    ../UsageReader.swift ../History.swift ../ClaudeCodeLogs.swift Sources/*.swift
 
 codesign --force --sign - "$APP"
 echo "Built $APP"

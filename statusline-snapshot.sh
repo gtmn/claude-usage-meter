@@ -22,5 +22,6 @@ else
   printf '%s' "$input" | jq -r '
     [ .model.display_name // empty,
       (.rate_limits.five_hour.used_percentage // empty | "5h \(floor)%"),
-      (.rate_limits.seven_day.used_percentage // empty | "7d \(floor)%") ] | join("  ·  ")'
+      (.rate_limits.seven_day.used_percentage // empty | "7d \(floor)%"),
+      (.rate_limits.spend_limit.used_percentage // empty | "$ \(floor)%") ] | join("  ·  ")'
 fi
