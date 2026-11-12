@@ -274,7 +274,8 @@ private struct BudgetLine: View {
         let code = spend.limit.currency
         let scale = pow(10, Double(spend.limit.exponent))
         let line = ChartPoint.runs(points.map { ($0.t, Double($0.usedMinor ?? 0) / scale, $0.estimated == true) })
-        let projectable = !window.isTooEarlyToProject(now: now) && spend.used.minor > 0
+        let projectable = !window.isTooEarlyToProject(now: now)
+            && (spend.used.minor > 0 || window.projectsFromPriorPace(now: now))
         let projected = projectable ? window.projectedPercentAtReset(now: now).map { spend.limit.amount * $0 / 100 } : nil
         let peak = max(spend.used.amount, projected ?? 0)
         // Show the whole budget only when the curve gets near it; otherwise the line would hug the floor.

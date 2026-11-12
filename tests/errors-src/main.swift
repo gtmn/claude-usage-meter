@@ -18,7 +18,11 @@ for s in ["Runs out Wednesday afternoon, 3 days before Saturday's reset",
           "Lasts until the 1 Dec reset — on track for about $1,990",
           "Runs out on 24 Nov, 7 days before the 1 Dec reset",
           "Too early to project — resets on 1 Dec",
-          "Budget used up — resets on 1 Dec"] {
+          "Budget used up — resets on 1 Dec",
+          "At last month's pace: about $1,990 by the 1 Jan reset",
+          "At last week's pace: about 100% by Wednesday's reset",
+          "At last month's pace: runs out Wednesday afternoon",
+          "At last month's pace: runs out on 24 Dec"] {
   print(Int((s as NSString).size(withAttributes: [.font: f]).width), s)
 }
 

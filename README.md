@@ -68,8 +68,14 @@ already keeps on your Mac.
   If a fetch fails, the last numbers stay and a short note explains why (e.g. *Offline*).
 
 Projections are a straight-line estimate from your average rate so far in the
-window, and are held back for the first 15% of a window (45 minutes of the
-5-hour window, about a day of the week, about 4½ days of the month), where they'd be too jumpy.
+window. In the first 15% of a window (45 minutes of the 5-hour window, about a day
+of the week, about 4½ days of the month) that rate alone is too jumpy: $20 in the
+first two hours of a month would project to $7,200. So the week and the budget start
+from the previous period's average pace instead, from the app's own history, e.g.
+*At last month's pace: about $600 by the 1 Jan reset*. As the first 15% goes by,
+this period's own spending counts more and more, and after it only this period counts.
+The 5-hour session, and any limit without a recorded previous period, says
+*Too early to project* until then.
 
 ## How it gets the data
 

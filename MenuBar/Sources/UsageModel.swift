@@ -193,7 +193,7 @@ final class UsageModel: ObservableObject {
             if let snap {
                 recordHistory(snap)
                 updateSeenReset()
-                snapshot = snap.confirmingAssumedReset(seen: seenReset)
+                snapshot = snap.confirmingAssumedReset(seen: seenReset).withPriorPace(from: history)
                 error = nil
             } else {
                 error = oauthWhy ?? "No usage data"

@@ -103,6 +103,39 @@ let weeklySnap = UsageSnapshot(source: .oauth, capturedAt: at("2026-12-02 10:00"
 check("a monthly reset says nothing about a weekly budget",
       weeklySnap.confirmingAssumedReset(seen: at("2026-12-01 00:00")).window("extra_usage")?.resetIsAssumed == true)
 
+// Last period's pace: early projections start from it instead of "Too early to project".
+let dec = UsageWindow(key: "extra_usage", percent: 0.75, resetsAt: at("2027-01-01 00:00"),
+                      spend: Spend(used: Money(minor: 1500, exponent: 2, currency: "USD"), limit: Money(minor: 200000, exponent: 2, currency: "USD")))
+let nov = UsageHistory(points: [bp("2026-11-10 12:00", 20000), bp("2026-11-30 23:50", 60000), bp("2026-12-01 00:05", 0)])
+let novPace = nov.priorPace(for: dec)
+check("last month's pace: November's total over the time it covers",
+      novPace.map { abs($0 - 30 / at("2026-11-30 23:50").timeIntervalSince(at("2026-11-01 00:00"))) < 1e-12 } ?? false)
+check("no pace when the history covers only the first half of last month",
+      UsageHistory(points: [bp("2026-11-10 12:00", 20000)]).priorPace(for: dec) == nil)
+check("no pace for the 5 h session", nov.priorPace(for: UsageWindow(key: "five_hour", percent: 5, resetsAt: at("2026-12-01 05:00"))) == nil)
+var early = dec; early.priorPace = novPace
+let day1 = at("2026-12-01 03:00")
+check("3 h into the month: projects instead of 'too early'",
+      !early.isTooEarlyToProject(now: day1) && early.projectsFromPriorPace(now: day1) && dec.isTooEarlyToProject(now: day1))
+let endPct = early.projectedPercentAtReset(now: day1) ?? 0
+check("…to about last month's total plus a little for the busy start (\(Int(endPct * 20))$)", (31...40).contains(endPct))
+check("…and says so", early.outlook(now: day1, calendar: cal) == "At last month's pace: about $720 by the 1 Jan reset")
+let rampEnd = at("2026-12-01 00:00").addingTimeInterval(31 * 86400 * 0.15)
+var atRamp = early; atRamp = UsageWindow(key: "extra_usage", percent: 10, resetsAt: early.resetsAt, spend: early.spend, priorPace: novPace)
+check("at 15% of the month the pace is this month's own (no jump)",
+      abs((atRamp.projectionPace(now: rampEnd) ?? 0) - 10 / rampEnd.timeIntervalSince(at("2026-12-01 00:00"))) < 1e-12)
+var heavy = early; heavy.priorPace = 150 / (30 * 86400.0)
+check("a heavy last month projects running out, in plain words",
+      heavy.outlook(now: day1, calendar: cal).hasPrefix("At last month's pace: runs out") && heavy.projectedLimitAt(now: day1) != nil)
+var fresh = early; fresh = UsageWindow(key: "extra_usage", percent: 0, resetsAt: early.resetsAt, spend: early.spend, priorPace: novPace)
+check("right after the reset, with nothing spent yet, it still projects",
+      fresh.outlook(now: at("2026-12-01 00:10"), calendar: cal).hasPrefix("At last month's pace: about"))
+let wk = UsageHistory(points: [HistoryPoint(t: at("2026-11-11 04:50"), key: "seven_day", percent: 70)])
+var week = UsageWindow(key: "seven_day", percent: 4, resetsAt: at("2026-11-18 05:00"))
+week.priorPace = wk.priorPace(for: week)
+check("the weekly limit uses last week's final percentage",
+      week.outlook(now: at("2026-11-11 09:00"), calendar: cal).hasPrefix("At last week's pace:"))
+
 // The log reader: dedupes streamed lines, skips unpriced models and times outside the range.
 let logDir = dir.appendingPathComponent("projects/p")
 try! FileManager.default.createDirectory(at: logDir, withIntermediateDirectories: true)

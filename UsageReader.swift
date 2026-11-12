@@ -81,6 +81,9 @@ public struct UsageWindow: Equatable {
     /// When the app saw the assumed reset (00:00 UTC on the 1st) actually happen, which is
     /// what lets it drop "(assumed)" (see `UsageHistory.seenBudgetReset`).
     public var resetSeen: Date? = nil
+    /// The previous period's average pace in percent of the limit per second, from the app's
+    /// history (see `UsageHistory.priorPace`). Lets the projection start right after a reset.
+    public var priorPace: Double? = nil
 
     /// Window length, inferred from the key ("five_hour" → 5h, "seven_day*" → 7d,
     /// "extra_usage" → the budget period, by default the calendar month that ends at `resetsAt`).
@@ -108,32 +111,64 @@ public struct UsageWindow: Equatable {
         return min(max(elapsed / d * 100, 0), 100)
     }
 
-    /// The first 15% of a window (45 min of 5 h, about a day of 7) is too little history:
-    /// a few percent in the first minutes would project to running out.
-    public func isTooEarlyToProject(now: Date = Date()) -> Bool {
-        guard let reset = resetsAt, let d = duration else { return false }
-        return now.timeIntervalSince(reset.addingTimeInterval(-d)) < d * 0.15
+    /// The first 15% of a window (45 min of 5 h, about a day of 7, 4½ days of a month) is too
+    /// little history on its own: a few percent in the first hours would project to running out.
+    static let rampShare = 0.15
+
+    private func elapsed(now: Date) -> (elapsed: TimeInterval, length: TimeInterval, reset: Date)? {
+        guard let reset = resetsAt, let d = duration else { return nil }
+        return (now.timeIntervalSince(reset.addingTimeInterval(-d)), d, reset)
     }
 
-    /// Linear projection: when 100% is reached at the average rate so far in this window.
-    /// nil if usage is 0, the window can't be placed, it's too early to tell,
-    /// or the limit won't be hit before reset.
+    /// Still in the first 15% with no earlier period to go by.
+    public func isTooEarlyToProject(now: Date = Date()) -> Bool {
+        guard let e = elapsed(now: now) else { return false }
+        return e.elapsed < e.length * Self.rampShare && priorPace == nil
+    }
+
+    /// In the first 15%, leaning on the previous period's pace.
+    public func projectsFromPriorPace(now: Date = Date()) -> Bool {
+        guard let e = elapsed(now: now) else { return false }
+        return e.elapsed < e.length * Self.rampShare && priorPace != nil
+    }
+
+    /// Projection pace in percent per second. After the first 15% of the window: the average so far.
+    /// Before that, as if the previous period's pace filled the rest of the first 15%, so the
+    /// projection starts at last period's pace and moves smoothly to this period's own.
+    public func projectionPace(now: Date = Date()) -> Double? {
+        guard let e = elapsed(now: now) else { return nil }
+        let ramp = e.length * Self.rampShare
+        if e.elapsed >= ramp { return percent / e.elapsed }
+        guard let prior = priorPace else { return nil }
+        return (percent + prior * (ramp - max(e.elapsed, 0))) / ramp
+    }
+
+    /// When 100% is reached at the projection pace. nil if nothing is used (and there's no
+    /// earlier pace), it's too early to tell, or the limit won't be hit before the reset.
     public func projectedLimitAt(now: Date = Date()) -> Date? {
-        guard percent > 0, let reset = resetsAt, let d = duration else { return nil }
+        guard let reset = resetsAt else { return nil }
         if percent >= 100 { return now }
-        guard !isTooEarlyToProject(now: now) else { return nil }
-        let start = reset.addingTimeInterval(-d)
-        let elapsed = now.timeIntervalSince(start)
-        let hit = start.addingTimeInterval(elapsed * 100 / percent)
+        guard percent > 0 || projectsFromPriorPace(now: now),
+              let pace = projectionPace(now: now), pace > 0 else { return nil }
+        let hit = now.addingTimeInterval((100 - percent) / pace)
         return hit < reset ? hit : nil
     }
 
-    /// Where usage lands at reset if the current rate holds (can exceed 100).
+    /// Where usage lands at reset at the projection pace (can exceed 100).
     public func projectedPercentAtReset(now: Date = Date()) -> Double? {
-        guard let reset = resetsAt, let d = duration else { return nil }
-        let elapsed = now.timeIntervalSince(reset.addingTimeInterval(-d))
-        guard elapsed > 0 else { return nil }
-        return percent * d / elapsed
+        guard let e = elapsed(now: now), e.elapsed > 0 || priorPace != nil,
+              let pace = projectionPace(now: now) else { return nil }
+        return percent + pace * max(e.reset.timeIntervalSince(now), 0)
+    }
+
+    /// "last month's", "last week's", "yesterday's": the period the prior pace comes from.
+    var priorPeriodName: String {
+        if key.hasPrefix("seven_day") { return "last week's" }
+        switch spend?.period {
+        case "daily": return "yesterday's"
+        case "weekly": return "last week's"
+        default: return "last month's"
+        }
     }
 
     /// Plain-language outlook, e.g. "Runs out Tuesday night, a day before Thursday's reset"
@@ -149,7 +184,12 @@ public struct UsageWindow: Equatable {
             let what = spend == nil ? "Limit reached" : "Budget used up"
             return "\(what) — resets \(resetMoment)"
         }
+        let fromPrior = projectsFromPriorPace(now: now)
         if let hit = projectedLimitAt(now: now) {
+            // Early on it's last period's pace, said so; the exact margin would be false precision.
+            if fromPrior {
+                return "At \(priorPeriodName) pace: runs out \(HumanTime.moment(hit, now: now, calendar: calendar))"
+            }
             let early = HumanTime.span(reset.timeIntervalSince(hit))
             if reset.timeIntervalSince(now) < 12 * 3600 {
                 return "Runs out around \(HumanTime.clock(hit, calendar.timeZone)), \(early) before the reset at \(HumanTime.clock(reset, calendar.timeZone))"
@@ -165,7 +205,11 @@ public struct UsageWindow: Equatable {
         let resetText = reset.timeIntervalSince(now) < 12 * 3600
             ? "the reset at \(HumanTime.clock(reset, calendar.timeZone))"
             : "\(HumanTime.dayName(reset, now: now, calendar: calendar, possessive: true)) reset"
-        if let end = projectedPercentAtReset(now: now), percent > 0 {
+        if let end = projectedPercentAtReset(now: now), percent > 0 || fromPrior {
+            if fromPrior {
+                let amount = spend.map { $0.approx(percent: end) } ?? String(format: "%.0f%%", (end / 5).rounded() * 5)
+                return "At \(priorPeriodName) pace: about \(amount) by \(resetText)"
+            }
             if let spend { return "Lasts until \(resetText) — on track for about \(spend.approx(percent: end))" }
             return String(format: "Lasts until %@ — on track for about %.0f%%", resetText, (end / 5).rounded() * 5)
         }

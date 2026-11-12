@@ -248,3 +248,42 @@ extension UsageSnapshot {
                              serverPace: serverPace, serverIndicator: serverIndicator, severity: severity)
     }
 }
+
+// MARK: Last period's pace (early projections)
+
+extension UsageHistory {
+    /// The previous period's average pace, in percent of the limit per second, for the limits that
+    /// reset on a fixed cycle (the weekly windows and the budget; a 5 h session says little about
+    /// the next one). Taken from the last recorded point before the current period began, which
+    /// must lie in the second half of the previous period. The budget is measured against today's
+    /// limit, so a raised or lowered budget still projects in today's terms.
+    public func priorPace(for w: UsageWindow) -> Double? {
+        guard w.key == "extra_usage" || w.key.hasPrefix("seven_day"),
+              let reset = w.resetsAt, let d = w.duration else { return nil }
+        let start = reset.addingTimeInterval(-d)
+        let prevStart = w.key == "extra_usage" && w.spend?.periodLength == nil
+            ? Spend.utc.date(byAdding: .month, value: -1, to: start)!
+            : start.addingTimeInterval(-d)
+        guard let last = points.last(where: { $0.key == w.key && $0.estimated != true && $0.t < start && $0.t > prevStart })
+        else { return nil }
+        let covered = last.t.timeIntervalSince(prevStart)
+        guard covered >= start.timeIntervalSince(prevStart) * 0.5 else { return nil }
+        let used: Double
+        if w.key == "extra_usage" {
+            guard let minor = last.usedMinor, let limit = w.spend?.limit.minor, limit > 0 else { return nil }
+            used = Double(minor) / Double(limit) * 100
+        } else {
+            used = last.percent
+        }
+        return used / covered
+    }
+}
+
+extension UsageSnapshot {
+    /// Each window with its previous period's pace from the history, for early projections.
+    public func withPriorPace(from history: UsageHistory) -> UsageSnapshot {
+        let ws = windows.map { w -> UsageWindow in var w = w; w.priorPace = history.priorPace(for: w); return w }
+        return UsageSnapshot(source: source, capturedAt: capturedAt, windows: ws,
+                             serverPace: serverPace, serverIndicator: serverIndicator, severity: severity)
+    }
+}
