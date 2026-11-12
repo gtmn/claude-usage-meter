@@ -85,3 +85,5 @@ show("status line, weekly cap", UsageReader.confirmingBudgetReset(plain, from: s
 show("no status line file", UsageReader.confirmingBudgetReset(plain, from: nil, now: nowB))
 let slOnly = slFuture.window("extra_usage")!
 print("  status-line fallback window: \(slOnly.spend.map { "\($0.used.formatted) of \($0.limit.formatted)" } ?? "no $"), \(String(format: "%.0f%%", slOnly.percent)), assumed=\(slOnly.resetIsAssumed)")
+print("--- pace marker tooltip")
+for (u, e) in [(41.0, 24.0), (8.0, 9.0), (20.0, 60.0), (95.0, 93.0), (0.0, 0.4)] { print(HumanTime.paceSummary(used: u, expected: e)) }

@@ -199,6 +199,6 @@ struct PaceBar: View {
             }
         }
         .frame(height: 5)
-        .help(pace.map { "Marker: \(Int($0.rounded()))% of the window has passed" } ?? "")
+        .help(pace.map { HumanTime.paceSummary(used: percent, expected: $0) } ?? "")
     }
 }

@@ -216,6 +216,13 @@ enum HumanTime {
         return (0...6).contains(days) ? "\(name)'s" : "the \(name)"   // "the 15 Nov reset"
     }
 
+    /// Pace marker tooltip: "Over pace: 41% used, 24% expected by now". Within 2 points is on pace.
+    static func paceSummary(used: Double, expected: Double) -> String {
+        let u = Int(used.rounded()), e = Int(expected.rounded())
+        let status = abs(u - e) <= 2 ? "On pace" : u > e ? "Over pace" : "Under pace"
+        return "\(status): \(u)% used, \(e)% expected by now"
+    }
+
     /// "today", "tomorrow", "on Tuesday", "on 1 Dec": the day only, no part of day.
     static func onDay(_ d: Date, now: Date, calendar: Calendar) -> String {
         let name = dayName(d, now: now, calendar: calendar)
