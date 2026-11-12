@@ -9,7 +9,7 @@ in plain words whether you'll run out before the reset. It handles both kinds of
 | Pro / Max | Enterprise / Team |
 |---|---|
 | <img src="docs/screenshots/menubar-pro-max.png" width="140" alt="Menu bar item with 5h and 7d bars at 20% and 60%, on a dark and a light menu bar"> | <img src="docs/screenshots/menubar-enterprise.png" width="130" alt="Menu bar item with a single $ bar at 21%, on a dark and a light menu bar"> |
-| <img src="docs/screenshots/popup-pro-max.png" width="356" alt="Popup: Session 5 h at 20%; Week all models at 60%, runs out Friday morning; below, a line graph of both over the last 7 days"> | <img src="docs/screenshots/popup-enterprise.png" width="356" alt="Popup: Monthly budget at 21%, $412.80 used of $2,000.00, $1,587.20 left, on track for about $1,240 by the 1 Dec reset; below, a line graph of money spent this month with a dashed projection, the first week drawn lighter as estimated"> |
+| <img src="docs/screenshots/popup-pro-max.png" width="356" alt="Popup: Session 5 h at 20%; Week all models at 60%, runs out Sunday afternoon; below, a line graph of both this week with a dashed projection of the week to 100% on Sunday"> | <img src="docs/screenshots/popup-enterprise.png" width="356" alt="Popup: Monthly budget at 21%, $412.80 used of $2,000.00, $1,587.20 left, on track for about $1,240 by the 1 Dec reset; below, a line graph of money spent this month with a dashed projection, the first week drawn lighter as estimated"> |
 | | <img src="docs/screenshots/popup-enterprise-daily.png" width="356" alt="The same popup with the graph switched to Per day: a bar per UTC day, the first week's bars lighter as estimated"> |
 
 *Sample numbers and a made-up history. The menu bar item is shown enlarged, on a dark and a light menu bar.*
@@ -44,7 +44,8 @@ already keeps on your Mac.
   - on an Enterprise/Team seat, money spent across the budget period, with a dashed
     projection to the reset (and the budget line once the curve gets near it). Switch to
     **Per day** for a bar per day, in UTC days like Claude's own usage page.
-  - on Pro/Max, the 5h and 7d percentages over the last 7 days
+  - on Pro/Max, the 5h and 7d percentages this week (from the last weekly reset to the next), with a
+    dashed projection of the weekly limit to 100% or to the reset, matching the outlook line
   - hover over it for the time and value at any point
 
   Claude's usage data only says "now", so the app records its own history from the first

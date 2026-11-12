@@ -42,7 +42,8 @@ enum PreviewRenderer {
             guard let r = result else { fputs("live fetch failed\n", stderr); exit(1) }
             // `seen`: as if the app had watched the budget reset at the start of this month.
             let monthStart = Spend.utc.date(from: Spend.utc.dateComponents([.year, .month], from: Date()))!
-            snap = CommandLine.arguments.contains("seen") ? r.confirmingAssumedReset(seen: monthStart) : r
+            snap = (CommandLine.arguments.contains("seen") ? r.confirmingAssumedReset(seen: monthStart) : r)
+                .withPriorPace(from: UsageHistory.load())   // as the app does, for early projections
         } else {
             snap = enterprise ? .sampleEnterprise : .sample
         }

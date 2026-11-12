@@ -5,7 +5,8 @@ import SwiftUI
 // - Budget-only accounts (Enterprise/Team): money spent across the budget period,
 //   with a dashed projection to the reset, or per UTC day as bars. Stretches the app didn't
 //   record are estimated from Claude Code's logs and drawn lighter.
-// - Pro/Max: the 5 h and 7 d percentages over the last 7 days.
+// - Pro/Max: the 5 h and 7 d percentages over this week (last reset to next), with a dashed
+//   projection of the weekly limit to the reset or to 100%, whichever comes first.
 //
 // Chart rules (dataviz skill): 2 px lines with round caps, hairline solid gridlines,
 // value at the line's end, text in text colours (never the line colour), one series
@@ -20,7 +21,7 @@ struct HistoryChart: View {
             if s.isBudgetOnly, let w = s.window("extra_usage"), w.spend != nil {
                 BudgetHistoryChart(window: w, history: model.history, logWeights: model.logWeights, now: now)
             } else if s.window("seven_day") != nil || s.window("five_hour") != nil {
-                LimitsHistoryChart(history: model.history, now: now)
+                LimitsHistoryChart(history: model.history, week: s.window("seven_day"), now: now)
             }
         }
     }
@@ -446,6 +447,8 @@ private func moneyAxis(top: Double, code: String) -> some AxisContent {
 
 struct LimitsHistoryChart: View {
     let history: UsageHistory
+    /// The weekly limit (with last week's pace when known): sets the chart's span and the projection.
+    var week: UsageWindow? = nil
     let now: Date
     @Environment(\.colorScheme) private var scheme
     @Environment(\.previewHover) private var previewHover
@@ -454,7 +457,11 @@ struct LimitsHistoryChart: View {
     private struct Line { let key, name, short: String; let color: Color }
 
     var body: some View {
-        let start = now.addingTimeInterval(-7 * 86400)
+        // This week, from the last reset to the next one; without a reset time, the last 7 days.
+        let weekReset = week?.resetsAt.flatMap { $0.isAtOrAfter(now) ? $0 : nil }
+        let end = weekReset ?? now
+        let start = end.addingTimeInterval(-7 * 86400)
+        let projection = weekReset.flatMap { r in week.flatMap { Self.projection($0, reset: r, now: now) } }
         let lines = [
             Line(key: "seven_day", name: "Week (7 d)", short: "7d", color: ChartInk.series1(scheme)),
             Line(key: "five_hour", name: "Session (5 h)", short: "5h", color: ChartInk.series2(scheme)),
@@ -467,7 +474,7 @@ struct LimitsHistoryChart: View {
 
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 10) {
-                ChartHeader(title: "Last 7 days")
+                ChartHeader(title: weekReset == nil ? "Last 7 days" : "This week")
                 Spacer()
                 // Legend: a short line key beside each name (identity is never colour alone;
                 // the line ends are labelled too).
@@ -497,10 +504,27 @@ struct LimitsHistoryChart: View {
                                 }
                         }
                     }
+                    if let projection, let week, let weekLine = lines.first {
+                        // Dashed: from the latest number to the reset, or to 100% if that comes first.
+                        LineMark(x: .value("Time", now), y: .value("Used", week.percent), series: .value("Run", "projection"))
+                            .foregroundStyle(weekLine.color.opacity(0.7)).lineStyle(ChartInk.dashed)
+                        LineMark(x: .value("Time", projection.t), y: .value("Used", projection.value),
+                                 series: .value("Run", "projection"))
+                            .foregroundStyle(weekLine.color.opacity(0.7)).lineStyle(ChartInk.dashed)
+                        PointMark(x: .value("Time", projection.t), y: .value("Used", projection.value))
+                            .foregroundStyle(weekLine.color.opacity(0.7)).symbolSize(16)
+                            // Above the point, clear of the line rising into it (at 100% that's above the
+                            // plot, in the extra top padding); right-aligned near the right edge.
+                            .annotation(position: .top,
+                                        alignment: projection.t < start.addingTimeInterval(5.5 * 86400) ? .center : .trailing,
+                                        spacing: 3, overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
+                                Text(projection.label).font(.system(size: 9)).foregroundStyle(ChartInk.label)
+                            }
+                    }
                     if let h = active {
                         // Beside the rule, on the side with more room, so it never covers the hovered points
                         // (above them there's no room: the lines reach the top of the chart).
-                        let leftHalf = h < start.addingTimeInterval(now.timeIntervalSince(start) / 2)
+                        let leftHalf = h < start.addingTimeInterval(end.timeIntervalSince(start) / 2)
                         RuleMark(x: .value("Time", h)).foregroundStyle(ChartInk.muted).lineStyle(StrokeStyle(lineWidth: 1))
                             .annotation(position: leftHalf ? .trailing : .leading, alignment: .top, spacing: 6,
                                         overflowResolution: .init(x: .disabled, y: .fit(to: .chart))) {
@@ -515,9 +539,9 @@ struct LimitsHistoryChart: View {
                         }
                     }
                 }
-                .chartXScale(domain: start...now)
+                .chartXScale(domain: start...end)
                 .chartYScale(domain: 0...100)
-                .chartXAxis { dayAxis(period: "weekly", start: start, end: now) }
+                .chartXAxis { dayAxis(period: "weekly", start: start, end: end) }
                 .chartYAxis {
                     AxisMarks(position: .leading, values: [0, 50, 100]) { v in
                         AxisGridLine(stroke: StrokeStyle(lineWidth: 1)).foregroundStyle(ChartInk.grid)
@@ -527,11 +551,25 @@ struct LimitsHistoryChart: View {
                 }
                 .chartPlotStyle { $0.padding(.trailing, 34) }   // room for the end labels
                 .modifier(HoverLayer(times: times, hovered: $hovered))
-                .padding(.top, 6)
-                .frame(height: 110)
-                .accessibilityLabel("Session and weekly usage over the last 7 days")
+                .padding(.top, projection == nil ? 6 : 14)   // room for the projection label above 100%
+                .frame(height: projection == nil ? 110 : 118)
+                .accessibilityLabel(weekReset == nil ? "Session and weekly usage over the last 7 days"
+                                    : "Session and weekly usage this week" + (projection.map { ", projected \($0.label)" } ?? ""))
             }
         }
+    }
+
+    /// Where the weekly line is headed: 100% at the moment it runs out, or the share at the reset.
+    /// Same numbers as the outlook sentence, so chart and text agree; nothing while it's too early.
+    static func projection(_ w: UsageWindow, reset: Date, now: Date) -> (t: Date, value: Double, label: String)? {
+        guard !w.isTooEarlyToProject(now: now), w.percent > 0 || w.projectsFromPriorPace(now: now),
+              w.percent < 100 else { return nil }
+        if let hit = w.projectedLimitAt(now: now) {
+            let f = DateFormatter(); f.locale = HumanTime.en; f.dateFormat = "EEE HH:mm"
+            return (hit, 100, "100% \(f.string(from: hit))")
+        }
+        guard let p = w.projectedPercentAtReset(now: now) else { return nil }
+        return (reset, min(p, 100), "≈ \(Int(p.rounded()))%")
     }
 
     private func nearest(_ pts: [ChartPoint], to t: Date) -> ChartPoint? {
