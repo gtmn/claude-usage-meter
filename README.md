@@ -119,9 +119,10 @@ brew services start claude-usage-meter   # opens it now and at every login
 Homebrew builds the app from source on your Mac (about a minute), so no download
 is quarantined and no notarization is needed. It also installs the command-line
 reader as `claude-usage` and the status-line script under
-`$(brew --prefix)/share/claude-usage-meter/`. Use `brew services` rather than the
-app's **Open at login** switch: the switch remembers the versioned Homebrew folder,
-which changes with every upgrade.
+`$(brew --prefix)/share/claude-usage-meter/`. Use `brew services` to open it at login:
+a Homebrew copy hides the app's **Open at login** switch, which would remember the
+versioned Homebrew folder that changes with every upgrade. Under `brew services` the
+popup says *Opens at login (brew services)* instead.
 
 ## Build and run from a checkout
 

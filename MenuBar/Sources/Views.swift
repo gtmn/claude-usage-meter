@@ -44,9 +44,13 @@ struct UsagePanel: View {
             Divider()
 
             HStack {
-                Toggle("Open at login", isOn: $openAtLogin)
-                    .toggleStyle(.checkbox)
-                    .onChange(of: openAtLogin) { _, on in setOpenAtLogin(on) }
+                if let note = Install.loginNote {
+                    Text(note).foregroundStyle(.secondary)
+                } else if !Install.byHomebrew {
+                    Toggle("Open at login", isOn: $openAtLogin)
+                        .toggleStyle(.checkbox)
+                        .onChange(of: openAtLogin) { _, on in setOpenAtLogin(on) }
+                }
                 Spacer()
                 Button("Quit") { NSApp.terminate(nil) }
                     .keyboardShortcut("q")
@@ -219,3 +223,12 @@ struct PaceBar: View {
 /// the Command Line Tools (as Homebrew builds) `@State` fails with "plugin for module
 /// 'SwiftUIMacros' not found". The typealias always means the property wrapper.
 typealias ViewState<Value> = SwiftUI.State<Value>
+
+/// How this copy was installed. A Homebrew copy hides "Open at login": that switch would remember
+/// this version's Cellar folder, which goes away on the next upgrade; `brew services` does it instead.
+enum Install {
+    static let byHomebrew = Bundle.main.bundleURL.resolvingSymlinksInPath().path.contains("/Cellar/")
+    /// launchd names the job in XPC_SERVICE_NAME; `brew services` jobs are "sh.brew.<formula>".
+    static let byBrewServices = ProcessInfo.processInfo.environment["XPC_SERVICE_NAME"]?.hasPrefix("sh.brew.") ?? false
+    static var loginNote: String? { byBrewServices ? "Opens at login (brew services)" : nil }
+}
