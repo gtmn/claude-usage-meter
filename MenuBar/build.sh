@@ -9,6 +9,13 @@ rm -rf build
 mkdir -p "$APP/Contents/MacOS"
 cp Info.plist "$APP/Contents/"
 
+# The macOS 27 SDK makes @State a macro whose plugin only Xcode has; Homebrew builds with the
+# Command Line Tools. Use @ViewState (see Views.swift) instead.
+if grep -nE '@State[[:space:]]' Sources/*.swift ../*.swift; then
+    echo "error: use @ViewState instead of @State (builds without Xcode)" >&2
+    exit 1
+fi
+
 swiftc -O -swift-version 5 -parse-as-library \
     -target "$(uname -m)-apple-macos14.0" \
     -o "$APP/Contents/MacOS/UsageMeter" \

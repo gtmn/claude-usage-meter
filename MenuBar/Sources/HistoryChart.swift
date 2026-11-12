@@ -267,7 +267,7 @@ private struct BudgetLine: View {
     let start: Date, reset: Date, now: Date
     @Environment(\.colorScheme) private var scheme
     @Environment(\.previewHover) private var previewHover
-    @State private var hovered: Date?
+    @ViewState private var hovered: Date?
 
     var body: some View {
         let spend = window.spend!
@@ -346,7 +346,7 @@ private struct DailySpendBars: View {
     let start: Date, end: Date, now: Date
     @Environment(\.colorScheme) private var scheme
     @Environment(\.previewHover) private var previewHover
-    @State private var hovered: Date?
+    @ViewState private var hovered: Date?
 
     var body: some View {
         let spend = window.spend!
@@ -449,7 +449,7 @@ struct LimitsHistoryChart: View {
     let now: Date
     @Environment(\.colorScheme) private var scheme
     @Environment(\.previewHover) private var previewHover
-    @State private var hovered: Date?
+    @ViewState private var hovered: Date?
 
     private struct Line { let key, name, short: String; let color: Color }
 

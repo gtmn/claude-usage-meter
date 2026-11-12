@@ -23,7 +23,7 @@ struct UsagePanel: View {
     static let padding: CGFloat = 12
 
     @ObservedObject var model: UsageModel
-    @State private var openAtLogin = SMAppService.mainApp.status == .enabled
+    @ViewState private var openAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
@@ -213,3 +213,9 @@ struct PaceBar: View {
         .help(pace.map { HumanTime.paceSummary(used: percent, expected: $0) } ?? "")
     }
 }
+
+/// SwiftUI's `@State` property wrapper, spelled so the compiler doesn't pick the `@State` macro.
+/// The macOS 27 SDK declares `@State` as a macro whose plugin ships only with Xcode, so with just
+/// the Command Line Tools (as Homebrew builds) `@State` fails with "plugin for module
+/// 'SwiftUIMacros' not found". The typealias always means the property wrapper.
+typealias ViewState<Value> = SwiftUI.State<Value>
