@@ -199,3 +199,52 @@ extension UsageHistory {
         return days.sorted { $0.day < $1.day }
     }
 }
+
+// MARK: Seeing the budget reset
+
+/// What the recorded history says about when the budget last reset. The usage data has no
+/// reset date, so the app assumes 00:00 UTC on the 1st; seeing the amount fall then confirms it.
+public enum SeenReset: Equatable, Sendable {
+    /// No reset recorded, or one with too long a gap around it to tell when it happened.
+    case unknown
+    /// The amount fell between two points close to 00:00 UTC on the 1st (that month start).
+    case monthStart(Date)
+    /// The amount fell with no month start nearby (the point after the fall): the assumption is wrong.
+    case elsewhere(Date)
+}
+
+extension UsageHistory {
+    /// How close to the month start the points on both sides of the fall must be
+    /// (the app fetches every 5 minutes and records every 10, a fall right away).
+    public static let resetTolerance: TimeInterval = 20 * 60
+
+    /// The newest budget reset in the recorded points (estimated ones never count).
+    public func seenBudgetReset(_ key: String = "extra_usage") -> SeenReset {
+        let pts = points.filter { $0.key == key && $0.usedMinor != nil && $0.estimated != true }
+        for (a, b) in zip(pts, pts.dropFirst()).reversed() {
+            let before = a.usedMinor!, after = b.usedMinor!
+            // A reset, not a correction of a few cents: at least half the amount is gone.
+            guard before > 0, after * 2 < before else { continue }
+            let monthStart = Spend.utc.date(from: Spend.utc.dateComponents([.year, .month], from: b.t))!
+            guard a.t < monthStart else { return .elsewhere(b.t) }
+            guard monthStart.timeIntervalSince(a.t) <= Self.resetTolerance,
+                  b.t.timeIntervalSince(monthStart) <= Self.resetTolerance else { return .unknown }
+            return .monthStart(monthStart)
+        }
+        return .unknown
+    }
+}
+
+extension UsageSnapshot {
+    /// Drops "(assumed)" from the monthly budget's reset once the app has seen one happen at
+    /// 00:00 UTC on the 1st (`seen`). A real reset date (status line) already isn't assumed.
+    public func confirmingAssumedReset(seen: Date?) -> UsageSnapshot {
+        guard let seen, let i = windows.firstIndex(where: { $0.key == "extra_usage" && $0.resetIsAssumed }),
+              windows[i].spend?.periodLength == nil else { return self }
+        var ws = windows
+        ws[i] = ws[i].withReset(ws[i].resetsAt, assumed: false)
+        ws[i].resetSeen = seen
+        return UsageSnapshot(source: source, capturedAt: capturedAt, windows: ws,
+                             serverPace: serverPace, serverIndicator: serverIndicator, severity: severity)
+    }
+}

@@ -8,7 +8,7 @@ struct UsageMeterApp: App {
     )
 
     init() {
-        // `UsageMeter --render-preview out.png [live] [offline] [enterprise] [hover] [light] [daily]`: render the panel rows to a PNG and exit.
+        // `UsageMeter --render-preview out.png [live] [offline] [enterprise] [hover] [light] [daily] [seen]`: render the panel rows to a PNG and exit.
         let args = CommandLine.arguments
         if let i = args.firstIndex(of: "--render-preview"), i + 1 < args.count {
             PreviewRenderer.run(output: args[i + 1], live: args.contains("live"), offline: args.contains("offline"),
@@ -40,7 +40,9 @@ enum PreviewRenderer {
             }
             sem.wait()
             guard let r = result else { fputs("live fetch failed\n", stderr); exit(1) }
-            snap = r
+            // `seen`: as if the app had watched the budget reset at the start of this month.
+            let monthStart = Spend.utc.date(from: Spend.utc.dateComponents([.year, .month], from: Date()))!
+            snap = CommandLine.arguments.contains("seen") ? r.confirmingAssumedReset(seen: monthStart) : r
         } else {
             snap = enterprise ? .sampleEnterprise : .sample
         }

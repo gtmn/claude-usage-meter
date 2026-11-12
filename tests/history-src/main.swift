@@ -73,6 +73,36 @@ check("after days with no data, the next day says what it includes",
 let reset = UsageHistory.dailySpend([bp("2026-11-30 22:00", 5000), bp("2026-11-30 23:00", 5200), bp("2026-12-01 01:00", 300)])
 check("after a reset, the new amount counts as spent since it", reset.last?.usedMinor == 300 && reset.first?.usedMinor == 200)
 
+// Seeing the budget reset: a fall close to 00:00 UTC on the 1st confirms the assumed date.
+func seen(_ pts: [HistoryPoint]) -> SeenReset { UsageHistory(points: pts).seenBudgetReset() }
+check("a fall at 00:00 UTC on the 1st confirms the reset",
+      seen([bp("2026-11-30 23:40", 19000), bp("2026-11-30 23:50", 19050), bp("2026-12-01 00:05", 0)]) == .monthStart(at("2026-12-01 00:00")))
+check("the fall may land a little after midnight with some spending",
+      seen([bp("2026-11-30 23:55", 19000), bp("2026-12-01 00:15", 400)]) == .monthStart(at("2026-12-01 00:00")))
+check("no fall: nothing seen", seen([bp("2026-11-30 23:50", 19000), bp("2026-12-01 00:05", 19100)]) == .unknown)
+check("asleep over midnight: too long a gap to tell",
+      seen([bp("2026-11-30 22:00", 19000), bp("2026-12-01 07:00", 0)]) == .unknown)
+check("a fall in mid-month says the assumption is wrong",
+      seen([bp("2026-12-14 09:00", 5000), bp("2026-12-14 09:10", 0)]) == .elsewhere(at("2026-12-14 09:10")))
+check("a small correction isn't a reset", seen([bp("2026-12-14 09:00", 5000), bp("2026-12-14 09:10", 4990)]) == .unknown)
+check("estimated points never count",
+      seen([bp("2026-11-30 23:55", 19000), HistoryPoint(t: at("2026-12-01 00:05"), key: "extra_usage", percent: 0, usedMinor: 0, estimated: true)]) == .unknown)
+check("the newest fall wins",
+      seen([bp("2026-11-14 09:00", 5000), bp("2026-11-14 09:10", 0), bp("2026-11-30 23:55", 9000), bp("2026-12-01 00:05", 10)]) == .monthStart(at("2026-12-01 00:00")))
+
+let budget = Spend(used: Money(minor: 100, exponent: 2, currency: "USD"), limit: Money(minor: 200000, exponent: 2, currency: "USD"))
+let assumed = UsageSnapshot(source: .oauth, capturedAt: at("2026-12-02 10:00"), windows: [
+  UsageWindow(key: "extra_usage", percent: 0.05, resetsAt: at("2027-01-01 00:00"), spend: budget, resetIsAssumed: true)])
+let confirmed = assumed.confirmingAssumedReset(seen: at("2026-12-01 00:00")).window("extra_usage")
+check("a seen reset drops (assumed) and keeps the date",
+      confirmed?.resetIsAssumed == false && confirmed?.resetSeen == at("2026-12-01 00:00") && confirmed?.resetsAt == at("2027-01-01 00:00"))
+check("nothing seen: still assumed", assumed.confirmingAssumedReset(seen: nil).window("extra_usage")?.resetIsAssumed == true)
+var weekly = budget; weekly.period = "weekly"
+let weeklySnap = UsageSnapshot(source: .oauth, capturedAt: at("2026-12-02 10:00"), windows: [
+  UsageWindow(key: "extra_usage", percent: 0.05, resetsAt: at("2026-12-07 00:00"), spend: weekly, resetIsAssumed: true)])
+check("a monthly reset says nothing about a weekly budget",
+      weeklySnap.confirmingAssumedReset(seen: at("2026-12-01 00:00")).window("extra_usage")?.resetIsAssumed == true)
+
 // The log reader: dedupes streamed lines, skips unpriced models and times outside the range.
 let logDir = dir.appendingPathComponent("projects/p")
 try! FileManager.default.createDirectory(at: logDir, withIntermediateDirectories: true)

@@ -114,6 +114,9 @@ final class UsageModel: ObservableObject {
     @Published private(set) var logWeights: [UsageWeight] = []
     private var logsCovered: [ClosedRange<Date>] = []
     private var readingLogs = false
+    /// The last month start at which the app saw the budget reset (kept beyond the 40 days of history).
+    private var seenReset: Date?
+    private static let seenResetKey = "budgetResetSeen"
 
     static let interval: TimeInterval = 5 * 60
     private let reader = UsageReader()
@@ -135,6 +138,7 @@ final class UsageModel: ObservableObject {
         }
         history = UsageHistory.load()
         persistsHistory = true
+        seenReset = UserDefaults.standard.object(forKey: Self.seenResetKey) as? Date
         refresh()
         // Fetch as soon as the network returns (a fetch right after wake often finds none yet).
         pathMonitor.pathUpdateHandler = { [weak self] path in
@@ -180,9 +184,10 @@ final class UsageModel: ObservableObject {
             lastAttempt = Date()
             oauthProblem = oauthWhy
             if let snap {
-                snapshot = snap
-                error = nil
                 recordHistory(snap)
+                updateSeenReset()
+                snapshot = snap.confirmingAssumedReset(seen: seenReset)
+                error = nil
             } else {
                 error = oauthWhy ?? "No usage data"
             }
@@ -199,6 +204,20 @@ final class UsageModel: ObservableObject {
         // One serial queue, so saves land in order and a newer history is never overwritten by an older one.
         Self.saveQueue.async {
             do { try copy.save() } catch { NSLog("UsageMeter: history save failed: \(error.localizedDescription)") }
+        }
+    }
+
+    /// Remembers a reset seen at 00:00 UTC on the 1st; forgets it when one is seen at another time.
+    private func updateSeenReset() {
+        guard persistsHistory else { return }
+        switch history.seenBudgetReset() {
+        case .monthStart(let t) where seenReset.map({ t > $0 }) ?? true:
+            seenReset = t
+            UserDefaults.standard.set(t, forKey: Self.seenResetKey)
+        case .elsewhere(let t) where seenReset.map({ t > $0 }) ?? false:
+            seenReset = nil
+            UserDefaults.standard.removeObject(forKey: Self.seenResetKey)
+        default: break
         }
     }
 

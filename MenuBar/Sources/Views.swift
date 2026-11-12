@@ -161,12 +161,23 @@ struct WindowRow: View {
                 .fixedSize(horizontal: false, vertical: true)
             if let reset = window.resetsAt {
                 Text(caption(reset)).font(.system(size: 10)).foregroundStyle(.secondary)
-                    .help(window.resetIsAssumed
-                          ? "Claude's usage data doesn't say when this budget resets, so 00:00 UTC on the 1st is assumed. "
-                            + "Set up statusline-snapshot.sh (see README) and use Claude Code once to get the real date."
-                          : "")
+                    .help(resetHelp)
             }
         }
+    }
+
+    private var resetHelp: String {
+        if window.resetIsAssumed {
+            return "Claude's usage data doesn't say when this budget resets, so 00:00 UTC on the 1st is assumed "
+                + "until the app sees a reset happen then. Or set up statusline-snapshot.sh (see README) "
+                + "and use Claude Code in Terminal once to get the real date."
+        }
+        if let seen = window.resetSeen {
+            let f = DateFormatter(); f.locale = HumanTime.en; f.timeZone = TimeZone(identifier: "UTC"); f.dateFormat = "d MMM"
+            return "Claude's usage data doesn't say when this budget resets. The app saw it reset at "
+                + "00:00 UTC on \(f.string(from: seen)), so the next reset is expected at the same time."
+        }
+        return ""
     }
 
     private func caption(_ reset: Date) -> String {

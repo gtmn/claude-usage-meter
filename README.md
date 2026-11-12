@@ -35,7 +35,9 @@ already keeps on your Mac.
 - **The budget's reset date** isn't part of the usage data. The app takes the real one from
   the [status-line snapshot](#optional-status-line-snapshot) when you've set that up (Claude Code
   passes it as `rate_limits.spend_limit`, along with the period: monthly, weekly or daily).
-  Without it, the app assumes 00:00 UTC on the 1st of each month and marks the date *(assumed)*.
+  Without it, the app assumes 00:00 UTC on the 1st of each month and marks the date *(assumed)*,
+  until it sees a reset happen: the amount falling between two fetches within 20 minutes of
+  00:00 UTC on the 1st confirms the date. A fall at any other time brings *(assumed)* back.
 - **Pro/Max with extra usage turned on:** the same $ amounts appear as an *Extra usage*
   row below the 5h and 7d limits, and the menu bar is unchanged.
 - **History graph** in the popup, a line over time like a temperature curve:
@@ -96,7 +98,21 @@ The app talks only to `api.anthropic.com`. No analytics, no update checks, no ot
 - Xcode command line tools (`swiftc`)
 - Claude Code, signed in with a Pro or Max subscription
 
-## Build and run
+## Install with Homebrew
+
+```bash
+brew install gtmn/tap/claude-usage-meter
+brew services start claude-usage-meter   # opens it now and at every login
+```
+
+Homebrew builds the app from source on your Mac (about a minute), so no download
+is quarantined and no notarization is needed. It also installs the command-line
+reader as `claude-usage` and the status-line script under
+`$(brew --prefix)/share/claude-usage-meter/`. Use `brew services` rather than the
+app's **Open at login** switch: the switch remembers the versioned Homebrew folder,
+which changes with every upgrade.
+
+## Build and run from a checkout
 
 ```bash
 cd MenuBar
@@ -123,6 +139,8 @@ Already using a status line? Keep it by setting `NEXT_STATUSLINE` to its command
 the script passes the same input on to it.
 
 ## Command-line reader
+
+Installed as `claude-usage` by Homebrew; from a checkout:
 
 ```bash
 swiftc -O -o usage UsageReader.swift main.swift

@@ -78,6 +78,9 @@ public struct UsageWindow: Equatable {
     public var spend: Spend? = nil
     /// True when `resetsAt` is the app's guess (the monthly budget), not the server's.
     public var resetIsAssumed = false
+    /// When the app saw the assumed reset (00:00 UTC on the 1st) actually happen, which is
+    /// what lets it drop "(assumed)" (see `UsageHistory.seenBudgetReset`).
+    public var resetSeen: Date? = nil
 
     /// Window length, inferred from the key ("five_hour" → 5h, "seven_day*" → 7d,
     /// "extra_usage" → the budget period, by default the calendar month that ends at `resetsAt`).
