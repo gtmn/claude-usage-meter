@@ -8,7 +8,7 @@ struct UsageMeterApp: App {
     )
 
     init() {
-        // `UsageMeter --render-preview out.png [live] [offline] [enterprise] [hover] [light] [daily] [seen]`: render the panel rows to a PNG and exit.
+        // `UsageMeter --render-preview out.png [live] [offline] [enterprise] [hover] [light] [daily] [seen]` (`hover=0.85`: pointer at 85% of the times): render the panel rows to a PNG and exit.
         let args = CommandLine.arguments
         if let i = args.firstIndex(of: "--render-preview"), i + 1 < args.count {
             PreviewRenderer.run(output: args[i + 1], live: args.contains("live"), offline: args.contains("offline"),
@@ -58,7 +58,7 @@ enum PreviewRenderer {
             .frame(width: UsagePanel.width)
             .background(Color(nsColor: .windowBackgroundColor))
             .environment(\.colorScheme, light ? .light : .dark)
-            .environment(\.previewHover, CommandLine.arguments.contains("hover") ? 0.4 : nil)
+            .environment(\.previewHover, previewHoverArg)
             .environment(\.previewBudgetMode, CommandLine.arguments.contains("daily") ? "daily" : nil)
         // AppKit colours (window background, label colours) follow the drawing appearance.
         NSApplication.shared.appearance = NSAppearance(named: light ? .aqua : .darkAqua)
@@ -93,4 +93,13 @@ enum PreviewRenderer {
             try? png.write(to: URL(fileURLWithPath: output + ".label.png"))
         }
     }
+}
+
+/// `hover` puts the preview's pointer at 40% of the recorded times; `hover=0.85` at 85%.
+private var previewHoverArg: Double? {
+    for a in CommandLine.arguments {
+        if a == "hover" { return 0.4 }
+        if a.hasPrefix("hover="), let f = Double(a.dropFirst(6)) { return min(max(f, 0), 1) }
+    }
+    return nil
 }

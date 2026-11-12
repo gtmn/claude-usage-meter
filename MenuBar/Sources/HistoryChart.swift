@@ -498,8 +498,12 @@ struct LimitsHistoryChart: View {
                         }
                     }
                     if let h = active {
+                        // Beside the rule, on the side with more room, so it never covers the hovered points
+                        // (above them there's no room: the lines reach the top of the chart).
+                        let leftHalf = h < start.addingTimeInterval(now.timeIntervalSince(start) / 2)
                         RuleMark(x: .value("Time", h)).foregroundStyle(ChartInk.muted).lineStyle(StrokeStyle(lineWidth: 1))
-                            .annotation(position: .top, spacing: 0, overflowResolution: .init(x: .fit(to: .chart), y: .fit(to: .chart))) {
+                            .annotation(position: leftHalf ? .trailing : .leading, alignment: .top, spacing: 6,
+                                        overflowResolution: .init(x: .disabled, y: .fit(to: .chart))) {
                                 Tooltip(lines: [tooltipTime.string(from: h)] + series.compactMap { l, pts in
                                     nearest(pts, to: h).map { "\(l.short) \(Int($0.value.rounded()))%" }
                                 })
