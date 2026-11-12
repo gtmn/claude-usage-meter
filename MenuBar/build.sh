@@ -12,7 +12,7 @@ cp Info.plist "$APP/Contents/"
 swiftc -O -swift-version 5 -parse-as-library \
     -target "$(uname -m)-apple-macos14.0" \
     -o "$APP/Contents/MacOS/UsageMeter" \
-    ../UsageReader.swift ../History.swift ../ClaudeCodeLogs.swift Sources/*.swift
+    ../UsageReader.swift ../History.swift ../ClaudeCodeLogs.swift ../LoginNudge.swift Sources/*.swift
 
 # Date >= / <= can compile to Foundation symbols macOS lacks (see Date.isAtOrAfter in UsageReader.swift).
 if nm -u "$APP/Contents/MacOS/UsageMeter" | grep -qE 'DateV2(ge|le)oiy'; then

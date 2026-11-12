@@ -170,17 +170,24 @@ final class UsageModel: ObservableObject {
         guard !isLoading else { return }
         isLoading = true
         let reader = self.reader
+        let mayNudge = persistsHistory && lastNudge.map { Date().timeIntervalSince($0) > Self.nudgeSpacing } ?? true
         Task {
             // Keychain access can block on a permission prompt, so keep it off the main actor.
-            let (snap, oauthWhy) = await Task.detached { () -> (UsageSnapshot?, String?) in
+            let (snap, oauthWhy, nudged) = await Task.detached { () -> (UsageSnapshot?, String?, Bool) in
                 do {
-                    return (try await reader.fetchOAuth(), nil)
+                    return (try await reader.fetchOAuth(), nil, false)
                 } catch {
+                    var nudged = false
+                    if mayNudge && LoginNudge.isExpiredLogin(error) {
+                        nudged = true
+                        if let s = await Self.nudgeAndRetry(reader) { return (s, nil, true) }
+                    }
                     let why = UsageError.shortMessage(for: error)
-                    return ((try? reader.readSnapshot(maxAge: reader.maxSnapshotAge)), why)
+                    return ((try? reader.readSnapshot(maxAge: reader.maxSnapshotAge)), why, nudged)
                 }
             }.value
 
+            if nudged { lastNudge = Date() }
             lastAttempt = Date()
             oauthProblem = oauthWhy
             if let snap {
@@ -193,6 +200,26 @@ final class UsageModel: ObservableObject {
             }
             isLoading = false
         }
+    }
+
+    /// When the app last asked Claude Code to check its expired login, and how often it may.
+    private var lastNudge: Date?
+    static let nudgeSpacing: TimeInterval = 30 * 60
+
+    /// Claude Code's login has expired: runs `claude auth status` (see LoginNudge.swift) and,
+    /// if that renewed the login, fetches again. Logs what happened (times only, no account data).
+    nonisolated static func nudgeAndRetry(_ reader: UsageReader) async -> UsageSnapshot? {
+        let before = (try? reader.readCredentials())?.expiresAt
+        let started = Date()
+        let outcome = LoginNudge.run()
+        let after = (try? reader.readCredentials())?.expiresAt
+        let renewed = after.map { $0 > Date() && $0 != before } ?? false
+        let f = ISO8601DateFormatter(); f.timeZone = .current
+        NSLog("UsageMeter: login expired (valid until %@); %@ after %.1f s; login renewed: %@",
+              before.map { f.string(from: $0) } ?? "unknown", outcome.description, Date().timeIntervalSince(started),
+              renewed ? "yes, now valid until \(f.string(from: after!))" : "no")
+        guard renewed else { return nil }
+        return try? await reader.fetchOAuth()
     }
 
     private func recordHistory(_ snap: UsageSnapshot) {

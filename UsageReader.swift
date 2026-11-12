@@ -300,9 +300,9 @@ extension UsageError {
         }
         guard let e = error as? UsageError else { return "Couldn't fetch usage" }
         switch e {
-        case .noCredentials:             return "Not signed in: run claude in Terminal"
-        case .tokenExpired:              return "Login expired: run claude in Terminal"
-        case .http(401), .http(403):     return "Login expired: run claude in Terminal"
+        case .noCredentials:             return "Not signed in: sign in to Claude Code"
+        case .tokenExpired:              return "Login expired: open Claude Code"
+        case .http(401), .http(403):     return "Login expired: open Claude Code"
         case .http(429):                 return "Too many requests, will retry"
         case .http(let c) where c >= 500: return "Claude's usage service is down"
         case .http(let c):               return "Usage request failed (HTTP \(c))"

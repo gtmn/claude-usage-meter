@@ -21,3 +21,15 @@ for s in ["Runs out Wednesday afternoon, 3 days before Saturday's reset",
           "Budget used up — resets on 1 Dec"] {
   print(Int((s as NSString).size(withAttributes: [.font: f]).width), s)
 }
+
+print("--- expired login: which errors run claude auth status")
+var nudgeFailures = 0
+for (name, e, want) in [("expired", UsageError.tokenExpired(Date()) as Error, true), ("401", UsageError.http(401), true),
+                        ("403", UsageError.http(403), false), ("offline", URLError(.notConnectedToInternet), false),
+                        ("none", UsageError.noCredentials, false)] {
+  let ok = LoginNudge.isExpiredLogin(e) == want
+  if !ok { nudgeFailures += 1 }
+  print(ok ? "ok  " : "FAIL", name, want ? "→ nudge" : "→ no nudge")
+}
+print("claude command:", LoginNudge.claudePath() ?? "not found")
+exit(nudgeFailures == 0 ? 0 : 1)
