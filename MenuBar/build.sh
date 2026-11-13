@@ -1,6 +1,8 @@
 #!/bin/bash
 # Builds build/UsageMeter.app (ad-hoc signed, this Mac only).
 # Usage: ./build.sh [--install]   (--install copies it to ~/Applications and launches it)
+# USAGE_METER_VERSION=0.1.3 ./build.sh   stamps that version into the app (the Homebrew formula
+# passes its own); without it, the app gets the version in Info.plist.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -8,6 +10,11 @@ APP=build/UsageMeter.app
 rm -rf build
 mkdir -p "$APP/Contents/MacOS"
 cp Info.plist "$APP/Contents/"
+if [ -n "${USAGE_METER_VERSION:-}" ]; then
+    for key in CFBundleShortVersionString CFBundleVersion; do
+        /usr/libexec/PlistBuddy -c "Set :$key $USAGE_METER_VERSION" "$APP/Contents/Info.plist"
+    done
+fi
 
 # The macOS 27 SDK makes @State a macro whose plugin only Xcode has; Homebrew builds with the
 # Command Line Tools. Use @ViewState (see Views.swift) instead.
