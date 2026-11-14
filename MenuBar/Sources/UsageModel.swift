@@ -103,6 +103,9 @@ final class UsageModel: ObservableObject {
     @Published private(set) var snapshot: UsageSnapshot?
     /// Why the OAuth source didn't work (set when we fell back to the status-line file or failed).
     @Published private(set) var oauthProblem: String?
+    /// The numbers on show weren't fetched by the last attempt: saved from an earlier run
+    /// (`LastUsage`) or kept after a failed fetch. The popup says so.
+    @Published private(set) var showingSaved = false
     /// Set when no source produced data on the last attempt.
     @Published private(set) var error: String?
     @Published private(set) var isLoading = false
@@ -125,10 +128,10 @@ final class UsageModel: ObservableObject {
     private let pathMonitor = NWPathMonitor()
     private var networkWasDown = false
 
-    init(preview: UsageSnapshot? = nil, problem: String? = nil, history previewHistory: UsageHistory? = nil,
-         logWeights previewLogs: [UsageWeight]? = nil) {
+    init(preview: UsageSnapshot? = nil, problem: String? = nil, saved: Bool = false,
+         history previewHistory: UsageHistory? = nil, logWeights previewLogs: [UsageWeight]? = nil) {
         if let preview {
-            snapshot = preview; oauthProblem = problem
+            snapshot = preview; oauthProblem = problem; showingSaved = saved
             if let previewHistory {
                 history = previewHistory; logWeights = previewLogs ?? []
             } else {
@@ -139,6 +142,11 @@ final class UsageModel: ObservableObject {
         history = UsageHistory.load()
         persistsHistory = true
         seenReset = UserDefaults.standard.object(forKey: Self.seenResetKey) as? Date
+        // The last good numbers, until the first fetch succeeds; the footer says how old they are.
+        if let saved = LastUsage.load() {
+            snapshot = saved.confirmingAssumedReset(seen: seenReset).withPriorPace(from: history)
+            showingSaved = true
+        }
         refresh()
         // Fetch as soon as the network returns (a fetch right after wake often finds none yet).
         pathMonitor.pathUpdateHandler = { [weak self] path in
@@ -175,7 +183,7 @@ final class UsageModel: ObservableObject {
             // Keychain access can block on a permission prompt, so keep it off the main actor.
             let (snap, oauthWhy, nudged) = await Task.detached { () -> (UsageSnapshot?, String?, Bool) in
                 do {
-                    return (try await reader.fetchOAuth(), nil, false)
+                    return (try await reader.fetchOAuth(saveResponseTo: LastUsage.defaultURL), nil, false)
                 } catch {
                     var nudged = false
                     if mayNudge && LoginNudge.isExpiredLogin(error) {
@@ -194,8 +202,10 @@ final class UsageModel: ObservableObject {
                 recordHistory(snap)
                 updateSeenReset()
                 snapshot = snap.confirmingAssumedReset(seen: seenReset).withPriorPace(from: history)
+                showingSaved = false
                 error = nil
             } else {
+                showingSaved = snapshot != nil
                 error = oauthWhy ?? "No usage data"
             }
             isLoading = false
@@ -288,20 +298,40 @@ final class UsageModel: ObservableObject {
         }
     }
 
-    /// The rows shown in the menu bar item; warns when nearly full or projected to run out.
+    /// The rows shown in the menu bar item, with what the pace colouring needs.
     func menuBarRows(now: Date = Date()) -> [MenuBarImage.Row] {
         guard let s = snapshot else { return [] }
         if s.isBudgetOnly, let w = s.window("extra_usage") {
-            let warn = w.percent >= 90 || (w.spend?.limitReached ?? false) || w.projectedLimitAt(now: now) != nil
-                || (s.severity["extra_usage"].map { $0 != "normal" } ?? false)
-            return [MenuBarImage.Row(label: "$", percent: w.percent, warn: warn)]
+            return [MenuBarImage.Row(w, label: "$", severity: s.severity["extra_usage"], now: now)]
         }
         return [("five_hour", "5h"), ("seven_day", "7d")].compactMap { key, label in
-            s.window(key).map {
-                MenuBarImage.Row(label: label, percent: $0.percent,
-                                 warn: $0.percent >= 90 || $0.projectedLimitAt(now: now) != nil)
-            }
+            s.window(key).map { MenuBarImage.Row($0, label: label, severity: s.severity[key], now: now) }
         }
+    }
+}
+
+extension UsageModel {
+    /// The Compact style's rings, outer first: the budget alone on an Enterprise/Team seat;
+    /// otherwise the week, then the 5 h session. The week is the weekly limit (all models, Opus,
+    /// Sonnet, …) furthest ahead of pace, so a model-specific week that's about to run out isn't
+    /// hidden behind a quiet all-models week.
+    func compactRings(now: Date = Date()) -> [MenuBarImage.Row] {
+        guard let s = snapshot else { return [] }
+        if s.isBudgetOnly { return menuBarRows(now: now) }
+        let session = menuBarRows(now: now).filter { $0.label == "5h" }
+        return (worstWeek(s, now: now).map { [$0] } ?? []) + session
+    }
+
+    private func worstWeek(_ s: UsageSnapshot, now: Date) -> MenuBarImage.Row? {
+        let weeks = s.windows.filter { $0.key.hasPrefix("seven_day") && $0.resetsAt != nil }.map { w in
+            MenuBarImage.Row(w, label: "7d", severity: s.severity[w.key], now: now)
+        }
+        func gap(_ r: MenuBarImage.Row) -> Double { r.expected.map { r.percent - $0 } ?? 0 }
+        let worst = weeks.max { a, b in
+            let (sa, sb) = (MenuBarImage.paceState(a), MenuBarImage.paceState(b))
+            return sa != sb ? sa < sb : gap(a) < gap(b)
+        }
+        return worst
     }
 }
 

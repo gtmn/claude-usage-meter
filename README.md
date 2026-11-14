@@ -8,8 +8,8 @@ in plain words whether you'll run out before the reset. It handles both kinds of
 
 | Pro / Max | Enterprise / Team |
 |---|---|
-| <img src="docs/screenshots/menubar-pro-max.png" width="140" alt="Menu bar item with 5h and 7d bars at 20% and 60%, on a dark and a light menu bar"> | <img src="docs/screenshots/menubar-enterprise.png" width="130" alt="Menu bar item with a single $ bar at 21%, on a dark and a light menu bar"> |
-| <img src="docs/screenshots/popup-pro-max.png" width="356" alt="Popup: Session 5 h at 20%; Week all models at 60%, runs out Sunday afternoon; below, a line graph of both this week with a dashed projection of the week to 100% on Sunday"> | <img src="docs/screenshots/popup-enterprise.png" width="356" alt="Popup: Monthly budget at 21%, $412.80 used of $2,000.00, $1,587.20 left, on track for about $1,240 by the 1 Dec reset; below, a line graph of money spent this month with a dashed projection, the first week drawn lighter as estimated"> |
+| <img src="docs/screenshots/menubar-pro-max.png" width="140" alt="Menu bar item with 5h and 7d bars at 20% (green, under pace) and 60% (yellow, ahead of pace), each with a pace tick, on a dark and a light menu bar"> | <img src="docs/screenshots/menubar-enterprise.png" width="130" alt="Menu bar item with a single green $ bar at 21% and a pace tick, on a dark and a light menu bar"> |
+| <img src="docs/screenshots/popup-pro-max.png" width="356" alt="Popup: Session 5 h at 20%; Week all models at 60% in yellow, runs out Monday evening, 8 h before Tuesday's reset; below, a line graph of both this week with a dashed projection of the week to 100% on Monday"> | <img src="docs/screenshots/popup-enterprise.png" width="356" alt="Popup: Monthly budget at 21%, $412.80 used of $2,000.00, $1,587.20 left, on track for about $950 by the 1 Dec reset; below, a line graph of money spent this month with a dashed projection, the first week drawn lighter as estimated"> |
 | | <img src="docs/screenshots/popup-enterprise-daily.png" width="356" alt="The same popup with the graph switched to Per day: a bar per UTC day, the first week's bars lighter as estimated"> |
 
 *Sample numbers and a made-up history. The menu bar item is shown enlarged, on a dark and a light menu bar.*
@@ -22,9 +22,21 @@ already keeps on your Mac.
 
 ## What it shows
 
-- **Menu bar:** two mini bars, `5h` and `7d`, with percentages, or a single `$` bar on an
-  Enterprise/Team seat. A number turns orange when that limit is nearly full (90%+) or
-  projected to run out before it resets.
+- **Menu bar**, in one of two styles, switched under **Menu bar** in the popup:
+  - **Bars** (default): two mini bars, `5h` and `7d`, with percentages, or a single `$` bar
+    on an Enterprise/Team seat.
+  - **Compact**: rings with their percentages beside them: the week outside and the 5h
+    session inside (the week follows the weekly limit furthest ahead of pace), or one budget
+    ring on an Enterprise/Team seat.
+
+  Both use the same colours, as ClaudeUsageBar's pace icon: green on or under pace, yellow
+  ahead of it, orange 15+ points ahead (about a day early in a week) or nearly full (90%+). Early
+  in a window, where a few percent would look far ahead, it stays plain. Checkboxes in the
+  popup turn on or off the `5h`/`7d` **labels**, the **percent**, a **pace tick** where usage
+  would be if spread evenly over the window, and, once a limit is 15+ points ahead, the points
+  ahead of pace (`+24 pts`: % used minus % expected by now), the time left until it runs out
+  at that pace (`1.5d left`), or how long before the reset that is (`3d early`). Times are rounded: half days from a day on (`1.5d`),
+  whole hours below, and minutes under an hour for the 5h session only.
 - **Popup**, per limit:
   - usage bar with a pace marker (how much of the window has passed)
   - for the $ budget: the amount used, the budget and what's left,
@@ -67,6 +79,11 @@ already keeps on your Mac.
   doesn't accept Claude Code's login.
 - Refreshes every 5 minutes, on wake, when the network returns, and when you open the popup.
   If a fetch fails, the last numbers stay and a short note explains why (e.g. *Offline*).
+  That works across restarts too: the app keeps the last good numbers in
+  `~/Library/Application Support/UsageMeter/last-usage.json` (limits, numbers and reset times
+  only) and shows them at launch until a fetch succeeds, leaving out any limit that has reset since.
+  While it shows saved numbers, the popup says so at the top, e.g. *Saved numbers from 01:57 ·
+  Too many requests, will retry*.
 
 Projections are a straight-line estimate from your average rate so far in the
 window. In the first 15% of a window (45 minutes of the 5-hour window, about a day
@@ -186,7 +203,7 @@ mv docs/screenshots/popup-pro-max.png.label.png docs/screenshots/menubar-pro-max
 mv docs/screenshots/popup-enterprise.png.label.png docs/screenshots/menubar-enterprise.png
 ```
 
-Add `daily` for the per-day bars, `hover` to show the graph's tooltip, `light` for light mode, or `live` to render your
+Add `compact` for the Compact menu bar style, `nolabels`, `nopercent`, `nopace` or `noahead` to leave those out, `left` or `early` for the time left or early, `daily` for the per-day bars, `hover` to show the graph's tooltip (`hover=1.5` halfway along the projection), `light` for light mode, or `live` to render your
 own current numbers and recorded history instead (don't commit those).
 
 ## Layout

@@ -5,11 +5,23 @@ import SwiftUI
 
 struct MenuBarLabel: View {
     @ObservedObject var model: UsageModel
+    @AppStorage(MenuBarImage.Style.key) private var style = MenuBarImage.Style.bars.rawValue
+    @AppStorage(MenuBarImage.Options.Key.labels) private var showLabels = true
+    @AppStorage(MenuBarImage.Options.Key.percent) private var showPercent = true
+    @AppStorage(MenuBarImage.Options.Key.pace) private var showPace = true
+    @AppStorage(MenuBarImage.Options.Key.ahead) private var showAhead = true
+    @AppStorage(MenuBarImage.Options.Key.aheadAs) private var aheadAs = MenuBarImage.AheadAs.points.rawValue
 
     var body: some View {
         let rows = model.menuBarRows()
-        if !rows.isEmpty {
-            Image(nsImage: MenuBarImage.make(rows: rows))
+        let chosen = MenuBarImage.Style(saved: style)
+        let options = MenuBarImage.Options(labels: showLabels, percent: showPercent, pace: showPace,
+                                           ahead: showAhead, aheadAs: MenuBarImage.AheadAs(saved: aheadAs))
+        let rings = model.compactRings()
+        if chosen == .compact, !rings.isEmpty {
+            Image(nsImage: MenuBarImage.makeCompact(rings: rings, options: options))
+        } else if !rows.isEmpty {
+            Image(nsImage: MenuBarImage.make(rows: rows, options: options))
         } else {
             Image(systemName: model.error == nil ? "gauge.with.dots.needle.0percent" : "exclamationmark.circle")
         }
@@ -23,6 +35,12 @@ struct UsagePanel: View {
     static let padding: CGFloat = 12
 
     @ObservedObject var model: UsageModel
+    @AppStorage(MenuBarImage.Style.key) private var menuBarStyle = MenuBarImage.Style.bars.rawValue
+    @AppStorage(MenuBarImage.Options.Key.labels) private var showLabels = true
+    @AppStorage(MenuBarImage.Options.Key.percent) private var showPercent = true
+    @AppStorage(MenuBarImage.Options.Key.pace) private var showPace = true
+    @AppStorage(MenuBarImage.Options.Key.ahead) private var showAhead = true
+    @AppStorage(MenuBarImage.Options.Key.aheadAs) private var aheadAs = MenuBarImage.AheadAs.points.rawValue
     @ViewState private var openAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
@@ -42,6 +60,35 @@ struct UsagePanel: View {
             UsageRows(model: model)
 
             Divider()
+
+            HStack(spacing: 6) {
+                Text("Menu bar").font(.system(size: 11))
+                ModeSwitch(mode: Binding(get: { MenuBarImage.Style(saved: menuBarStyle).rawValue },
+                                         set: { menuBarStyle = $0 }),
+                           options: MenuBarImage.Style.allCases.map { ($0.rawValue, $0.name) })
+                    .help("Bars: the session and weekly bars. Compact: rings, the week outside and the session inside "
+                          + "(one budget ring on Enterprise). Both: green on or under pace, yellow ahead, "
+                          + "orange 15+ points ahead.")
+                Spacer()
+            }
+            HStack(spacing: 10) {
+                Toggle("Labels", isOn: $showLabels).help("“5h” and “7d” (or “$”) beside the bars or numbers")
+                Toggle("Percent", isOn: $showPercent).help("How much of each limit is used")
+                Toggle("Pace tick", isOn: $showPace).help("A tick where usage would be by now if spread evenly over the window")
+                Spacer(minLength: 0)
+            }
+            .toggleStyle(.checkbox).controlSize(.small).font(.system(size: 11))
+            HStack(spacing: 6) {
+                Toggle("When well ahead, show", isOn: $showAhead)
+                    .toggleStyle(.checkbox).controlSize(.small).font(.system(size: 11))
+                    .help("Once a limit is 15+ points ahead of pace (orange): how far ahead")
+                ModeSwitch(mode: Binding(get: { MenuBarImage.AheadAs(saved: aheadAs).rawValue }, set: { aheadAs = $0 }),
+                           options: MenuBarImage.AheadAs.allCases.map { ($0.rawValue, $0.name) })
+                    .help("+N pts: percentage points ahead of pace (% used minus % expected by now). time left: until it runs out at this pace (1.5d left). "
+                          + "early: how long before the reset it runs out (3d early). Half days, whole hours, and minutes only for the 5 h session.")
+                    .disabled(!showAhead).opacity(showAhead ? 1 : 0.5)
+                Spacer(minLength: 0)
+            }
 
             HStack {
                 if let note = Install.loginNote {
@@ -79,6 +126,16 @@ struct UsageRows: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
+            if model.showingSaved, let s = model.snapshot {
+                // Saved numbers (rate-limited, offline, login expired, or still fetching at launch):
+                // say so up front, with how old they are and why.
+                Label("Saved numbers from \(stamp(s.capturedAt)) · \(model.oauthProblem ?? model.error ?? "updating…")",
+                      systemImage: "clock.arrow.circlepath")
+                    .font(.system(size: 11)).foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .help("The latest numbers couldn't be fetched, so these are the last ones the app got. "
+                          + "Limits that have reset since are left out. It keeps retrying every 5 minutes.")
+            }
             if model.snapshot != nil {
                 // Re-render every minute so outlooks ("in 40 min") stay current between fetches.
                 TimelineView(.periodic(from: .now, by: 60)) { ctx in
@@ -103,7 +160,7 @@ struct UsageRows: View {
                 Text("Loading…").foregroundStyle(.secondary)
             }
 
-            if let s = model.snapshot {
+            if let s = model.snapshot, !model.showingSaved {
                 Text(footer(s))
                     .font(.system(size: 10))
                     .foregroundStyle(model.oauthProblem == nil ? Color.secondary : Color.orange)
@@ -112,8 +169,14 @@ struct UsageRows: View {
         }
     }
 
+    /// "01:36" today, "Fri 01:36" before (numbers kept from an earlier run).
+    private func stamp(_ d: Date) -> String {
+        if Calendar.current.isDateInToday(d) { return HumanTime.clock(d) }
+        let f = DateFormatter(); f.locale = HumanTime.en; f.dateFormat = "EEE HH:mm"; return f.string(from: d)
+    }
+
     private func footer(_ s: UsageSnapshot) -> String {
-        let time = HumanTime.clock(s.capturedAt)
+        let time = stamp(s.capturedAt)
         if let problem = model.oauthProblem { return "\(problem) · numbers from \(time)" }
         return "Updated \(time) via Claude Code login"
     }
@@ -133,11 +196,11 @@ struct WindowRow: View {
 
     private var runsOut: Bool { window.projectedLimitAt(now: now) != nil }
 
+    /// The same pace colour as the menu bar: green on or under pace, yellow ahead, orange well
+    /// ahead or nearly full, grey early in the window.
     private var tint: Color {
-        if window.percent >= 90 || (window.spend?.limitReached ?? false)
-            || (severity.map { $0 != "normal" } ?? false) { return .red }
-        if runsOut || window.percent >= 70 { return .orange }
-        return .green
+        let state = MenuBarImage.paceState(MenuBarImage.Row(window, label: "", severity: severity, now: now))
+        return state == .unknown ? Color.secondary : Color(nsColor: MenuBarImage.color(state))
     }
 
     var body: some View {

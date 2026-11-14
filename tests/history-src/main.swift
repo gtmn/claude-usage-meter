@@ -152,5 +152,20 @@ check("list-price cost of an Opus 5.5 request", abs((w.first?.weight ?? 0) - 0.2
 check("unknown versions are priced by family", ClaudeCodeLogs.cost(model: "claude-opus-9", usage: ["output_tokens": 1_000_000]) == 20)
 try? FileManager.default.removeItem(at: dir)
 
+// MARK: Last good response
+let lastURL = FileManager.default.temporaryDirectory.appendingPathComponent("usage-meter-last-\(UUID().uuidString).json")
+let response = #"{"five_hour":{"utilization":35,"resets_at":"2026-11-12T22:00:00Z"},"seven_day":{"utilization":22,"resets_at":"2026-11-19T04:00:00Z"},"account_note":{"name":"someone"},"spend":{"used":{"amount_minor":1},"limit":{"amount_minor":2},"balance":{"amount_minor":777}},"limits":[]}"#
+LastUsage.save(Data(response.utf8), capturedAt: at("2026-11-12 18:00"), to: lastURL)
+let savedText = (try? String(contentsOf: lastURL, encoding: .utf8)) ?? ""
+check("last response keeps only the usage part", savedText.contains("seven_day") && !savedText.contains("someone") && !savedText.contains("777"))
+let soon = LastUsage.load(from: lastURL, now: at("2026-11-12 19:00"))
+check("loads both limits before any reset, with the original time",
+      soon?.windows.map(\.key) == ["five_hour", "seven_day"] && soon?.capturedAt == at("2026-11-12 18:00"))
+let later = LastUsage.load(from: lastURL, now: at("2026-11-13 09:00"))
+check("leaves out the session once it has reset", later?.windows.map(\.key) == ["seven_day"] && later?.windows.first?.percent == 22)
+check("nothing once every limit has reset", LastUsage.load(from: lastURL, now: at("2026-11-20 09:00")) == nil)
+check("nothing without a file", LastUsage.load(from: lastURL.appendingPathExtension("missing")) == nil)
+try? FileManager.default.removeItem(at: lastURL)
+
 print(failures == 0 ? "history: all passed" : "history: \(failures) failed")
 exit(failures == 0 ? 0 : 1)

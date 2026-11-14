@@ -124,25 +124,90 @@ extension EnvironmentValues {
     }
 }
 
-private func activeHover(_ hovered: Date?, preview: Double?, times: [Date]) -> Date? {
+private func activeHover(_ hovered: Date?, preview: Double?, times: [Date],
+                         future: (from: Date, to: Date)? = nil) -> Date? {
     if let hovered { return hovered }
     guard let f = preview, !times.isEmpty else { return nil }
-    return times[Int(Double(times.count - 1) * f)]
+    // Previews: 0…1 across the recorded times, 1…2 along the projection.
+    if 1 < f, let future { return future.from.addingTimeInterval(future.to.timeIntervalSince(future.from) * min(f - 1, 1)) }
+    return times[Int(Double(times.count - 1) * min(f, 1))]
+}
+
+// MARK: Projection (shared by both charts)
+
+/// A dashed line from the latest number to where it's headed: the weekly limit to 100% or its
+/// reset, the budget to its reset. Both charts draw it, label its end and follow it on hover
+/// the same way.
+struct ChartProjection {
+    let now: Date, from: Double          // the latest number
+    let end: Date, to: Double            // where the dashed line ends
+    let endLabel: String                 // "100% Mon 17:39", "≈ $950"
+    let hoverText: (Double) -> String    // "7d ≈ 80% projected", "≈ $735 projected"
+
+    /// The stretch the hover follows the pointer along.
+    var span: (from: Date, to: Date) { (now, end) }
+
+    /// The value on the dashed line at `t`.
+    func value(at t: Date) -> Double {
+        let length = end.timeIntervalSince(now)
+        guard length > 0 else { return to }
+        return from + (to - from) * min(max(t.timeIntervalSince(now) / length, 0), 1)
+    }
+
+    /// The dashed line and the label above its end (right-aligned near the chart's right edge,
+    /// so it stays inside; at the top of the chart it sits in the extra top padding).
+    @ChartContentBuilder
+    func marks(color: Color, domain: (start: Date, end: Date)) -> some ChartContent {
+        let nearRightEdge = domain.start.addingTimeInterval(domain.end.timeIntervalSince(domain.start) * 0.79) < end
+        LineMark(x: .value("Time", now), y: .value("Value", from), series: .value("Run", "projection"))
+            .foregroundStyle(color.opacity(0.7)).lineStyle(ChartInk.dashed)
+        LineMark(x: .value("Time", end), y: .value("Value", to), series: .value("Run", "projection"))
+            .foregroundStyle(color.opacity(0.7)).lineStyle(ChartInk.dashed)
+        PointMark(x: .value("Time", end), y: .value("Value", to))
+            .foregroundStyle(color.opacity(0.7)).symbolSize(16)
+            .annotation(position: .top, alignment: nearRightEdge ? .trailing : .center,
+                        spacing: 3, overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
+                Text(endLabel).font(.system(size: 9)).foregroundStyle(ChartInk.label)
+            }
+    }
+
+    /// Hovering the dashed line: a rule, the point on the line, and the tooltip beside the rule
+    /// on the side with more room.
+    @ChartContentBuilder
+    func hoverMarks(at h: Date, color: Color, domain: (start: Date, end: Date)) -> some ChartContent {
+        let v = value(at: h)
+        let leftHalf = h < domain.start.addingTimeInterval(domain.end.timeIntervalSince(domain.start) / 2)
+        RuleMark(x: .value("Time", h)).foregroundStyle(ChartInk.muted).lineStyle(StrokeStyle(lineWidth: 1))
+            .annotation(position: leftHalf ? .trailing : .leading, alignment: .top, spacing: 6,
+                        overflowResolution: .init(x: .disabled, y: .fit(to: .chart))) {
+                Tooltip(lines: [tooltipTime.string(from: h), hoverText(v)])
+            }
+        PointMark(x: .value("Time", h), y: .value("Value", v))
+            .foregroundStyle(color.opacity(0.7)).symbolSize(36)
+    }
 }
 
 /// The tooltip box drawn above a hovered point.
+/// The menu bar popup is a translucent window: `.background` would be its see-through material,
+/// and `.primary`/`.secondary` text is drawn vibrant, blending with what's behind the window,
+/// so over an opaque box it all but vanishes. Hence fixed AppKit colours, flattened into one layer.
 private struct Tooltip: View {
     let lines: [String]
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
             ForEach(Array(lines.enumerated()), id: \.offset) { i, s in
                 Text(s).font(.system(size: i == 0 ? 10 : 11, weight: i == 0 ? .regular : .semibold))
-                    .foregroundStyle(i == 0 ? Color.secondary : Color.primary)
+                    .foregroundStyle(Color(nsColor: i == 0 ? .secondaryLabelColor : .labelColor))
             }
         }
         .monospacedDigit()
         .padding(.horizontal, 6).padding(.vertical, 4)
-        .background(RoundedRectangle(cornerRadius: 5).fill(.background.shadow(.drop(radius: 2))))
+        .background(
+            RoundedRectangle(cornerRadius: 5)
+                .fill(Color(nsColor: .windowBackgroundColor).shadow(.drop(color: .black.opacity(0.25), radius: 3)))
+                .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(Color(nsColor: .separatorColor), lineWidth: 0.5))
+        )
+        .compositingGroup()
     }
 }
 
@@ -150,9 +215,11 @@ private let tooltipTime: DateFormatter = {
     let f = DateFormatter(); f.locale = HumanTime.en; f.dateFormat = "EEE d MMM, HH:mm"; return f
 }()
 
-/// Hover layer: maps the pointer to the nearest recorded time.
+/// Hover layer: maps the pointer to the nearest recorded time, or, past the last one and over
+/// a projection (`future`: from now to where the dashed line ends), to the time under the pointer.
 private struct HoverLayer: ViewModifier {
     let times: [Date]
+    var future: (from: Date, to: Date)? = nil
     @Binding var hovered: Date?
 
     func body(content: Content) -> some View {
@@ -163,6 +230,10 @@ private struct HoverLayer: ViewModifier {
                         guard case .active(let loc) = phase, let frame = proxy.plotFrame else { hovered = nil; return }
                         let x = loc.x - geo[frame].origin.x
                         guard let t: Date = proxy.value(atX: x), !times.isEmpty else { hovered = nil; return }
+                        if let f = future, f.from < t {
+                            hovered = t < f.to ? t : f.to
+                            return
+                        }
                         hovered = times.min { abs($0.timeIntervalSince(t)) < abs($1.timeIntervalSince(t)) }
                     }
             }
@@ -184,7 +255,8 @@ private let localDayTime: DateFormatter = {
 }()
 
 /// A two-option switch drawn in SwiftUI (renders in previews, unlike the AppKit segmented control).
-private struct ModeSwitch: View {
+/// Small two-or-more-way switch (the chart mode, the menu bar style).
+struct ModeSwitch: View {
     @Binding var mode: String
     let options: [(String, String)]
     var body: some View {
@@ -278,13 +350,18 @@ private struct BudgetLine: View {
         let projectable = !window.isTooEarlyToProject(now: now)
             && (spend.used.minor > 0 || window.projectsFromPriorPace(now: now))
         let projected = projectable ? window.projectedPercentAtReset(now: now).map { spend.limit.amount * $0 / 100 } : nil
+        let projection = projected.map { to in
+            // End label rounded like the outlook line ("on track for about $950").
+            ChartProjection(now: now, from: spend.used.amount, end: reset, to: to,
+                            endLabel: "≈ " + spend.approx(percent: to / spend.limit.amount * 100), hoverText: { "≈ \(currency($0, code)) projected" })
+        }
         let peak = max(spend.used.amount, projected ?? 0)
         // Show the whole budget only when the curve gets near it; otherwise the line would hug the floor.
         let showLimit = spend.limit.amount <= niceCeil(peak * 1.15) * 1.5
         let top = showLimit ? niceCeil(spend.limit.amount * 1.05) : niceCeil(peak * 1.15)
         let tint = ChartInk.series1(scheme)
         let times = line.map(\.t)
-        let active = activeHover(hovered, preview: previewHover, times: times)
+        let active = activeHover(hovered, preview: previewHover, times: times, future: projection?.span)
 
         Chart {
             if showLimit {
@@ -301,14 +378,8 @@ private struct BudgetLine: View {
                     .foregroundStyle(p.estimated ? tint.opacity(0.45) : tint)
                     .lineStyle(ChartInk.line)
             }
-            if let projected {
-                LineMark(x: .value("Time", now), y: .value("Spent", spend.used.amount), series: .value("Run", "projection"))
-                    .foregroundStyle(tint.opacity(0.7)).lineStyle(ChartInk.dashed)
-                LineMark(x: .value("Time", reset), y: .value("Spent", projected), series: .value("Run", "projection"))
-                    .foregroundStyle(tint.opacity(0.7)).lineStyle(ChartInk.dashed)
-                    .annotation(position: .top, alignment: .trailing, spacing: 2) {
-                        Text("≈ \(currency(projected, code))").font(.system(size: 9)).foregroundStyle(ChartInk.label)
-                    }
+            if let projection {
+                projection.marks(color: tint, domain: (start, reset))
             }
             // Value at the line's end.
             PointMark(x: .value("Time", now), y: .value("Spent", spend.used.amount))
@@ -319,7 +390,9 @@ private struct BudgetLine: View {
                             .foregroundStyle(.primary).monospacedDigit()
                     }
                 }
-            if let h = active, let p = line.last(where: { $0.t == h }) {
+            if let h = active, now < h, let projection {
+                projection.hoverMarks(at: h, color: tint, domain: (start, reset))
+            } else if let h = active, let p = line.last(where: { $0.t == h }) {
                 RuleMark(x: .value("Time", p.t)).foregroundStyle(ChartInk.muted).lineStyle(StrokeStyle(lineWidth: 1))
                 PointMark(x: .value("Time", p.t), y: .value("Spent", p.value))
                     .foregroundStyle(tint).symbolSize(40)
@@ -333,7 +406,7 @@ private struct BudgetLine: View {
         .chartYScale(domain: 0...top)
         .chartXAxis { dayAxis(period: spend.period, start: start, end: reset) }
         .chartYAxis { moneyAxis(top: top, code: code) }
-        .modifier(HoverLayer(times: times, hovered: $hovered))
+        .modifier(HoverLayer(times: times, future: projection?.span, hovered: $hovered))
         .padding(.top, 6)
         .frame(height: 110)
         .accessibilityLabel("Money spent over time this budget period")
@@ -462,15 +535,16 @@ struct LimitsHistoryChart: View {
         let end = weekReset ?? now
         let start = end.addingTimeInterval(-7 * 86400)
         let projection = weekReset.flatMap { r in week.flatMap { Self.projection($0, reset: r, now: now) } }
+        let weekColor = ChartInk.series1(scheme)
         let lines = [
-            Line(key: "seven_day", name: "Week (7 d)", short: "7d", color: ChartInk.series1(scheme)),
+            Line(key: "seven_day", name: "Week (7 d)", short: "7d", color: weekColor),
             Line(key: "five_hour", name: "Session (5 h)", short: "5h", color: ChartInk.series2(scheme)),
         ]
         let series = lines.map { l in
             (l, ChartPoint.runs(history.series(l.key, from: start, to: now).map { ($0.t, $0.percent) }))
         }.filter { $0.1.count >= 1 }
         let times = Array(Set(series.flatMap { $0.1.map(\.t) })).sorted()
-        let active = activeHover(hovered, preview: previewHover, times: times)
+        let active = activeHover(hovered, preview: previewHover, times: times, future: projection?.span)
 
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 10) {
@@ -504,24 +578,13 @@ struct LimitsHistoryChart: View {
                                 }
                         }
                     }
-                    if let projection, let week, let weekLine = lines.first {
-                        // Dashed: from the latest number to the reset, or to 100% if that comes first.
-                        LineMark(x: .value("Time", now), y: .value("Used", week.percent), series: .value("Run", "projection"))
-                            .foregroundStyle(weekLine.color.opacity(0.7)).lineStyle(ChartInk.dashed)
-                        LineMark(x: .value("Time", projection.t), y: .value("Used", projection.value),
-                                 series: .value("Run", "projection"))
-                            .foregroundStyle(weekLine.color.opacity(0.7)).lineStyle(ChartInk.dashed)
-                        PointMark(x: .value("Time", projection.t), y: .value("Used", projection.value))
-                            .foregroundStyle(weekLine.color.opacity(0.7)).symbolSize(16)
-                            // Above the point, clear of the line rising into it (at 100% that's above the
-                            // plot, in the extra top padding); right-aligned near the right edge.
-                            .annotation(position: .top,
-                                        alignment: projection.t < start.addingTimeInterval(5.5 * 86400) ? .center : .trailing,
-                                        spacing: 3, overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
-                                Text(projection.label).font(.system(size: 9)).foregroundStyle(ChartInk.label)
-                            }
+                    if let projection {
+                        projection.marks(color: weekColor, domain: (start, end))
                     }
-                    if let h = active {
+                    if let h = active, now < h, let projection {
+                        // Along the dashed line: the projected weekly number (no session projection).
+                        projection.hoverMarks(at: h, color: weekColor, domain: (start, end))
+                    } else if let h = active {
                         // Beside the rule, on the side with more room, so it never covers the hovered points
                         // (above them there's no room: the lines reach the top of the chart).
                         let leftHalf = h < start.addingTimeInterval(end.timeIntervalSince(start) / 2)
@@ -550,26 +613,29 @@ struct LimitsHistoryChart: View {
                     }
                 }
                 .chartPlotStyle { $0.padding(.trailing, 34) }   // room for the end labels
-                .modifier(HoverLayer(times: times, hovered: $hovered))
+                .modifier(HoverLayer(times: times, future: projection?.span, hovered: $hovered))
                 .padding(.top, projection == nil ? 6 : 14)   // room for the projection label above 100%
                 .frame(height: projection == nil ? 110 : 118)
                 .accessibilityLabel(weekReset == nil ? "Session and weekly usage over the last 7 days"
-                                    : "Session and weekly usage this week" + (projection.map { ", projected \($0.label)" } ?? ""))
+                                    : "Session and weekly usage this week" + (projection.map { ", projected \($0.endLabel)" } ?? ""))
             }
         }
     }
 
     /// Where the weekly line is headed: 100% at the moment it runs out, or the share at the reset.
     /// Same numbers as the outlook sentence, so chart and text agree; nothing while it's too early.
-    static func projection(_ w: UsageWindow, reset: Date, now: Date) -> (t: Date, value: Double, label: String)? {
+    static func projection(_ w: UsageWindow, reset: Date, now: Date) -> ChartProjection? {
         guard !w.isTooEarlyToProject(now: now), w.percent > 0 || w.projectsFromPriorPace(now: now),
               w.percent < 100 else { return nil }
+        let hover: (Double) -> String = { "7d ≈ \(Int($0.rounded()))% projected" }
         if let hit = w.projectedLimitAt(now: now) {
             let f = DateFormatter(); f.locale = HumanTime.en; f.dateFormat = "EEE HH:mm"
-            return (hit, 100, "100% \(f.string(from: hit))")
+            return ChartProjection(now: now, from: w.percent, end: hit, to: 100,
+                                   endLabel: "100% \(f.string(from: hit))", hoverText: hover)
         }
         guard let p = w.projectedPercentAtReset(now: now) else { return nil }
-        return (reset, min(p, 100), "≈ \(Int(p.rounded()))%")
+        return ChartProjection(now: now, from: w.percent, end: reset, to: min(p, 100),
+                               endLabel: String(format: "≈ %.0f%%", (p / 5).rounded() * 5), hoverText: hover)   // as the outlook rounds
     }
 
     private func nearest(_ pts: [ChartPoint], to t: Date) -> ChartPoint? {

@@ -263,11 +263,13 @@ enum HumanTime {
         return (0...6).contains(days) ? "\(name)'s" : "the \(name)"   // "the 15 Nov reset"
     }
 
-    /// Pace marker tooltip: "Over pace: 41% used, 24% expected by now". Within 2 points is on pace.
+    /// Pace marker tooltip: "Ahead of pace: 41% used, 24% expected by now", with the same
+    /// ahead / well ahead rule as the menu bar (`PaceLead`).
     static func paceSummary(used: Double, expected: Double) -> String {
-        let u = Int(used.rounded()), e = Int(expected.rounded())
-        let status = abs(u - e) <= 2 ? "On pace" : u > e ? "Over pace" : "Under pace"
-        return "\(status): \(u)% used, \(e)% expected by now"
+        let lead = PaceLead.points(used: used, expected: expected)
+        let status = PaceLead.wellAhead <= lead ? "Well ahead of pace"
+            : 0 < lead ? "Ahead of pace" : lead == 0 ? "On pace" : "Under pace"
+        return "\(status): \(Int(used.rounded()))% used, \(Int(expected.rounded()))% expected by now"
     }
 
     /// "today", "tomorrow", "on Tuesday", "on 1 Dec": the day only, no part of day.
@@ -458,8 +460,11 @@ public final class UsageReader {
         return data
     }
 
-    public func fetchOAuth() async throws -> UsageSnapshot {
-        let snap = try Self.parseOAuth(try await fetchOAuthRaw())
+    /// `saveResponseTo`: also keep the response's usage part there (see `LastUsage`).
+    public func fetchOAuth(saveResponseTo url: URL? = nil) async throws -> UsageSnapshot {
+        let data = try await fetchOAuthRaw()
+        let snap = try Self.parseOAuth(data)
+        if let url { LastUsage.save(data, capturedAt: snap.capturedAt, to: url) }
         // The status-line file may be old for usage numbers, but a reset still in the future is valid.
         return Self.confirmingBudgetReset(snap, from: try? readSnapshot())
     }
@@ -614,6 +619,67 @@ public final class UsageReader {
         f.formatOptions = [.withInternetDateTime]
         return f.date(from: s)
     }
+}
+
+/// The last good usage response, so the app can show numbers right away at launch, before its
+/// first fetch succeeds (offline, rate-limited, login expired). Only the fields the app reads
+/// are kept: the limits with their numbers and reset times, and the budget's used and limit.
+/// Stored next to the history in ~/Library/Application Support/UsageMeter/last-usage.json.
+public enum LastUsage {
+    public static var defaultURL: URL {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        return base.appendingPathComponent("UsageMeter/last-usage.json")
+    }
+
+    /// Exactly the fields `parseOAuth` reads, so nothing else from the response (balances,
+    /// billing settings) ends up on disk.
+    private static let windowFields: Set<String> = ["utilization", "resets_at", "spend_limit_reached",
+                                                    "used_credits", "monthly_limit", "currency", "decimal_places"]
+    private static let spendFields: Set<String> = ["used", "limit", "severity"]
+    private static let limitFields: Set<String> = ["kind", "is_active", "group", "resets_at", "severity"]
+
+    static func save(_ data: Data, capturedAt: Date, to url: URL) {
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
+        func keep(_ o: Any?, _ fields: Set<String>) -> [String: Any]? {
+            (o as? [String: Any])?.filter { fields.contains($0.key) }
+        }
+        var usage: [String: Any] = [:]
+        for (key, value) in root where (value as? [String: Any])?["utilization"] is NSNumber {
+            usage[key] = keep(value, windowFields)
+        }
+        usage["spend"] = keep(root["spend"], spendFields)
+        usage["limits"] = (root["limits"] as? [Any])?.compactMap { keep($0, limitFields) }
+        for key in ["pace", "indicator"] { usage[key] = root[key] }
+        let file: [String: Any] = ["captured_at": capturedAt.timeIntervalSince1970, "response": usage]
+        guard let out = try? JSONSerialization.data(withJSONObject: file, options: [.sortedKeys]) else { return }
+        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? out.write(to: url, options: .atomic)
+    }
+
+    /// The saved numbers, without the limits that have reset since (their numbers would be
+    /// wrong now). nil when nothing is saved or nothing is left.
+    public static func load(from url: URL = defaultURL, now: Date = Date()) -> UsageSnapshot? {
+        guard let data = try? Data(contentsOf: url),
+              let file = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let t = (file["captured_at"] as? NSNumber)?.doubleValue,
+              let response = file["response"],
+              let raw = try? JSONSerialization.data(withJSONObject: response),
+              let snap = try? UsageReader.parseOAuth(raw, now: Date(timeIntervalSince1970: t)) else { return nil }
+        let current = snap.windows.filter { w in w.resetsAt.map { now < $0 } ?? true }
+        guard !current.isEmpty else { return nil }
+        return UsageSnapshot(source: snap.source, capturedAt: snap.capturedAt, windows: current,
+                             serverPace: snap.serverPace, serverIndicator: snap.serverIndicator,
+                             severity: snap.severity)
+    }
+}
+
+/// How far usage is ahead of the pace marker, in whole percentage points, as ClaudeUsageBar's
+/// pace icon counts it: ahead from 1 point, well ahead from 15. A week burns 100 / 7 ≈ 14.3
+/// points a day, so 15 points ahead is about a day early: at that rate the limit runs out
+/// roughly a day before the reset.
+public enum PaceLead {
+    public static let wellAhead = 15
+    public static func points(used: Double, expected: Double) -> Int { Int((used - expected).rounded()) }
 }
 
 extension Date {

@@ -8,7 +8,7 @@ struct UsageMeterApp: App {
     )
 
     init() {
-        // `UsageMeter --render-preview out.png [live] [offline] [enterprise] [hover] [light] [daily] [seen]` (`hover=0.85`: pointer at 85% of the times): render the panel rows to a PNG and exit.
+        // `UsageMeter --render-preview out.png [live] [offline] [enterprise] [hover] [light] [daily] [seen] [saved] [compact] [nolabels] [nopercent] [nopace] [noahead] [left|early]` (`hover=0.85`: pointer at 85% of the times): render the panel rows to a PNG and exit.
         let args = CommandLine.arguments
         if let i = args.firstIndex(of: "--render-preview"), i + 1 < args.count {
             PreviewRenderer.run(output: args[i + 1], live: args.contains("live"), offline: args.contains("offline"),
@@ -39,6 +39,10 @@ enum PreviewRenderer {
                 sem.signal()
             }
             sem.wait()
+            // Rate-limited or offline: the numbers the app saved last (see LastUsage).
+            if result == nil, let saved = LastUsage.load() {
+                fputs("live fetch failed, using the saved numbers\n", stderr); result = saved
+            }
             guard let r = result else { fputs("live fetch failed\n", stderr); exit(1) }
             // `seen`: as if the app had watched the budget reset at the start of this month.
             let monthStart = Spend.utc.date(from: Spend.utc.dateComponents([.year, .month], from: Date()))!
@@ -51,7 +55,10 @@ enum PreviewRenderer {
         let light = CommandLine.arguments.contains("light")
         var logs: [UsageWeight]?
         if live, let period = UsageModel.budgetPeriod(snap) { logs = ClaudeCodeLogs.weights(from: period.start, to: Date()) }
-        let model = UsageModel(preview: snap, problem: offline ? "Offline" : nil,
+        // `saved`: as if rate-limited, showing numbers saved earlier.
+        let saved = CommandLine.arguments.contains("saved")
+        let model = UsageModel(preview: snap, problem: saved ? "Too many requests, will retry" : offline ? "Offline" : nil,
+                               saved: saved,
                                history: live ? UsageHistory.load() : nil, logWeights: logs)
         writeLabelPreview(model: model, output: output)
         let view = UsageRows(model: model)
@@ -76,7 +83,13 @@ enum PreviewRenderer {
 
     /// The menu bar item, enlarged 6x, on a light and a dark menu bar (two stacked strips).
     private static func writeLabelPreview(model: UsageModel, output: String) {
-        let label = MenuBarImage.make(rows: model.menuBarRows())
+        let args = CommandLine.arguments
+        let options = MenuBarImage.Options(labels: !args.contains("nolabels"), percent: !args.contains("nopercent"),
+                                           pace: !args.contains("nopace"), ahead: !args.contains("noahead"),
+                                           aheadAs: args.contains("left") ? .left : args.contains("early") ? .early : .points)
+        let label = args.contains("compact")
+            ? MenuBarImage.makeCompact(rings: model.compactRings(), options: options)
+            : MenuBarImage.make(rows: model.menuBarRows(), options: options)
         let strip = NSSize(width: label.size.width * 6 + 24, height: label.size.height * 6 + 24)
         let canvas = NSImage(size: NSSize(width: strip.width, height: strip.height * 2))
         canvas.lockFocus()
@@ -96,11 +109,12 @@ enum PreviewRenderer {
     }
 }
 
-/// `hover` puts the preview's pointer at 40% of the recorded times; `hover=0.85` at 85%.
+/// `hover` puts the preview's pointer at 40% of the recorded times; `hover=0.85` at 85%;
+/// `hover=1.5` halfway along the dashed projection.
 private var previewHoverArg: Double? {
     for a in CommandLine.arguments {
         if a == "hover" { return 0.4 }
-        if a.hasPrefix("hover="), let f = Double(a.dropFirst(6)) { return min(max(f, 0), 1) }
+        if a.hasPrefix("hover="), let f = Double(a.dropFirst(6)) { return min(max(f, 0), 2) }
     }
     return nil
 }
