@@ -84,7 +84,7 @@ struct UsagePanel: View {
                     .help("Once a limit is 15+ points ahead of pace (orange): how far ahead")
                 ModeSwitch(mode: Binding(get: { MenuBarImage.AheadAs(saved: aheadAs).rawValue }, set: { aheadAs = $0 }),
                            options: MenuBarImage.AheadAs.allCases.map { ($0.rawValue, $0.name) })
-                    .help("+N pts: percentage points ahead of pace (% used minus % expected by now). time left: until it runs out at this pace (1.5d left). "
+                    .help("+N: percentage points ahead of pace (% used minus % expected by now, e.g. 52% − 27% = +25). time left: until it runs out at this pace (1.5d left). "
                           + "early: how long before the reset it runs out (3d early). Half days, whole hours, and minutes only for the 5 h session.")
                     .disabled(!showAhead).opacity(showAhead ? 1 : 0.5)
                 Spacer(minLength: 0)

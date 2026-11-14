@@ -12,7 +12,7 @@ import AppKit
 /// coloured 9 pt text is hard to read in the menu bar.
 ///
 /// Options (checkboxes in the popup): the "5h"/"7d" labels, the %, the pace tick (where usage
-/// would be if spread evenly over the window), and, once well ahead, the points ahead ("+24 pts"),
+/// would be if spread evenly over the window), and, once well ahead, the points ahead ("+24"),
 /// the time left until it runs out at that pace ("1.5d left"), or how long before the reset
 /// that is ("3d early"). Text sits in aligned columns (see Columns).
 ///
@@ -81,13 +81,13 @@ enum MenuBarImage {
         }
     }
 
-    /// How "well ahead" is shown: points ahead of pace ("+24 pts"), the time until it runs out at
+    /// How "well ahead" is shown: points ahead of pace ("+24"), the time until it runs out at
     /// this pace ("1.5d left"), or how long before the reset that is ("3d early").
     enum AheadAs: String, CaseIterable {
         case points, left, early
         var name: String {
             switch self {
-            case .points: return "+N pts"
+            case .points: return "+N"
             case .left: return "time left"
             case .early: return "early"
             }
@@ -138,13 +138,13 @@ enum MenuBarImage {
     }
 
     /// The text beside a bar or ring, as cells: the label, the %, and how far ahead once well
-    /// ahead ("+24 pts", "1.5d left", or "3d early"). Empty when not shown.
+    /// ahead ("+24", "1.5d left", or "3d early"). Empty when not shown.
     private static func cells(_ row: Row, _ o: Options, label: Bool) -> [String] {
         var ahead = ""
         if o.ahead, let lead = row.lead, PaceLead.wellAhead <= lead {
             let minutes = (row.duration ?? 0) <= 5 * 3600     // minutes only for the 5 h session
             switch o.aheadAs {
-            case .points: ahead = "+\(lead) pts"    // percentage points, not a relative %
+            case .points: ahead = "+\(lead)"    // percentage points ahead; no unit, to keep it short
             case .left: ahead = row.runsOutIn.map { span($0, minutes: minutes) + " left" } ?? ""
             case .early: ahead = row.runsOutEarly.map { span($0, minutes: minutes) + " early" } ?? ""
             }
@@ -166,7 +166,7 @@ enum MenuBarImage {
     }
 
     /// Text beside the bars or rings in aligned columns: labels left-aligned, numbers
-    /// right-aligned, so "22%" sits under "50%" even when only one row also has "+24 pts".
+    /// right-aligned, so "22%" sits under "50%" even when only one row also has "+24".
     /// Columns empty in every row take no space.
     private struct Columns {
         let rows: [[NSString]]

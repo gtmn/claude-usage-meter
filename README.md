@@ -34,7 +34,7 @@ already keeps on your Mac.
   in a window, where a few percent would look far ahead, it stays plain. Checkboxes in the
   popup turn on or off the `5h`/`7d` **labels**, the **percent**, a **pace tick** where usage
   would be if spread evenly over the window, and, once a limit is 15+ points ahead, the points
-  ahead of pace (`+24 pts`: % used minus % expected by now), the time left until it runs out
+  ahead of pace (`+24`: % used minus % expected by now), the time left until it runs out
   at that pace (`1.5d left`), or how long before the reset that is (`3d early`). Times are rounded: half days from a day on (`1.5d`),
   whole hours below, and minutes under an hour for the 5h session only.
 - **Popup**, per limit:
