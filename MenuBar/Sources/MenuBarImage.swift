@@ -168,24 +168,39 @@ enum MenuBarImage {
     /// Text beside the bars or rings in aligned columns: labels left-aligned, numbers
     /// right-aligned, so "22%" sits under "50%" even when only one row also has "+24".
     /// Columns empty in every row take no space.
+    ///
+    /// The % column uses fixed-width digits, so it doesn't wiggle as numbers change; the last
+    /// column ("+24", "1.5d left") uses ordinary ones, where a fixed-width "1" would sit far from
+    /// the "." and, with its foot, look bigger than the digits around it.
     private struct Columns {
         let rows: [[NSString]]
         let widths: [CGFloat]
         let leftAligned: [Bool]
+        let fonts: [NSFont]
         static let gap: CGFloat = 3
 
-        init(_ cells: [[String]], leftAligned: [Bool], attrs: [NSAttributedString.Key: Any]) {
+        init(_ cells: [[String]], leftAligned: [Bool], fonts: [NSFont]) {
             let used = (0..<(cells.first?.count ?? 0)).filter { c in cells.contains { !$0[c].isEmpty } }
             rows = cells.map { r in used.map { r[$0] as NSString } }
-            widths = used.map { c in ceil(cells.map { ($0[c] as NSString).size(withAttributes: attrs).width }.max() ?? 0) }
+            widths = used.map { c in
+                ceil(cells.map { ($0[c] as NSString).size(withAttributes: [.font: fonts[c]]).width }.max() ?? 0)
+            }
             self.leftAligned = used.map { leftAligned[$0] }
+            self.fonts = used.map { fonts[$0] }
+        }
+
+        /// Fonts for the label, % and ahead columns at `size`.
+        static func fonts(size: CGFloat) -> [NSFont] {
+            let fixed = NSFont.monospacedDigitSystemFont(ofSize: size, weight: .semibold)
+            return [fixed, fixed, NSFont.systemFont(ofSize: size, weight: .semibold)]
         }
 
         var width: CGFloat { widths.isEmpty ? 0 : widths.reduce(0, +) + Self.gap * CGFloat(widths.count - 1) }
 
-        func draw(row i: Int, x: CGFloat, y: CGFloat, attrs: [NSAttributedString.Key: Any]) {
+        func draw(row i: Int, x: CGFloat, y: CGFloat, color: NSColor) {
             var left = x
             for (c, text) in rows[i].enumerated() {
+                let attrs: [NSAttributedString.Key: Any] = [.font: fonts[c], .foregroundColor: color]
                 let w = text.size(withAttributes: attrs).width
                 text.draw(at: NSPoint(x: leftAligned[c] ? left : left + widths[c] - w, y: y), withAttributes: attrs)
                 left += widths[c] + Self.gap
@@ -209,7 +224,8 @@ enum MenuBarImage {
         let measure: [NSAttributedString.Key: Any] = [.font: font]
         let labelWidth = o.labels ? ceil(rows.map { ($0.label as NSString).size(withAttributes: measure).width }.max() ?? 0) : 0
         let barX = o.labels ? labelWidth + 3 : 0
-        let columns = Columns(rows.map { cells($0, o, label: false) }, leftAligned: [true, false, false], attrs: measure)
+        let columns = Columns(rows.map { cells($0, o, label: false) }, leftAligned: [true, false, false],
+                              fonts: Columns.fonts(size: font.pointSize))
         let textX = barX + barWidth + 3
         let size = NSSize(width: columns.width > 0 ? textX + columns.width : barX + barWidth, height: height)
         let firstRowBottom = (height + rowHeight * CGFloat(rows.count)) / 2 - rowHeight
@@ -240,7 +256,7 @@ enum MenuBarImage {
                     NSRect(x: tickX, y: y + 1, width: 1, height: rowHeight - 2).fill()
                 }
 
-                columns.draw(row: i, x: textX, y: textY, attrs: attrs)
+                columns.draw(row: i, x: textX, y: textY, color: .labelColor)
             }
             return true
         }
@@ -255,7 +271,7 @@ enum MenuBarImage {
         let font = NSFont.monospacedDigitSystemFont(ofSize: stacked ? 9 : 11, weight: .semibold)
         let textRows = stacked ? Array(rings.reversed()) : rings
         let columns = Columns(textRows.map { cells($0, o, label: o.labels) }, leftAligned: [true, false, false],
-                              attrs: [.font: font])
+                              fonts: Columns.fonts(size: font.pointSize))
         let diameter: CGFloat = stacked ? 16 : 13, line: CGFloat = stacked ? 2.2 : 2.5
         let ringGap: CGFloat = 1
         let textGap: CGFloat = columns.width > 0 ? 3 : 0
@@ -301,7 +317,7 @@ enum MenuBarImage {
             let textHeight = ("0" as NSString).size(withAttributes: attrs).height
             for i in textRows.indices {
                 let y = firstBottom - CGFloat(i) * rowHeight + (rowHeight - textHeight) / 2
-                columns.draw(row: i, x: diameter + textGap, y: y, attrs: attrs)
+                columns.draw(row: i, x: diameter + textGap, y: y, color: .labelColor)
             }
             return true
         }
