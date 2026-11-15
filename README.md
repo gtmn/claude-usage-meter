@@ -102,11 +102,12 @@ The 5-hour session, and any limit without a recorded previous period, says
    `GET https://api.anthropic.com/api/oauth/usage` (the call behind Claude Code's `/status`).
    - The token is read on every fetch, never stored, logged or sent anywhere else.
    - It is **never refreshed** by this app, because that would rotate Claude Code's refresh token
-     and could sign Claude Code out. Any Claude Code renews it (Terminal, IDE or the desktop app's
-     Code tab), and it lasts about 8 hours. When it has expired, the app runs `claude auth status`
-     once (at most every 30 minutes) if the Claude Code command is installed: it makes no model
-     request and costs nothing, and it may make Claude Code renew its own login. Its output is
-     discarded; the app logs only whether the login was renewed.
+     and could sign Claude Code out. Claude Code in Terminal or an IDE renews it (the desktop app's
+     Code tab doesn't seem to), and it lasts about 8 hours. When it has expired, the app runs `claude mcp list`
+     once (at most every 30 minutes, in an empty folder) if the Claude Code command is installed.
+     Checking the MCP connections makes Claude Code renew its own login; it sends no request to a
+     model and costs nothing. (`claude auth status` only reports the expiry.) The command's output
+     is discarded; the app logs only whether the login was renewed, in `~/Library/Logs/UsageMeter.log`.
    - It reads the item the same way Claude Code does, through Apple's `security` tool, which the
      item already trusts. So there's no Keychain password dialog, not after a rebuild and not after
      Claude Code refreshes its token. (Asking the Keychain directly would prompt each time, because
@@ -213,7 +214,7 @@ own current numbers and recorded history instead (don't commit those).
 | `UsageReader.swift` | Reads both sources, projections, plain-language wording |
 | `History.swift` | Records and stores usage over time for the graph; fills gaps, daily totals |
 | `ClaudeCodeLogs.swift` | Reads request times and token counts from Claude Code's logs, for the estimates |
-| `LoginNudge.swift` | Runs `claude auth status` when Claude Code's login has expired |
+| `LoginNudge.swift` | Runs `claude mcp list` when Claude Code's login has expired, so Claude Code renews it |
 | `MenuBar/` | The SwiftUI menu bar app |
 | `main.swift` | Command-line reader |
 | `statusline-snapshot.sh` | Claude Code status-line command for the fallback |

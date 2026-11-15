@@ -26,7 +26,7 @@ for s in ["Runs out Wednesday afternoon, 3 days before Saturday's reset",
   print(Int((s as NSString).size(withAttributes: [.font: f]).width), s)
 }
 
-print("--- expired login: which errors run claude auth status")
+print("--- expired login: which errors run claude mcp list")
 var nudgeFailures = 0
 for (name, e, want) in [("expired", UsageError.tokenExpired(Date()) as Error, true), ("401", UsageError.http(401), true),
                         ("403", UsageError.http(403), false), ("offline", URLError(.notConnectedToInternet), false),
@@ -36,4 +36,16 @@ for (name, e, want) in [("expired", UsageError.tokenExpired(Date()) as Error, tr
   print(ok ? "ok  " : "FAIL", name, want ? "→ nudge" : "→ no nudge")
 }
 print("claude command:", LoginNudge.claudePath() ?? "not found")
+func expect(_ name: String, _ ok: Bool) { if !ok { nudgeFailures += 1 }; print(ok ? "ok  " : "FAIL", name) }
+expect("the log line names the command", LoginNudge.Outcome.exited(0).description == "claude mcp list exited with 0")
+let logURL = FileManager.default.temporaryDirectory.appendingPathComponent("usagemeter-log-test/UsageMeter.log")
+try? FileManager.default.removeItem(at: logURL)
+AppLog.write("first", to: logURL); AppLog.write("second", to: logURL)
+let logText = (try? String(contentsOf: logURL, encoding: .utf8)) ?? ""
+expect("log lines are appended with a time", logText.split(separator: "\n").count == 2 && logText.hasSuffix(" second\n"))
+for i in 0..<4000 { AppLog.write("line \(i) " + String(repeating: "x", count: 60), to: logURL) }
+let size = (try? FileManager.default.attributesOfItem(atPath: logURL.path)[.size] as? Int) ?? 0
+let trimmed = (try? String(contentsOf: logURL, encoding: .utf8)) ?? ""
+expect("a big log drops its oldest half (\(size) bytes)", size <= AppLog.maxBytes + 200 && !trimmed.contains(" first\n") && trimmed.hasSuffix(" line 3999 " + String(repeating: "x", count: 60) + "\n"))
+try? FileManager.default.removeItem(at: logURL.deletingLastPathComponent())
 exit(nudgeFailures == 0 ? 0 : 1)

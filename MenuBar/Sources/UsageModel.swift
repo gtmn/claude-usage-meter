@@ -216,8 +216,9 @@ final class UsageModel: ObservableObject {
     private var lastNudge: Date?
     static let nudgeSpacing: TimeInterval = 30 * 60
 
-    /// Claude Code's login has expired: runs `claude auth status` (see LoginNudge.swift) and,
-    /// if that renewed the login, fetches again. Logs what happened (times only, no account data).
+    /// Claude Code's login has expired: runs `claude mcp list` (see LoginNudge.swift) and, if that
+    /// renewed the login, fetches again. Logs what happened to ~/Library/Logs/UsageMeter.log
+    /// (times only, no account data).
     nonisolated static func nudgeAndRetry(_ reader: UsageReader) async -> UsageSnapshot? {
         let before = (try? reader.readCredentials())?.expiresAt
         let started = Date()
@@ -225,9 +226,12 @@ final class UsageModel: ObservableObject {
         let after = (try? reader.readCredentials())?.expiresAt
         let renewed = after.map { $0 > Date() && $0 != before } ?? false
         let f = ISO8601DateFormatter(); f.timeZone = .current
-        NSLog("UsageMeter: login expired (valid until %@); %@ after %.1f s; login renewed: %@",
-              before.map { f.string(from: $0) } ?? "unknown", outcome.description, Date().timeIntervalSince(started),
-              renewed ? "yes, now valid until \(f.string(from: after!))" : "no")
+        let line = String(format: "login expired (valid until %@); %@ after %.1f s; login renewed: %@",
+                          before.map { f.string(from: $0) } ?? "unknown", outcome.description,
+                          Date().timeIntervalSince(started),
+                          renewed ? "yes, now valid until \(f.string(from: after!))" : "no")
+        AppLog.write(line)
+        NSLog("UsageMeter: %@", line)
         guard renewed else { return nil }
         return try? await reader.fetchOAuth()
     }

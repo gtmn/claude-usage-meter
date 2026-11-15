@@ -1,13 +1,18 @@
 // LoginNudge.swift
-// Claude Code's login lasts about 8 hours and only Claude Code renews it. When it has expired
-// because no Claude Code ran for a while, the app asks the Claude Code command-line tool to check
-// its own login (`claude auth status`: no model request, nothing billed), which may make it renew
-// the login. The meter itself still never renews, writes or logs the login. The tool's output
-// (account details) is discarded.
+// Claude Code's login lasts about 8 hours and only Claude Code renews it (the desktop app's Code
+// tab doesn't seem to renew this saved login). When it has expired, the app runs
+// `claude mcp list`: it checks the MCP connections with the login, which makes Claude Code renew
+// the login itself. No model request, nothing billed. (`claude auth status` only reports the
+// expiry.) The meter itself still never renews, writes or logs the login. The tool's output
+// (server names and addresses) is discarded.
 
 import Foundation
 
 public enum LoginNudge {
+    /// The command. It briefly starts the configured MCP servers to check them, so it runs in an
+    /// empty folder: no project's .mcp.json servers get involved.
+    static let arguments = ["mcp", "list"]
+
     /// Where the Claude Code installers put the command (Homebrew, npm, the native installer).
     public static var candidates: [String] {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
@@ -26,22 +31,26 @@ public enum LoginNudge {
         case exited(Int32)
 
         public var description: String {
+            let command = "claude " + LoginNudge.arguments.joined(separator: " ")
             switch self {
             case .noCLI: return "no claude command found"
             case .couldNotRun: return "claude couldn't be started"
-            case .timedOut: return "claude auth status timed out"
-            case .exited(let code): return "claude auth status exited with \(code)"
+            case .timedOut: return "\(command) timed out"
+            case .exited(let code): return "\(command) exited with \(code)"
             }
         }
     }
 
-    /// Runs `claude auth status` and waits for it (at most `timeout`). Blocks: call off the main thread.
-    public static func run(timeout: TimeInterval = 30) -> Outcome {
+    /// Runs the command and waits for it (at most `timeout`). Blocks: call off the main thread.
+    public static func run(timeout: TimeInterval = 60) -> Outcome {
         guard let path = claudePath() else { return .noCLI }
         let p = Process()
         p.executableURL = URL(fileURLWithPath: path)
-        p.arguments = ["auth", "status"]
-        // Apps get a minimal PATH; give the tool the usual one (it may look for git, node, …).
+        p.arguments = arguments
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("UsageMeter-login-check")
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        p.currentDirectoryURL = folder
+        // Apps get a minimal PATH; give the tool the usual one (MCP servers may need node, npx, …).
         var env = ProcessInfo.processInfo.environment
         env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
         // Without USER the tool can't find its Keychain item and reports "not logged in".
@@ -63,6 +72,32 @@ public enum LoginNudge {
         switch error as? UsageError {
         case .tokenExpired, .http(401): return true
         default: return false
+        }
+    }
+}
+
+/// A small log of the app's own, in ~/Library/Logs/UsageMeter.log (Console.app shows it too):
+/// times and outcomes only, never the login or usage data. The app's NSLog lines didn't show up
+/// in `log show`, so there was no telling whether the login check ran.
+public enum AppLog {
+    public static var url: URL {
+        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/UsageMeter.log")
+    }
+    /// Above this the oldest half is dropped.
+    static let maxBytes = 200_000
+
+    public static func write(_ message: String, to url: URL = url, now: Date = Date()) {
+        let f = ISO8601DateFormatter(); f.timeZone = .current
+        let line = Data("\(f.string(from: now)) \(message)\n".utf8)
+        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        if var data = try? Data(contentsOf: url) {
+            if data.count > maxBytes, let cut = data[(data.count / 2)...].firstIndex(of: 0x0A) {
+                data = data[(cut + 1)...]
+            }
+            data.append(line)
+            try? data.write(to: url, options: .atomic)
+        } else {
+            try? line.write(to: url, options: .atomic)
         }
     }
 }
