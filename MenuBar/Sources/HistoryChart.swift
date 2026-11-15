@@ -72,7 +72,9 @@ struct ChartPoint: Identifiable {
         for (i, p) in raw.enumerated() {
             if i > 0 {
                 let prev = raw[i - 1]
-                if p.0.timeIntervalSince(prev.0) > gap { run += 1 }
+                // Unrecorded, but unchanged: nothing happened in between (the amounts only rise
+                // within a period), so the line carries on as recorded.
+                if p.0.timeIntervalSince(prev.0) > gap && p.1 != prev.1 { run += 1 }
                 else if p.2 != prev.2 { run += 1; out.append(ChartPoint(t: prev.0, value: prev.1, run: run, estimated: p.2)) }
             }
             out.append(ChartPoint(t: p.0, value: p.1, run: run, estimated: p.2))
@@ -82,8 +84,9 @@ struct ChartPoint: Identifiable {
 }
 
 /// A stretch with nothing recorded between two points (the Mac was off or asleep, or the app
-/// couldn't fetch): drawn as a faint line so the curve doesn't just stop. Both ends are real values;
-/// what happened in between isn't known.
+/// couldn't fetch) across which the value changed: drawn as a faint line so the curve doesn't just
+/// stop. Both ends are real values; when in between it changed isn't known. (Unchanged across a
+/// gap is known: nothing happened, and `ChartPoint.runs` keeps that part of the line solid.)
 struct ChartGap: Identifiable {
     let id: Int
     let from: (t: Date, value: Double), to: (t: Date, value: Double)
@@ -92,7 +95,7 @@ struct ChartGap: Identifiable {
     static func gaps(_ raw: [(Date, Double)], gap: TimeInterval = 3600) -> [ChartGap] {
         zip(raw, raw.dropFirst()).enumerated().compactMap { i, pair in
             let (a, b) = pair
-            return b.0.timeIntervalSince(a.0) > gap ? ChartGap(id: i, from: (a.0, a.1), to: (b.0, b.1)) : nil
+            return b.0.timeIntervalSince(a.0) > gap && a.1 != b.1 ? ChartGap(id: i, from: (a.0, a.1), to: (b.0, b.1)) : nil
         }
     }
 }
@@ -344,13 +347,23 @@ struct BudgetHistoryChart: View {
 
     /// Says where the curve isn't recorded: estimated from the logs, or not known at all.
     static func footnote(_ pts: [HistoryPoint], start: Date) -> String? {
+        var notes: [String] = []
         if pts.contains(where: { $0.estimated == true }) {
-            return "Lighter: estimated from Claude Code's logs on this Mac, scaled to the real totals."
+            notes.append("Lighter: estimated from Claude Code's logs on this Mac, scaled to the real totals.")
+        } else if let first = pts.first, first.t.timeIntervalSince(start) > UsageHistory.fillableGap {
+            notes.append("Recorded since \(localDayTime.string(from: first.t)); no Claude Code logs cover the time before.")
         }
-        if let first = pts.first, first.t.timeIntervalSince(start) > UsageHistory.fillableGap {
-            return "Recorded since \(localDayTime.string(from: first.t)); no Claude Code logs cover the time before."
+        if hasFaintGap(pts, start: start) {
+            notes.append("Faint: not recorded, and no Claude Code activity to place the spending.")
         }
-        return nil
+        return notes.isEmpty ? nil : notes.joined(separator: " ")
+    }
+
+    /// The same gaps `BudgetLine` draws faint: unrecorded for over an hour while the amount rose.
+    static func hasFaintGap(_ pts: [HistoryPoint], start: Date) -> Bool {
+        let values = pts.map { ($0.t, Double($0.usedMinor ?? 0)) }
+        let startsLate = pts.first.map { $0.t.timeIntervalSince(start) > UsageHistory.fillableGap } ?? false
+        return !ChartGap.gaps((startsLate ? [(start, 0)] : []) + values).isEmpty
     }
 }
 
