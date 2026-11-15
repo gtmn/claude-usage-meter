@@ -71,13 +71,23 @@ enum MenuBarImage {
         init(saved: String) { self = Style(rawValue: saved) ?? .bars }
     }
 
+    /// Colour: the bars and rings show the pace (green, yellow, orange). Mono: they're drawn in
+    /// the menu bar's text colour, like the numbers, so the item looks like the system's own.
+    enum Palette: String, CaseIterable {
+        case colour, mono
+        var name: String { self == .colour ? "Colour" : "Mono" }
+        init(saved: String) { self = Palette(rawValue: saved) ?? .colour }
+    }
+
     /// What to show besides the bars or rings. Each is a checkbox in the popup.
     struct Options {
         var labels = true, percent = true, pace = true, ahead = true
         var aheadAs = AheadAs.points
+        var palette = Palette.colour
         enum Key {
             static let labels = "menuBarShowLabels", percent = "menuBarShowPercent"
             static let pace = "menuBarShowPace", ahead = "menuBarShowAhead", aheadAs = "menuBarAheadAs"
+            static let palette = "menuBarPalette"
         }
     }
 
@@ -105,6 +115,11 @@ enum MenuBarImage {
         if row.critical { return .far }
         guard let lead = row.lead else { return .unknown }
         return PaceLead.wellAhead <= lead ? .far : 0 < lead ? .ahead : .under
+    }
+
+    /// The bar's or ring's fill: its pace colour, or the text colour in Mono.
+    static func fillColor(_ row: Row, _ o: Options) -> NSColor {
+        o.palette == .mono ? .labelColor : color(paceState(row))
     }
 
     static func color(_ state: PaceState) -> NSColor {
@@ -245,7 +260,7 @@ enum MenuBarImage {
                 if row.percent > 0 {
                     var fill = track
                     fill.size.width = max(barHeight, barWidth * min(row.percent, 100) / 100)
-                    color(paceState(row)).setFill()
+                    fillColor(row, o).setFill()
                     NSBezierPath(roundedRect: fill, xRadius: barHeight / 2, yRadius: barHeight / 2).fill()
                 }
                 if o.pace, let expected = row.expected {
@@ -290,7 +305,7 @@ enum MenuBarImage {
                     let sweep = max(min(row.percent, 100) / 100 * 360, 12)
                     let arc = NSBezierPath(); arc.lineWidth = line; arc.lineCapStyle = .round
                     arc.appendArc(withCenter: center, radius: radius, startAngle: 90, endAngle: 90 - sweep, clockwise: true)
-                    color(paceState(row)).setStroke()
+                    fillColor(row, o).setStroke()
                     arc.stroke()
                 }
                 if o.pace, let expected = row.expected {

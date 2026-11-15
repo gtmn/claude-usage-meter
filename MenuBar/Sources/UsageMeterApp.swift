@@ -86,7 +86,8 @@ enum PreviewRenderer {
         let args = CommandLine.arguments
         let options = MenuBarImage.Options(labels: !args.contains("nolabels"), percent: !args.contains("nopercent"),
                                            pace: !args.contains("nopace"), ahead: !args.contains("noahead"),
-                                           aheadAs: args.contains("left") ? .left : args.contains("early") ? .early : .points)
+                                           aheadAs: args.contains("left") ? .left : args.contains("early") ? .early : .points,
+                                           palette: args.contains("mono") ? .mono : .colour)
         let label = args.contains("compact")
             ? MenuBarImage.makeCompact(rings: model.compactRings(), options: options)
             : MenuBarImage.make(rows: model.menuBarRows(), options: options)

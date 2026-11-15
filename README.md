@@ -31,7 +31,8 @@ already keeps on your Mac.
 
   Both use the same colours, as ClaudeUsageBar's pace icon: green on or under pace, yellow
   ahead of it, orange 15+ points ahead (about a day early in a week) or nearly full (90%+). Early
-  in a window, where a few percent would look far ahead, it stays plain. Checkboxes in the
+  in a window, where a few percent would look far ahead, it stays plain. Switch **Colour** to
+  **Mono** for bars or rings in the menu bar's text colour, like the numbers. Checkboxes in the
   popup turn on or off the `5h`/`7d` **labels**, the **percent**, a **pace tick** where usage
   would be if spread evenly over the window, and, once a limit is 15+ points ahead, the points
   ahead of pace (`+24`: % used minus % expected by now), the time left until it runs out
@@ -214,7 +215,7 @@ mv docs/screenshots/popup-pro-max.png.label.png docs/screenshots/menubar-pro-max
 mv docs/screenshots/popup-enterprise.png.label.png docs/screenshots/menubar-enterprise.png
 ```
 
-Add `compact` for the Compact menu bar style, `nolabels`, `nopercent`, `nopace` or `noahead` to leave those out, `left` or `early` for the time left or early, `daily` for the per-day bars, `hover` to show the graph's tooltip (`hover=1.5` halfway along the projection), `light` for light mode, or `live` to render your
+Add `compact` for the Compact menu bar style, `mono` for the Mono palette, `nolabels`, `nopercent`, `nopace` or `noahead` to leave those out, `left` or `early` for the time left or early, `daily` for the per-day bars, `hover` to show the graph's tooltip (`hover=1.5` halfway along the projection), `light` for light mode, or `live` to render your
 own current numbers and recorded history instead (don't commit those).
 
 ## Layout

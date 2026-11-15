@@ -11,12 +11,14 @@ struct MenuBarLabel: View {
     @AppStorage(MenuBarImage.Options.Key.pace) private var showPace = true
     @AppStorage(MenuBarImage.Options.Key.ahead) private var showAhead = true
     @AppStorage(MenuBarImage.Options.Key.aheadAs) private var aheadAs = MenuBarImage.AheadAs.points.rawValue
+    @AppStorage(MenuBarImage.Options.Key.palette) private var palette = MenuBarImage.Palette.colour.rawValue
 
     var body: some View {
         let rows = model.menuBarRows()
         let chosen = MenuBarImage.Style(saved: style)
         let options = MenuBarImage.Options(labels: showLabels, percent: showPercent, pace: showPace,
-                                           ahead: showAhead, aheadAs: MenuBarImage.AheadAs(saved: aheadAs))
+                                           ahead: showAhead, aheadAs: MenuBarImage.AheadAs(saved: aheadAs),
+                                           palette: MenuBarImage.Palette(saved: palette))
         let rings = model.compactRings()
         if chosen == .compact, !rings.isEmpty {
             Image(nsImage: MenuBarImage.makeCompact(rings: rings, options: options))
@@ -41,6 +43,7 @@ struct UsagePanel: View {
     @AppStorage(MenuBarImage.Options.Key.pace) private var showPace = true
     @AppStorage(MenuBarImage.Options.Key.ahead) private var showAhead = true
     @AppStorage(MenuBarImage.Options.Key.aheadAs) private var aheadAs = MenuBarImage.AheadAs.points.rawValue
+    @AppStorage(MenuBarImage.Options.Key.palette) private var palette = MenuBarImage.Palette.colour.rawValue
     @ViewState private var openAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
@@ -67,8 +70,11 @@ struct UsagePanel: View {
                                          set: { menuBarStyle = $0 }),
                            options: MenuBarImage.Style.allCases.map { ($0.rawValue, $0.name) })
                     .help("Bars: the session and weekly bars. Compact: rings, the week outside and the session inside "
-                          + "(one budget ring on Enterprise). Both: green on or under pace, yellow ahead, "
-                          + "orange 15+ points ahead.")
+                          + "(one budget ring on Enterprise).")
+                ModeSwitch(mode: Binding(get: { MenuBarImage.Palette(saved: palette).rawValue }, set: { palette = $0 }),
+                           options: MenuBarImage.Palette.allCases.map { ($0.rawValue, $0.name) })
+                    .help("Colour: green on or under pace, yellow ahead, orange 15+ points ahead. "
+                          + "Mono: in the menu bar's text colour, like the numbers.")
                 Spacer()
             }
             HStack(spacing: 10) {
