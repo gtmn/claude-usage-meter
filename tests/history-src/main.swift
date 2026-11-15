@@ -136,6 +136,18 @@ week.priorPace = wk.priorPace(for: week)
 check("the weekly limit uses last week's final percentage",
       week.outlook(now: at("2026-11-11 09:00"), calendar: cal).hasPrefix("At last week's pace:"))
 
+// Saved numbers: the outlook projects from when they were fetched, not from now.
+let novBudget = UsageWindow(key: "extra_usage", percent: 14.519, resetsAt: at("2026-12-01 00:00"),
+                            spend: Spend(used: Money(minor: 29038, exponent: 2, currency: "USD"), limit: Money(minor: 200000, exponent: 2, currency: "USD")))
+let fetched = at("2026-11-13 23:11"), monday = at("2026-11-16 09:00")
+check("saved numbers project at the pace up to their fetch time",
+      novBudget.outlook(now: monday, asOf: fetched, calendar: cal) == "Lasts until the 1 Dec reset — on track for about $670")
+check("…while treating them as current projects lower (no spending since)",
+      (novBudget.projectedPercentAtReset(now: monday) ?? 0) < (novBudget.projectedPercentAtReset(now: fetched) ?? 0))
+let fast = UsageWindow(key: "seven_day", percent: 80, resetsAt: at("2026-11-17 05:00"))
+check("saved numbers whose pace ran out since: may be used up by now",
+      fast.outlook(now: at("2026-11-16 20:00"), asOf: at("2026-11-14 05:00"), calendar: cal).hasPrefix("At that pace it may be used up by now"))
+
 // The log reader: dedupes streamed lines, skips unpriced models and times outside the range.
 let logDir = dir.appendingPathComponent("projects/p")
 try! FileManager.default.createDirectory(at: logDir, withIntermediateDirectories: true)

@@ -173,8 +173,11 @@ public struct UsageWindow: Equatable {
 
     /// Plain-language outlook, e.g. "Runs out Tuesday night, a day before Thursday's reset"
     /// or "Lasts until the reset at 03:20 — on track for about 45%".
-    public func outlook(now: Date = Date(), calendar: Calendar = .current) -> String {
+    /// `asOf`: when the numbers were fetched, if earlier than `now` (saved numbers). Projections
+    /// run from then, at the pace up to then; the wording ("tonight", "Thursday's reset") is from now.
+    public func outlook(now: Date = Date(), asOf: Date? = nil, calendar: Calendar = .current) -> String {
         guard let reset = resetsAt else { return String(format: "%.0f%% used", percent) }
+        let at = min(asOf ?? now, now)
         // A monthly reset falls around midnight, which `moment` would call "the night before"
         // ("resets on 30 Nov" for 00:00 on 1 Dec), so it's named by its date instead.
         let resetMoment = spend == nil
@@ -184,8 +187,12 @@ public struct UsageWindow: Equatable {
             let what = spend == nil ? "Limit reached" : "Budget used up"
             return "\(what) — resets \(resetMoment)"
         }
-        let fromPrior = projectsFromPriorPace(now: now)
-        if let hit = projectedLimitAt(now: now) {
+        let fromPrior = projectsFromPriorPace(now: at)
+        if let hit = projectedLimitAt(now: at) {
+            // Saved numbers whose pace ran out between then and now.
+            if hit.isAtOrBefore(now) {
+                return "At that pace it may be used up by now — resets \(resetMoment)"
+            }
             // Early on it's last period's pace, said so; the exact margin would be false precision.
             if fromPrior {
                 return "At \(priorPeriodName) pace: runs out \(HumanTime.moment(hit, now: now, calendar: calendar))"
@@ -196,7 +203,7 @@ public struct UsageWindow: Equatable {
             }
             return "Runs out \(HumanTime.moment(hit, now: now, calendar: calendar)), \(early) before \(HumanTime.dayName(reset, now: now, calendar: calendar, possessive: true)) reset"
         }
-        if percent > 0, isTooEarlyToProject(now: now) {
+        if percent > 0, isTooEarlyToProject(now: at) {
             let when = reset.timeIntervalSince(now) < 12 * 3600
                 ? "at \(HumanTime.clock(reset, calendar.timeZone))"
                 : resetMoment
@@ -205,7 +212,7 @@ public struct UsageWindow: Equatable {
         let resetText = reset.timeIntervalSince(now) < 12 * 3600
             ? "the reset at \(HumanTime.clock(reset, calendar.timeZone))"
             : "\(HumanTime.dayName(reset, now: now, calendar: calendar, possessive: true)) reset"
-        if let end = projectedPercentAtReset(now: now), percent > 0 || fromPrior {
+        if let end = projectedPercentAtReset(now: at), percent > 0 || fromPrior {
             if fromPrior {
                 let amount = spend.map { $0.approx(percent: end) } ?? String(format: "%.0f%%", (end / 5).rounded() * 5)
                 return "At \(priorPeriodName) pace: about \(amount) by \(resetText)"

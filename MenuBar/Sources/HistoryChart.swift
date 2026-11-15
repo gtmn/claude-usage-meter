@@ -18,10 +18,12 @@ struct HistoryChart: View {
 
     var body: some View {
         if let s = model.snapshot {
+            // Saved numbers end the curve (and start the projection) when they were fetched, not now.
+            let asOf = model.showingSaved ? min(s.capturedAt, now) : now
             if s.isBudgetOnly, let w = s.window("extra_usage"), w.spend != nil {
-                BudgetHistoryChart(window: w, history: model.history, logWeights: model.logWeights, now: now)
+                BudgetHistoryChart(window: w, history: model.history, logWeights: model.logWeights, now: asOf)
             } else if s.window("seven_day") != nil || s.window("five_hour") != nil {
-                LimitsHistoryChart(history: model.history, week: s.window("seven_day"), now: now)
+                LimitsHistoryChart(history: model.history, week: s.window("seven_day"), now: asOf)
             }
         }
     }
@@ -78,6 +80,25 @@ struct ChartPoint: Identifiable {
         return out
     }
 }
+
+/// A stretch with nothing recorded between two points (the Mac was off or asleep, or the app
+/// couldn't fetch): drawn as a faint line so the curve doesn't just stop. Both ends are real values;
+/// what happened in between isn't known.
+struct ChartGap: Identifiable {
+    let id: Int
+    let from: (t: Date, value: Double), to: (t: Date, value: Double)
+
+    /// Gaps longer than `gap`, the same threshold that splits `ChartPoint.runs`.
+    static func gaps(_ raw: [(Date, Double)], gap: TimeInterval = 3600) -> [ChartGap] {
+        zip(raw, raw.dropFirst()).enumerated().compactMap { i, pair in
+            let (a, b) = pair
+            return b.0.timeIntervalSince(a.0) > gap ? ChartGap(id: i, from: (a.0, a.1), to: (b.0, b.1)) : nil
+        }
+    }
+}
+
+/// Faint enough to read as "not recorded", next to the solid line.
+private let gapOpacity = 0.25
 
 private func currency(_ amount: Double, _ code: String, decimals: Int = 0) -> String {
     let f = NumberFormatter()
@@ -347,6 +368,9 @@ private struct BudgetLine: View {
         let code = spend.limit.currency
         let scale = pow(10, Double(spend.limit.exponent))
         let line = ChartPoint.runs(points.map { ($0.t, Double($0.usedMinor ?? 0) / scale, $0.estimated == true) })
+        // Before the first recorded point the period started at zero, so that stretch is a gap too.
+        let startsLate = points.first.map { $0.t.timeIntervalSince(start) > UsageHistory.fillableGap } ?? false
+        let gaps = ChartGap.gaps((startsLate ? [(start, 0)] : []) + points.map { ($0.t, Double($0.usedMinor ?? 0) / scale) })
         let projectable = !window.isTooEarlyToProject(now: now)
             && (spend.used.minor > 0 || window.projectsFromPriorPace(now: now))
         let projected = projectable ? window.projectedPercentAtReset(now: now).map { spend.limit.amount * $0 / 100 } : nil
@@ -372,6 +396,12 @@ private struct BudgetLine: View {
                         Text("Budget \(currency(spend.limit.amount, code))")
                             .font(.system(size: 9)).foregroundStyle(ChartInk.label)
                     }
+            }
+            ForEach(gaps) { g in
+                LineMark(x: .value("Time", g.from.t), y: .value("Spent", g.from.value), series: .value("Run", "gap-\(g.id)"))
+                    .foregroundStyle(tint.opacity(gapOpacity)).lineStyle(ChartInk.line)
+                LineMark(x: .value("Time", g.to.t), y: .value("Spent", g.to.value), series: .value("Run", "gap-\(g.id)"))
+                    .foregroundStyle(tint.opacity(gapOpacity)).lineStyle(ChartInk.line)
             }
             ForEach(line) { p in
                 LineMark(x: .value("Time", p.t), y: .value("Spent", p.value), series: .value("Run", "spent-\(p.run)"))
@@ -564,6 +594,14 @@ struct LimitsHistoryChart: View {
             } else {
                 Chart {
                     ForEach(series, id: \.0.key) { l, pts in
+                        ForEach(ChartGap.gaps(pts.map { ($0.t, $0.value) })) { g in
+                            LineMark(x: .value("Time", g.from.t), y: .value("Used", g.from.value),
+                                     series: .value("Run", "\(l.key)-gap-\(g.id)"))
+                                .foregroundStyle(l.color.opacity(gapOpacity)).lineStyle(ChartInk.line)
+                            LineMark(x: .value("Time", g.to.t), y: .value("Used", g.to.value),
+                                     series: .value("Run", "\(l.key)-gap-\(g.id)"))
+                                .foregroundStyle(l.color.opacity(gapOpacity)).lineStyle(ChartInk.line)
+                        }
                         ForEach(pts) { p in
                             LineMark(x: .value("Time", p.t), y: .value("Used", p.value),
                                      series: .value("Run", "\(l.key)-\(p.run)"))
@@ -639,7 +677,8 @@ struct LimitsHistoryChart: View {
     }
 
     private func nearest(_ pts: [ChartPoint], to t: Date) -> ChartPoint? {
-        let p = pts.min { abs($0.t.timeIntervalSince(t)) < abs($1.t.timeIntervalSince(t)) }
+        // The newest of equally near points: a value recorded twice at one time (a reset) shows its later one.
+        let p = pts.reversed().min { abs($0.t.timeIntervalSince(t)) < abs($1.t.timeIntervalSince(t)) }
         guard let p, abs(p.t.timeIntervalSince(t)) < 3600 else { return nil }
         return p
     }

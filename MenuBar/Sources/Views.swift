@@ -142,7 +142,8 @@ struct UsageRows: View {
                     VStack(alignment: .leading, spacing: 10) {
                         ForEach(model.orderedWindows) { w in
                             WindowRow(window: w, severity: model.snapshot?.severity[w.key],
-                                      budgetOnly: model.snapshot?.isBudgetOnly ?? false, now: ctx.date)
+                                      budgetOnly: model.snapshot?.isBudgetOnly ?? false, now: ctx.date,
+                                      asOf: model.showingSaved ? model.snapshot?.capturedAt : nil)
                         }
                         HistoryChart(model: model, now: ctx.date)
                             .padding(.top, 2)
@@ -193,8 +194,10 @@ struct WindowRow: View {
     let severity: String?
     var budgetOnly = false
     let now: Date
+    /// When saved numbers were fetched: the outlook projects from then (see `UsageWindow.outlook`).
+    var asOf: Date? = nil
 
-    private var runsOut: Bool { window.projectedLimitAt(now: now) != nil }
+    private var runsOut: Bool { window.projectedLimitAt(now: min(asOf ?? now, now)) != nil }
 
     /// The same pace colour as the menu bar: green on or under pace, yellow ahead, orange well
     /// ahead or nearly full, grey early in the window.
@@ -222,13 +225,13 @@ struct WindowRow: View {
                 }
                 .monospacedDigit()
             }
-            Text(window.outlook(now: now))
+            Text(window.outlook(now: now, asOf: asOf))
                 .font(.system(size: 11))
                 .foregroundStyle(runsOut ? Color.orange : Color.primary)
                 .fixedSize(horizontal: false, vertical: true)
             if let reset = window.resetsAt {
                 Text(caption(reset)).font(.system(size: 10)).foregroundStyle(.secondary)
-                    .help(resetHelp)
+                    .helpIfAny(resetHelp)
             }
         }
     }
@@ -277,7 +280,15 @@ struct PaceBar: View {
             }
         }
         .frame(height: 5)
-        .help(pace.map { HumanTime.paceSummary(used: percent, expected: $0) } ?? "")
+        .helpIfAny(pace.map { HumanTime.paceSummary(used: percent, expected: $0) } ?? "")
+    }
+}
+
+extension View {
+    /// A hover tooltip only when there's something to say: `.help("")` shows an empty box on macOS
+    /// (it did on the session and week rows, whose reset needs no explanation).
+    @ViewBuilder func helpIfAny(_ text: String) -> some View {
+        if text.isEmpty { self } else { help(text) }
     }
 }
 
