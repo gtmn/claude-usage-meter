@@ -152,9 +152,15 @@ popup says *Opens at login (brew services)* instead.
 cd MenuBar
 ./build.sh            # builds MenuBar/build/UsageMeter.app (ad-hoc signed, this Mac only)
 ./build.sh --install  # also copies it to ~/Applications and launches it
+./dev.sh              # runs a dev build in place of the installed copy, see below
 ```
 
 Enable **Open at login** in the popup after installing.
+
+To try changes while the Homebrew copy is installed, run `./dev.sh`. It stops the
+Homebrew service and quits any other copy, builds the checkout (stamped with `git describe`),
+and runs it in the terminal. Quit it from its popup or press Ctrl-C, and the Homebrew copy
+is started again. Both use the same history and settings, so your real data carries on.
 
 ### Optional: status-line snapshot
 
