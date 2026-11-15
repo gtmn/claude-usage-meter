@@ -49,11 +49,18 @@ check("the stretch before the first record is a gap, and so is a 4-hour pause",
 let logs = [UsageWeight(t: at("2026-11-02 12:00"), weight: 1), UsageWeight(t: at("2026-11-05 12:00"), weight: 3)]
 let filled = UsageHistory.filledBudget(recorded, periodStart: period, weights: logs, limitMinor: 200000)
 let est = filled.filter { $0.estimated == true }
-check("estimated points start at zero and are shaped by the logs",
-      est.first?.usedMinor == 0 && est.first { $0.t > at("2026-11-03 00:00") }?.usedMinor == 3250)
-check("…and end exactly at the first recorded amount", est.filter { $0.t < at("2026-11-10 18:00") }.last?.usedMinor == 13000)
-check("a gap with no log activity stays a gap", est.allSatisfy { $0.t < at("2026-11-10 18:00") })
-check("recorded points are kept as they are", filled.filter { $0.estimated != true } == recorded)
+check("every filled point is estimated, from the period start at zero",
+      filled.allSatisfy { recorded.contains($0) || $0.estimated == true } && est.first?.t == period && est.first?.usedMinor == 0)
+check("the estimate is shaped by the logs", filled.first { $0.t == at("2026-11-02 12:00") }?.usedMinor == 3250)
+check("…and ends exactly at the first recorded amount", est.filter { $0.t < at("2026-11-10 18:00") }.last?.usedMinor == 13000)
+let active = est.filter { $0.idle != true }.map(\.t)
+check("only the steps with Claude Code activity are not idle",
+      active == [at("2026-11-02 12:00"), at("2026-11-05 12:00")])
+let between = filled.first { $0.t == at("2026-11-03 12:00") }
+check("quiet time is flat and idle", between?.usedMinor == 3250 && between?.idle == true
+      && est.filter { $0.t < at("2026-11-02 12:00") }.allSatisfy { $0.usedMinor == 0 && $0.idle == true })
+check("a gap with no log activity stays a gap", filled.allSatisfy { $0.t.isAtOrBefore(at("2026-11-10 18:10")) || recorded.contains($0) })
+check("recorded points are kept as they are", recorded.allSatisfy(filled.contains))
 check("no logs: nothing is filled", UsageHistory.filledBudget(recorded, periodStart: period, weights: [], limitMinor: 200000) == recorded)
 
 let days = UsageHistory.dailySpend(filled)

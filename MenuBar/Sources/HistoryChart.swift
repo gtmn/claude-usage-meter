@@ -4,7 +4,8 @@ import SwiftUI
 // Usage history as a line over time, like a temperature curve.
 // - Budget-only accounts (Enterprise/Team): money spent across the budget period,
 //   with a dashed projection to the reset, or per UTC day as bars. Stretches the app didn't
-//   record are estimated from Claude Code's logs and drawn lighter.
+//   record are estimated from Claude Code's logs and drawn lighter (an unrecorded stretch
+//   with the same amount on both sides stays solid: nothing was spent in it).
 // - Pro/Max: the 5 h and 7 d percentages over this week (last reset to next), with a dashed
 //   projection of the weekly limit to the reset or to 100%, whichever comes first.
 //
@@ -349,7 +350,7 @@ struct BudgetHistoryChart: View {
     static func footnote(_ pts: [HistoryPoint], start: Date) -> String? {
         var notes: [String] = []
         if pts.contains(where: { $0.estimated == true }) {
-            notes.append("Lighter: estimated from Claude Code's logs on this Mac, scaled to the real totals.")
+            notes.append("Lighter: not recorded; estimated from Claude Code's logs on this Mac, scaled to the real totals.")
         } else if let first = pts.first, first.t.timeIntervalSince(start) > UsageHistory.fillableGap {
             notes.append("Recorded since \(localDayTime.string(from: first.t)); no Claude Code logs cover the time before.")
         }
@@ -440,8 +441,13 @@ private struct BudgetLine: View {
                 PointMark(x: .value("Time", p.t), y: .value("Spent", p.value))
                     .foregroundStyle(tint).symbolSize(40)
                     .annotation(position: .top, spacing: 4, overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
+                        let amount = currency(p.value, code, decimals: spend.limit.exponent)
+                        // From the data, not the drawn point: a run's first point repeats the
+                        // previous run's last one, which may be recorded.
+                        let src = points.last { $0.t == p.t }
                         Tooltip(lines: [tooltipTime.string(from: p.t),
-                                        currency(p.value, code, decimals: spend.limit.exponent) + (p.estimated ? " (estimated)" : "")])
+                                        src?.estimated != true ? amount
+                                            : src?.idle == true ? "about \(amount) · no activity" : amount + " (estimated)"])
                     }
             }
         }

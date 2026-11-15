@@ -70,6 +70,10 @@ already keeps on your Mac.
     and keeps nothing on disk.
   - Each request is priced at list price, and the curve is scaled so it ends exactly at the
     known total. The amounts are real and only the shape in between is estimated.
+  - Everything the app didn't record is drawn lighter, quiet time included: the logs can't
+    see spending elsewhere. The hover says "(estimated)" where spending was placed and
+    "about $… · no activity" where the logs show none (a weekend, a night). An unrecorded
+    stretch with the same amount on both sides stays solid, since nothing was spent in it.
   - Spending the logs can't see (the Claude apps, other computers) is spread over the
     Claude Code activity in the same stretch.
   - A stretch with no Claude Code activity stays a gap. In the per-day view, its spending

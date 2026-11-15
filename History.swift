@@ -12,9 +12,13 @@ public struct HistoryPoint: Codable, Equatable, Sendable {
     public var usedMinor: Int64?    // money used, for the budget (same units as `Spend.used`)
     /// Not recorded but estimated from Claude Code's logs (never saved; see `filledBudget`).
     public var estimated: Bool?
+    /// An estimated point with no Claude Code activity since the one before: the line is flat
+    /// there (never saved either).
+    public var idle: Bool?
 
-    public init(t: Date, key: String, percent: Double, usedMinor: Int64? = nil, estimated: Bool? = nil) {
-        self.t = t; self.key = key; self.percent = percent; self.usedMinor = usedMinor; self.estimated = estimated
+    public init(t: Date, key: String, percent: Double, usedMinor: Int64? = nil, estimated: Bool? = nil, idle: Bool? = nil) {
+        self.t = t; self.key = key; self.percent = percent; self.usedMinor = usedMinor
+        self.estimated = estimated; self.idle = idle
     }
 }
 
@@ -149,18 +153,25 @@ extension UsageHistory {
             let total = inGap.reduce(0) { $0 + $1.weight }
             guard total > 0 else { continue }
             let span = Double(g.toMinor - g.fromMinor)
-            func point(_ t: Date, _ acc: Double) -> HistoryPoint {
-                let used = Int64((Double(g.fromMinor) + span * acc / total).rounded())
+            // Every filled point is estimated: the app didn't record it, and the logs can't see
+            // spending elsewhere (the Claude apps, other computers). Steps with no Claude Code
+            // activity are also `idle`: the line is flat there.
+            var placedBefore = 0
+            func point(_ t: Date, _ acc: Double, placed: Int) -> HistoryPoint {
+                let quiet = placed == placedBefore
+                placedBefore = placed
+                let used = placed == 0 ? g.fromMinor : placed == inGap.count ? g.toMinor
+                    : Int64((Double(g.fromMinor) + span * acc / total).rounded())
                 return HistoryPoint(t: t, key: key, percent: limitMinor > 0 ? Double(used) / Double(limitMinor) * 100 : 0,
-                                    usedMinor: used, estimated: true)
+                                    usedMinor: used, estimated: true, idle: quiet ? true : nil)
             }
             // A point every `step` (so the line stays unbroken), plus the period start at zero.
             var acc = 0.0, i = 0
-            if g.fromMinor == 0 && g.start == periodStart { out.append(point(g.start, 0)) }
+            if g.fromMinor == 0 && g.start == periodStart { out.append(point(g.start, 0, placed: 0)) }
             var t = g.start.addingTimeInterval(step)
             while t < g.end {
                 while i < inGap.count && inGap[i].t.isAtOrBefore(t) { acc += inGap[i].weight; i += 1 }
-                out.append(point(t, acc))
+                out.append(point(t, acc, placed: i))
                 t = t.addingTimeInterval(step)
             }
         }
