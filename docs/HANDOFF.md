@@ -35,6 +35,10 @@ user's Homebrew tap `gtmn/tap`.
 2. **Before 2026-12-07** (Claude Code refresh token expiry): decide on a "Sign in again" button (`claude auth login`).
 Other ideas offered, not requested: dark-mode contrast of the lighter (estimated) line; ClaudeUsageBar features
 (notifications, reset countdowns, service status, global shortcut); hide numbers while on pace (its PR #124).
+Idea (2026-11-16): the same subscription on several Macs. Each Mac records the same account-wide curve, but only
+while it runs - merged, they'd give the whole curve. One history file per Mac in iCloud Drive (`history-<Mac>.json`:
+each Mac writes only its own, so no sync conflicts); the app reads all of them and merges by time (one point per
+window per 10 minutes, as now). Only worth it once the curve is watched on more than one Mac.
 
 ## Key decisions and why
 - **Token via `/usr/bin/security`**, not `SecItemCopyMatching`: Claude Code writes the Keychain item with the
@@ -84,12 +88,14 @@ last 24 h. The download is ad-hoc signed only (Gatekeeper "Open Anyway"); notari
 4. Optional: copy `~/Library/Application Support/UsageMeter/history.json` from backup to keep recorded history
    (otherwise the graph re-estimates from local Claude Code logs, which are also lost on a wipe).
 5. For development: `git clone git@github.com:gtmn/claude-usage-meter.git`, `./test.sh`, `MenuBar/build.sh`.
-Not captured anywhere yet: the dotfiles `Brewfile` has neither the `gtmn/tap` taps nor `claude-usage-meter`.
+The dotfiles `Brewfile` has `brew "gtmn/tap/claude-usage-meter", trusted: true` (added 2026-11-16) - step 1's
+install comes with `dots setup`; `brew services start` and the status-line script are still by hand.
 
 ## Open questions
-- Add `gtmn/tap` + `claude-usage-meter` (and `brew services`) to the dotfiles Brewfile, and ship
-  `statusline-snapshot.sh` via dotfiles or the formula's `share/` copy?
-- Back up `history.json`?
+- `brew services` for the app, and ship `statusline-snapshot.sh` via dotfiles or the formula's `share/` copy? (The
+  dotfiles Brewfile has `claude-usage-meter` since 2026-11-16.)
+- ~~Back up `history.json`?~~ No (2026-11-16): a move to a new Mac starts it fresh - the gap doesn't matter; see the
+  several-Macs idea under "Open / Next 3 steps".
 - Build the "Sign in again" button before 7 Dec?
 
 ## Sources
