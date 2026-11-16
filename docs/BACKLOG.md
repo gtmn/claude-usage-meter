@@ -5,6 +5,10 @@
 1. **Check that the app renews Claude Code's login.** After the login lapses with no Claude Code session
    running, look for "login renewed" in `~/Library/Logs/UsageMeter.log`. Not yet seen in the app: a manual
    `claude mcp list` renewed it (2026-11-15), but so far a running Claude Code session always renewed it first.
+   - Cleanest test: a night with Claude Code and the Claude app fully quit.
+   - The log file is only written once the app tries a renewal; if it doesn't exist, no attempt was made.
+   - The app's other messages go to the system log. Claude sessions can't read that, so run this in your
+     own Terminal: `/usr/bin/log show --predicate 'process == "UsageMeter"' --last 1d`.
 2. **"Sign in again" button** (runs `claude auth login`): decide before 2026-12-07, when Claude Code's
    refresh token here expires.
 
