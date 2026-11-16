@@ -3,6 +3,8 @@
 # Usage: ./build.sh [--install]   (--install copies it to ~/Applications and launches it)
 # USAGE_METER_VERSION=0.1.3 ./build.sh   stamps that version into the app (the Homebrew formula
 # passes its own); without it, the app gets the version in Info.plist.
+# USAGE_METER_ARCHS="arm64 x86_64" ./build.sh   builds one app for both kinds of Mac (the release
+# workflow does); without it, just this Mac's.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -23,10 +25,17 @@ if grep -nE '@State[[:space:]]' Sources/*.swift ../*.swift; then
     exit 1
 fi
 
-swiftc -O -swift-version 5 -parse-as-library \
-    -target "$(uname -m)-apple-macos14.0" \
-    -o "$APP/Contents/MacOS/UsageMeter" \
-    ../UsageReader.swift ../History.swift ../ClaudeCodeLogs.swift ../LoginNudge.swift Sources/*.swift
+ARCHS=(${USAGE_METER_ARCHS:-$(uname -m)})
+slices=()
+for arch in "${ARCHS[@]}"; do
+    swiftc -O -swift-version 5 -parse-as-library \
+        -target "$arch-apple-macos14.0" \
+        -o "build/UsageMeter-$arch" \
+        ../UsageReader.swift ../History.swift ../ClaudeCodeLogs.swift ../LoginNudge.swift Sources/*.swift
+    slices+=("build/UsageMeter-$arch")
+done
+lipo -create "${slices[@]}" -output "$APP/Contents/MacOS/UsageMeter"
+rm "${slices[@]}"
 
 # Date >= / <= can compile to Foundation symbols macOS lacks (see Date.isAtOrAfter in UsageReader.swift).
 if nm -u "$APP/Contents/MacOS/UsageMeter" | grep -qE 'DateV2(ge|le)oiy'; then

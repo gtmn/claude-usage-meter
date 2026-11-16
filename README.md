@@ -129,7 +129,7 @@ The app talks only to `api.anthropic.com`. No analytics, no update checks, no ot
 ## Requirements
 
 - macOS 14 or later
-- Xcode command line tools (`swiftc`)
+- Xcode command line tools (`swiftc`), except for the download
 - Claude Code, signed in with a Pro or Max subscription
 
 ## Install with Homebrew
@@ -146,6 +146,28 @@ reader as `claude-usage` and the status-line script under
 a Homebrew copy hides the app's **Open at login** switch, which would remember the
 versioned Homebrew folder that changes with every upgrade. Under `brew services` the
 popup says *Opens at login (brew services)* instead.
+
+## Download
+
+Each version tag gets a [release](https://github.com/gtmn/claude-usage-meter/releases) with a
+pre-built app for Apple silicon and Intel Macs (`UsageMeter-<version>.zip`) and the command-line
+reader (`claude-usage-<version>.zip`). They're built by GitHub Actions
+([`.github/workflows/release.yml`](.github/workflows/release.yml)).
+
+The app is ad-hoc signed but not notarized, so macOS blocks it the first time: open it once,
+then click **Open Anyway** in System Settings → Privacy & Security. Or remove the quarantine:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/UsageMeter.app
+```
+
+Homebrew is still the easier way: no warning, and `brew upgrade` updates it. A download
+doesn't update itself. Turn on **Open at login** in the popup to start it at login.
+
+To make a release: tag the commit (`git tag -a v0.1.9 -m "Usage Meter 0.1.9"`) and push the
+tag. The workflow tests, builds and publishes it in a few minutes. It also builds every push
+to `main`, kept as a downloadable artifact on the run. `.github/package.sh 0.1.9` makes the
+same files locally, in `dist/`.
 
 ## Build and run from a checkout
 
@@ -231,6 +253,7 @@ own current numbers and recorded history instead (don't commit those).
 | `statusline-snapshot.sh` | Claude Code status-line command for the fallback |
 | `tests/` | Scenario checks |
 | `docs/screenshots/` | README images, rendered from sample data |
+| `.github/` | Release workflow and `package.sh`, which builds the release files |
 
 ## License
 

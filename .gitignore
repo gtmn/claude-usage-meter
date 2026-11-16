@@ -11,3 +11,6 @@ MenuBar/build/
 # Local usage data, never commit
 usage-snapshot.json
 *.label.png
+
+# Release files (.github/package.sh)
+/dist/
