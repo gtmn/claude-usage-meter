@@ -187,4 +187,10 @@ check("nothing without a file", LastUsage.load(from: lastURL.appendingPathExtens
 try? FileManager.default.removeItem(at: lastURL)
 
 print(failures == 0 ? "history: all passed" : "history: \(failures) failed")
+// The menu bar's amount: whole units, rounded down (what has been spent, not more).
+check("whole units for the menu bar",
+      Money(minor: 41280, exponent: 2, currency: "USD").wholeUnits == "$412"
+      && Money(minor: 100099, exponent: 2, currency: "EUR").wholeUnits == "€1,000"
+      && Money(minor: 99, exponent: 2, currency: "USD").wholeUnits == "$0")
+
 exit(failures == 0 ? 0 : 1)

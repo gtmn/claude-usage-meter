@@ -10,11 +10,17 @@ show Claude usage: 5h/7d limits on Pro/Max, monthly $ budget with pace marker an
 Enterprise/Team seats, and a history graph. Built with `swiftc` (no Xcode project), distributed through the
 user's Homebrew tap `gtmn/tap`.
 
-## Current state (2026-11-15)
-- `main` = `origin/main` = `39e2e58` ("Add dev.sh"); clean tree, no stash, no other branches; tags
-  `v0.1.0`..`v0.1.7` all on GitHub. Latest release **v0.1.7** (`8cd0d85`); `39e2e58` (dev.sh + README) is unreleased.
-- Installed: Homebrew `claude-usage-meter 0.1.7`, run by `brew services`
-  (`~/Library/LaunchAgents/sh.brew.claude-usage-meter.plist`). The old `~/Applications/UsageMeter.app` was moved to the Trash.
+## Current state (2026-11-16)
+- Latest release **v0.1.9** (`4e4ba1d`), tags `v0.1.0`..`v0.1.9` on GitHub. v0.1.9 is the first with a GitHub
+  release (pre-built universal zips, made by `.github/workflows/release.yml` on the tag); the tap formula
+  points to it. On main since then, unreleased: `% / Amount` for the budget in the menu
+  bar; Pro/Max extra usage as an optional `$` item beside the 5h/7d one and as its own graph (recorded only,
+  never estimated from logs: on Pro/Max most activity is covered by the plan); the `panel` / `settings` /
+  `extra` preview modes; settings screenshots in the README. The Pro/Max extra-usage parts are checked only
+  with sample data (this account is Enterprise).
+- Installed: Homebrew `claude-usage-meter 0.1.9`, run by `brew services`
+  (`~/Library/LaunchAgents/sh.brew.claude-usage-meter.plist`). The old `~/Applications/UsageMeter.app` is in
+  the Trash and its leftover login item was removed (2026-11-15).
 - App data: `~/Library/Application Support/UsageMeter/history.json` (recorded history since 2026-11-10 19:08)
   and `last-usage.json` (saved numbers). Log: `~/Library/Logs/UsageMeter.log` (did not exist yet on 2026-11-15 23:15).
 - Status line: `~/.claude/statusline-snapshot.sh` (identical copy of the repo file) is set as `statusLine` in the
@@ -26,9 +32,7 @@ user's Homebrew tap `gtmn/tap`.
 1. **Verify the login renewal**: after Claude Code's login lapses with no session running, check
    `~/Library/Logs/UsageMeter.log` for "login renewed". Unverified through the app so far (manual
    `claude mcp list` test on 2026-11-15 worked; the 2026-11-13 check of the old `auth status` nudge could not read the log).
-2. **Remove the leftover login item** "UsageMeter" in System Settings > General > Login Items > Open at Login
-   (user action; keep the `sh.brew.claude-usage-meter` background item), else two copies may start.
-3. **Before 2026-12-07** (Claude Code refresh token expiry): decide on a "Sign in again" button (`claude auth login`).
+2. **Before 2026-12-07** (Claude Code refresh token expiry): decide on a "Sign in again" button (`claude auth login`).
 Other ideas offered, not requested: dark-mode contrast of the lighter (estimated) line; ClaudeUsageBar features
 (notifications, reset countdowns, service status, global shortcut); hide numbers while on pace (its PR #124).
 
@@ -60,13 +64,17 @@ Other ideas offered, not requested: dark-mode contrast of the lighter (estimated
 - Don't commit in the dotfiles repo from this project.
 - Swift gotchas: avoid `Date >=`/`<=` (with Xcode 27.2 they compile to Foundation symbols macOS lacks and crash; `test.sh` checks; use `isAtOrAfter`/`isAtOrBefore`);
   use `RectangleMark` for x+y ranges; render previews with `--render-preview` (no Keychain, sample data); never
-  commit `live` renders.
+  commit `live` renders. Renders take their settings from the arguments (throwaway store), never the saved
+  ones; preview/sample models never fetch (`refresh()` is guarded).
 - Develop with `MenuBar/dev.sh` (stops the Homebrew service, runs the checkout build, restarts the service).
 
 ## Where things are
-Code layout: see README "Layout". Release flow: tag `vX.Y.Z` -> sha256 of GitHub tarball -> update
+Code layout: see README "Layout". Release flow: annotated tag `vX.Y.Z` ("Usage Meter X.Y.Z"), push it (the workflow
+publishes the GitHub release with the zips) -> sha256 of GitHub's tag tarball -> update
 `Formula/claude-usage-meter.rb` in `gtmn/homebrew-tap` (local tap checkout under
-`$(brew --repository)/Library/Taps/gtmn/homebrew-tap`) -> `brew upgrade` + `brew test`.
+`$(brew --repository)/Library/Taps/gtmn/homebrew-tap`, commit "claude-usage-meter X.Y.Z") -> `brew upgrade`,
+`brew test`, `brew services restart`. Other Macs need `brew update` first if Homebrew auto-updated in the
+last 24 h. The download is ad-hoc signed only (Gatekeeper "Open Anyway"); notarizing needs a Developer ID.
 
 ## Restore on a new Mac
 1. Xcode command line tools; `brew trust gtmn/tap` (Homebrew 7 needs it for third-party taps), then

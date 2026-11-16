@@ -4,11 +4,12 @@ import SwiftUI
 struct UsageMeterApp: App {
     @StateObject private var model = UsageModel(
         preview: CommandLine.arguments.contains("--sample")
-            ? (CommandLine.arguments.contains("enterprise") ? .sampleEnterprise : .sample) : nil
+            ? (CommandLine.arguments.contains("enterprise") ? .sampleEnterprise
+               : CommandLine.arguments.contains("extra") ? .sampleWithExtra : .sample) : nil
     )
 
     init() {
-        // `UsageMeter --render-preview out.png [live] [offline] [enterprise] [hover] [light] [daily] [seen] [saved] [compact] [nolabels] [nopercent] [nopace] [noahead] [left|early]` (`hover=0.85`: pointer at 85% of the times): render the panel rows to a PNG and exit.
+        // `UsageMeter --render-preview out.png [live] [offline] [enterprise] [hover] [light] [daily] [seen] [saved] [compact] [mono] [amount] [extra] [panel|settings] [nolabels] [nopercent] [nopace] [noahead] [left|early]` (`hover=0.85`: pointer at 85% of the times): render the panel rows (`panel`: the whole popup; `settings`: its menu bar settings) to a PNG and exit.
         let args = CommandLine.arguments
         if let i = args.firstIndex(of: "--render-preview"), i + 1 < args.count {
             PreviewRenderer.run(output: args[i + 1], live: args.contains("live"), offline: args.contains("offline"),
@@ -49,7 +50,7 @@ enum PreviewRenderer {
             snap = (CommandLine.arguments.contains("seen") ? r.confirmingAssumedReset(seen: monthStart) : r)
                 .withPriorPace(from: UsageHistory.load())   // as the app does, for early projections
         } else {
-            snap = enterprise ? .sampleEnterprise : .sample
+            snap = enterprise ? .sampleEnterprise : CommandLine.arguments.contains("extra") ? .sampleWithExtra : .sample
         }
         // Live numbers get the real recorded history; samples get a made-up one.
         let light = CommandLine.arguments.contains("light")
@@ -61,6 +62,9 @@ enum PreviewRenderer {
                                saved: saved,
                                history: live ? UsageHistory.load() : nil, logWeights: logs)
         writeLabelPreview(model: model, output: output)
+        if CommandLine.arguments.contains("panel") || CommandLine.arguments.contains("settings") {
+            writePanel(model: model, light: light, output: output)
+        }
         let view = UsageRows(model: model)
             .padding(UsagePanel.padding)
             .frame(width: UsagePanel.width)
@@ -68,6 +72,7 @@ enum PreviewRenderer {
             .environment(\.colorScheme, light ? .light : .dark)
             .environment(\.previewHover, previewHoverArg)
             .environment(\.previewBudgetMode, CommandLine.arguments.contains("daily") ? "daily" : nil)
+            .defaultAppStorage(previewStore)
         // AppKit colours (window background, label colours) follow the drawing appearance.
         NSApplication.shared.appearance = NSAppearance(named: light ? .aqua : .darkAqua)
         let renderer = ImageRenderer(content: view)
@@ -77,6 +82,63 @@ enum PreviewRenderer {
             fputs("render failed\n", stderr); exit(1)
         }
         try? png.write(to: URL(fileURLWithPath: output))
+        previewStore.removePersistentDomain(forName: previewSuite)
+        print("wrote \(output)")
+        exit(0)
+    }
+
+    /// The settings previews use: from the arguments, in a throwaway store, so an image never shows
+    /// (or changes) the ones saved on this Mac, such as the graph's Total / Per day choice.
+    private static let previewSuite = "local.usagemeter.preview"
+    private static let previewStore: UserDefaults = {
+        let a = CommandLine.arguments
+        let store = UserDefaults(suiteName: previewSuite)!
+        store.removePersistentDomain(forName: previewSuite)
+        typealias Key = MenuBarImage.Options.Key
+        let settings: [String: Any] = [
+            MenuBarImage.Style.key: a.contains("compact") ? "compact" : "bars",
+            Key.labels: !a.contains("nolabels"), Key.percent: !a.contains("nopercent"),
+            Key.pace: !a.contains("nopace"), Key.ahead: !a.contains("noahead"),
+            Key.aheadAs: a.contains("left") ? "left" : a.contains("early") ? "early" : "points",
+            Key.palette: a.contains("mono") ? "mono" : "colour",
+            Key.budgetAs: a.contains("amount") ? "amount" : "percent",
+            "budgetChartMode": a.contains("daily") ? "daily" : "total",
+            Key.extra: a.contains("extra"),
+        ]
+        for (k, v) in settings { store.set(v, forKey: k) }
+        return store
+    }()
+
+    /// `panel`: the whole popup, settings included (`settings`: those alone). AppKit draws it in an offscreen window, since
+    /// ImageRenderer can't draw AppKit controls (checkboxes). Settings: see `previewStore`.
+    private static func writePanel(model: UsageModel, light: Bool, output: String) -> Never {
+        let a = CommandLine.arguments
+        let appearance = NSAppearance(named: light ? .aqua : .darkAqua)
+        NSApplication.shared.appearance = appearance
+        // `settings`: only the menu bar settings, as in the popup.
+        let content = a.contains("settings")
+            ? AnyView(MenuBarSettings(model: model).padding(UsagePanel.padding)
+                .frame(width: UsagePanel.width, alignment: .leading))
+            : AnyView(UsagePanel(model: model))
+        let host = NSHostingView(rootView: content
+            .background(Color(nsColor: .windowBackgroundColor))
+            .environment(\.colorScheme, light ? .light : .dark)
+            .environment(\.previewHover, previewHoverArg)
+            .environment(\.previewBudgetMode, a.contains("daily") ? "daily" : nil)
+            .defaultAppStorage(previewStore))
+        host.frame.size = host.fittingSize
+        let window = NSWindow(contentRect: host.frame, styleMask: .borderless, backing: .buffered, defer: false)
+        window.appearance = appearance
+        window.contentView = host
+        host.layoutSubtreeIfNeeded()
+        RunLoop.current.run(until: Date().addingTimeInterval(0.5))   // let SwiftUI and Charts settle
+        guard let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) else {
+            fputs("render failed\n", stderr); exit(1)
+        }
+        host.cacheDisplay(in: host.bounds, to: rep)
+        guard let png = rep.representation(using: .png, properties: [:]) else { fputs("render failed\n", stderr); exit(1) }
+        try? png.write(to: URL(fileURLWithPath: output))
+        previewStore.removePersistentDomain(forName: previewSuite)
         print("wrote \(output)")
         exit(0)
     }
@@ -87,10 +149,12 @@ enum PreviewRenderer {
         let options = MenuBarImage.Options(labels: !args.contains("nolabels"), percent: !args.contains("nopercent"),
                                            pace: !args.contains("nopace"), ahead: !args.contains("noahead"),
                                            aheadAs: args.contains("left") ? .left : args.contains("early") ? .early : .points,
-                                           palette: args.contains("mono") ? .mono : .colour)
-        let label = args.contains("compact")
-            ? MenuBarImage.makeCompact(rings: model.compactRings(), options: options)
-            : MenuBarImage.make(rows: model.menuBarRows(), options: options)
+                                           palette: args.contains("mono") ? .mono : .colour,
+                                           budgetAs: args.contains("amount") ? .amount : .percent,
+                                           extra: args.contains("extra"))
+        guard let label = MenuBarImage.item(style: args.contains("compact") ? .compact : .bars, rows: model.menuBarRows(),
+                                            rings: model.compactRings(), extra: model.extraRow(), options: options)
+        else { return }
         let strip = NSSize(width: label.size.width * 6 + 24, height: label.size.height * 6 + 24)
         let canvas = NSImage(size: NSSize(width: strip.width, height: strip.height * 2))
         canvas.lockFocus()

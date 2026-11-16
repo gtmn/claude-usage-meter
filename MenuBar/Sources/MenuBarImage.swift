@@ -11,7 +11,8 @@ import AppKit
 /// window, where a few percent would look far ahead. Text always stays in the text colour:
 /// coloured 9 pt text is hard to read in the menu bar.
 ///
-/// Options (checkboxes in the popup): the "5h"/"7d" labels, the %, the pace tick (where usage
+/// Options (checkboxes in the popup): the "5h"/"7d" labels, the % (or, for a budget, the amount
+/// used), the pace tick (where usage
 /// would be if spread evenly over the window), and, once well ahead, the points ahead ("+24"),
 /// the time left until it runs out at that pace ("1.5d left"), or how long before the reset
 /// that is ("3d early"). Text sits in aligned columns (see Columns).
@@ -35,6 +36,8 @@ enum MenuBarImage {
         var runsOutIn: TimeInterval? = nil
         /// How long before the reset it runs out at that pace (same condition).
         var runsOutEarly: TimeInterval? = nil
+        /// The budget's amount used, in whole units ("$306"), shown instead of the % when chosen.
+        var amount: String? = nil
 
         /// One limit's row: everything the pace colouring needs. Shared by the menu bar and the
         /// popup's bars, so both always show the same colour.
@@ -45,6 +48,7 @@ enum MenuBarImage {
             critical = w.percent >= 90 || (w.spend?.limitReached ?? false) || (severity.map { $0 != "normal" } ?? false)
             tooEarly = w.isTooEarlyToProject(now: now)
             duration = w.duration
+            amount = w.spend?.used.wholeUnits
             if let hit = w.projectedLimitAt(now: now) {
                 runsOutIn = max(hit.timeIntervalSince(now), 0)
                 runsOutEarly = w.resetsAt.map { max($0.timeIntervalSince(hit), 0) }
@@ -79,15 +83,25 @@ enum MenuBarImage {
         init(saved: String) { self = Palette(rawValue: saved) ?? .colour }
     }
 
+    /// For a $ budget: its number as the % of the budget used, or the amount used ("$306").
+    enum BudgetAs: String, CaseIterable {
+        case percent, amount
+        var name: String { self == .percent ? "%" : "Amount" }
+        init(saved: String) { self = BudgetAs(rawValue: saved) ?? .percent }
+    }
+
     /// What to show besides the bars or rings. Each is a checkbox in the popup.
     struct Options {
         var labels = true, percent = true, pace = true, ahead = true
         var aheadAs = AheadAs.points
         var palette = Palette.colour
+        var budgetAs = BudgetAs.percent
+        /// Pro/Max: the extra usage as its own $ item beside the 5h/7d one.
+        var extra = false
         enum Key {
             static let labels = "menuBarShowLabels", percent = "menuBarShowPercent"
             static let pace = "menuBarShowPace", ahead = "menuBarShowAhead", aheadAs = "menuBarAheadAs"
-            static let palette = "menuBarPalette"
+            static let palette = "menuBarPalette", budgetAs = "menuBarBudgetAs", extra = "menuBarShowExtra"
         }
     }
 
@@ -154,6 +168,12 @@ enum MenuBarImage {
 
     /// The text beside a bar or ring, as cells: the label, the %, and how far ahead once well
     /// ahead ("+24", "1.5d left", or "3d early"). Empty when not shown.
+    /// A budget's amount instead of its %, when chosen.
+    private static func showsAmount(_ row: Row, _ o: Options) -> Bool { o.budgetAs == .amount && row.amount != nil }
+
+    /// The amount carries its currency, so the "$" label beside it would only repeat it.
+    private static func showsLabel(_ row: Row, _ o: Options) -> Bool { o.labels && !(o.percent && showsAmount(row, o)) }
+
     private static func cells(_ row: Row, _ o: Options, label: Bool) -> [String] {
         var ahead = ""
         if o.ahead, let lead = row.lead, PaceLead.wellAhead <= lead {
@@ -164,7 +184,8 @@ enum MenuBarImage {
             case .early: ahead = row.runsOutEarly.map { span($0, minutes: minutes) + " early" } ?? ""
             }
         }
-        return [label ? row.label : "", o.percent ? "\(Int(row.percent.rounded()))%" : "", ahead]
+        let number = showsAmount(row, o) ? row.amount! : "\(Int(row.percent.rounded()))%"
+        return [label && showsLabel(row, o) ? row.label : "", o.percent ? number : "", ahead]
     }
 
     /// Rounded, since it's an estimate: half days from a day on ("1d", "1.5d", "3d"), whole hours
@@ -237,8 +258,9 @@ enum MenuBarImage {
     static func make(rows: [Row], options o: Options = Options()) -> NSImage {
         let font = NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .semibold)
         let measure: [NSAttributedString.Key: Any] = [.font: font]
-        let labelWidth = o.labels ? ceil(rows.map { ($0.label as NSString).size(withAttributes: measure).width }.max() ?? 0) : 0
-        let barX = o.labels ? labelWidth + 3 : 0
+        let labelled = rows.filter { showsLabel($0, o) }
+        let labelWidth = ceil(labelled.map { ($0.label as NSString).size(withAttributes: measure).width }.max() ?? 0)
+        let barX = labelled.isEmpty ? 0 : labelWidth + 3
         let columns = Columns(rows.map { cells($0, o, label: false) }, leftAligned: [true, false, false],
                               fonts: Columns.fonts(size: font.pointSize))
         let textX = barX + barWidth + 3
@@ -251,7 +273,7 @@ enum MenuBarImage {
                 let y = firstRowBottom - CGFloat(i) * rowHeight
                 let textHeight = ("0" as NSString).size(withAttributes: attrs).height
                 let textY = y + (rowHeight - textHeight) / 2
-                if o.labels { (row.label as NSString).draw(at: NSPoint(x: 0, y: textY), withAttributes: attrs) }
+                if showsLabel(row, o) { (row.label as NSString).draw(at: NSPoint(x: 0, y: textY), withAttributes: attrs) }
 
                 let track = NSRect(x: barX, y: y + (rowHeight - barHeight) / 2, width: barWidth, height: barHeight)
                 trackColor.setFill()
@@ -273,6 +295,28 @@ enum MenuBarImage {
 
                 columns.draw(row: i, x: textX, y: textY, color: .labelColor)
             }
+            return true
+        }
+    }
+
+    /// The item for the chosen style, with Pro/Max extra usage (`extra`) as a second item beside
+    /// it: there's no room for a third row in the menu bar's height.
+    static func item(style: Style, rows: [Row], rings: [Row], extra: Row?, options o: Options) -> NSImage? {
+        let main = style == .compact && !rings.isEmpty ? makeCompact(rings: rings, options: o)
+            : !rows.isEmpty ? make(rows: rows, options: o) : nil
+        guard let main else { return nil }
+        guard o.extra, let extra else { return main }
+        return beside(main, style == .compact ? makeCompact(rings: [extra], options: o) : make(rows: [extra], options: o))
+    }
+
+    /// Two items side by side. Both keep their drawing handlers, so their colours still follow
+    /// the menu bar's appearance.
+    static func beside(_ a: NSImage, _ b: NSImage, gap: CGFloat = 6) -> NSImage {
+        let size = NSSize(width: a.size.width + gap + b.size.width, height: max(a.size.height, b.size.height))
+        return NSImage(size: size, flipped: false) { _ in
+            a.draw(in: NSRect(x: 0, y: (size.height - a.size.height) / 2, width: a.size.width, height: a.size.height))
+            b.draw(in: NSRect(x: a.size.width + gap, y: (size.height - b.size.height) / 2,
+                              width: b.size.width, height: b.size.height))
             return true
         }
     }

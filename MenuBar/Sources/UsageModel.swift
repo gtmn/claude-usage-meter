@@ -22,6 +22,23 @@ extension UsageSnapshot {
         ])
     }
 
+    /// Pro/Max with extra usage turned on: the sample plus a monthly $ limit (`--sample extra`).
+    static var sampleWithExtra: UsageSnapshot {
+        let spend = Spend(used: Money(minor: 1240, exponent: 2, currency: "USD"),
+                          limit: Money(minor: 5000, exponent: 2, currency: "USD"))
+        let s = sample
+        return UsageSnapshot(source: s.source, capturedAt: s.capturedAt, windows: s.windows + [
+            UsageWindow(key: "extra_usage", percent: spend.percent, resetsAt: Spend.assumedReset(after: Date()),
+                        spend: spend, resetIsAssumed: false),
+        ])
+    }
+
+    /// Extra usage on a Pro/Max account: a $ limit next to the session and week windows.
+    var extraUsage: UsageWindow? {
+        guard !isBudgetOnly, let w = window("extra_usage"), w.spend != nil else { return nil }
+        return w
+    }
+
     /// True when the account has no session/week windows, so the $ budget is the only limit.
     var isBudgetOnly: Bool { window("five_hour") == nil && window("seven_day") == nil && window("extra_usage")?.spend != nil }
 }
@@ -134,8 +151,10 @@ final class UsageModel: ObservableObject {
             snapshot = preview; oauthProblem = problem; showingSaved = saved
             if let previewHistory {
                 history = previewHistory; logWeights = previewLogs ?? []
-            } else {
+            } else if preview.isBudgetOnly {
                 (history, logWeights) = UsageHistory.sampleWithLogs(for: preview)
+            } else {
+                history = UsageHistory.sample(for: preview)   // Pro/Max: no log estimates (see HistoryChart)
             }
             return
         }
@@ -175,7 +194,9 @@ final class UsageModel: ObservableObject {
     }
 
     func refresh() {
-        guard !isLoading else { return }
+        // Sample numbers (previews, `--sample`) never fetch: that would replace them with the real
+        // ones and overwrite the saved numbers. `persistsHistory` is only set for the real model.
+        guard persistsHistory, !isLoading else { return }
         isLoading = true
         let reader = self.reader
         let mayNudge = persistsHistory && lastNudge.map { Date().timeIntervalSince($0) > Self.nudgeSpacing } ?? true
@@ -315,6 +336,12 @@ final class UsageModel: ObservableObject {
 }
 
 extension UsageModel {
+    /// The menu bar's extra-usage item on a Pro/Max account, when it has extra usage turned on.
+    func extraRow(now: Date = Date()) -> MenuBarImage.Row? {
+        guard let s = snapshot, let w = s.extraUsage else { return nil }
+        return MenuBarImage.Row(w, label: "$", severity: s.severity["extra_usage"], now: now)
+    }
+
     /// The Compact style's rings, outer first: the budget alone on an Enterprise/Team seat;
     /// otherwise the week, then the 5 h session. The week is the weekly limit (all models, Opus,
     /// Sonnet, …) furthest ahead of pace, so a model-specific week that's about to run out isn't

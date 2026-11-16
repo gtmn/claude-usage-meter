@@ -9,8 +9,8 @@ in plain words whether you'll run out before the reset. It handles both kinds of
 | Pro / Max | Enterprise / Team |
 |---|---|
 | <img src="docs/screenshots/menubar-pro-max.png" width="140" alt="Menu bar item with 5h and 7d bars at 20% (green, under pace) and 60% (yellow, ahead of pace), each with a pace tick, on a dark and a light menu bar"> | <img src="docs/screenshots/menubar-enterprise.png" width="130" alt="Menu bar item with a single green $ bar at 21% and a pace tick, on a dark and a light menu bar"> |
-| <img src="docs/screenshots/popup-pro-max.png" width="356" alt="Popup: Session 5 h at 20%; Week all models at 60% in yellow, runs out Monday evening, 8 h before Tuesday's reset; below, a line graph of both this week with a dashed projection of the week to 100% on Monday"> | <img src="docs/screenshots/popup-enterprise.png" width="356" alt="Popup: Monthly budget at 21%, $412.80 used of $2,000.00, $1,587.20 left, on track for about $950 by the 1 Dec reset; below, a line graph of money spent this month with a dashed projection, the first week drawn lighter as estimated"> |
-| | <img src="docs/screenshots/popup-enterprise-daily.png" width="356" alt="The same popup with the graph switched to Per day: a bar per UTC day, the first week's bars lighter as estimated"> |
+| <img src="docs/screenshots/popup-pro-max.png" width="356" alt="Popup: Session 5 h at 20%; Week all models at 60% in yellow, runs out 8 h before the weekly reset; below, a line graph of both this week with a dashed projection of the week to 100%"> | <img src="docs/screenshots/popup-enterprise.png" width="356" alt="Popup: Monthly budget at 21%, $412.80 used of $2,000.00, $1,587.20 left, on track for about $800 by the 1 Dec reset; below, a line graph of money spent this month with a dashed projection, the unrecorded part drawn lighter as estimated"> |
+| | <img src="docs/screenshots/popup-enterprise-daily.png" width="356" alt="The same popup with the graph switched to Per day: a bar per UTC day, the unrecorded days' bars lighter as estimated"> |
 
 *Sample numbers and a made-up history. The menu bar item is shown enlarged, on a dark and a light menu bar.*
 
@@ -32,7 +32,8 @@ already keeps on your Mac.
   Both use the same colours, as ClaudeUsageBar's pace icon: green on or under pace, yellow
   ahead of it, orange 15+ points ahead (about a day early in a week) or nearly full (90%+). Early
   in a window, where a few percent would look far ahead, it stays plain. Switch **Colour** to
-  **Mono** for bars or rings in the menu bar's text colour, like the numbers. Checkboxes in the
+  **Mono** for bars or rings in the menu bar's text colour, like the numbers. On a $ budget,
+  **% / Amount** shows the share used (`21%`) or the money spent so far (`$306`). Checkboxes in the
   popup turn on or off the `5h`/`7d` **labels**, the **percent**, a **pace tick** where usage
   would be if spread evenly over the window, and, once a limit is 15+ points ahead, the points
   ahead of pace (`+24`: % used minus % expected by now), the time left until it runs out
@@ -52,7 +53,9 @@ already keeps on your Mac.
   until it sees a reset happen: the amount falling between two fetches within 20 minutes of
   00:00 UTC on the 1st confirms the date. A fall at any other time brings *(assumed)* back.
 - **Pro/Max with extra usage turned on:** the same $ amounts appear as an *Extra usage*
-  row below the 5h and 7d limits, and the menu bar is unchanged.
+  row below the 5h and 7d limits, with its own graph under the 5h/7d one (recorded only:
+  Claude Code's logs can't tell which activity was paid extra). Tick **Extra usage beside it**
+  to add a `$` item next to the 5h/7d one in the menu bar, as `%` or the amount.
 - **History graph** in the popup, a line over time like a temperature curve:
   - on an Enterprise/Team seat, money spent across the budget period, with a dashed
     projection to the reset (and the budget line once the curve gets near it). Switch to
@@ -99,6 +102,26 @@ from the previous period's average pace instead, from the app's own history, e.g
 this period's own spending counts more and more, and after it only this period counts.
 The 5-hour session, and any limit without a recorded previous period, says
 *Too early to project* until then.
+
+## Settings
+
+Under the graph, the popup sets what the menu bar item shows (hover over a control to see
+what it does). On a $ budget, **Percent** becomes **Used**, with a choice of `%` or the amount.
+On Pro/Max with extra usage turned on, **Extra usage beside it** adds a `$` item for it.
+
+| Pro / Max | Enterprise / Team |
+|---|---|
+| <img src="docs/screenshots/settings-pro-max.png" width="356" alt="Settings: Menu bar Bars or Compact, Colour or Mono; checkboxes Labels, Percent, Pace tick; Extra usage beside it, as % or Amount; When well ahead, show +N, time left or early"> | <img src="docs/screenshots/settings-enterprise.png" width="356" alt="The same settings on a budget account: the Percent checkbox reads Used, with a switch between % and Amount"> |
+
+Some of the combinations, shown enlarged on a dark and a light menu bar:
+
+| Compact | Mono | Amount (budget) |
+|---|---|---|
+| <img src="docs/screenshots/menubar-compact.png" width="110" alt="Compact style: two rings, the week outside in yellow and the session inside in green, with 5h 20% and 7d 60% beside them"> | <img src="docs/screenshots/menubar-mono.png" width="140" alt="Mono palette: the 5h and 7d bars filled in the text colour instead of green and yellow"> | <img src="docs/screenshots/menubar-enterprise-amount.png" width="120" alt="A budget bar with $412 beside it instead of 21%"> |
+
+| Pro/Max with extra usage beside it | The popup with extra usage |
+|---|---|
+| <img src="docs/screenshots/menubar-pro-max-extra.png" width="190" alt="The 5h and 7d bars, and beside them a $ bar with $12"> | <img src="docs/screenshots/popup-pro-max-extra.png" width="356" alt="Popup: Session and Week rows, then Extra usage at 25%, $12.40 used of $50.00, on track for about $24; the 5h/7d graph, and below it a graph of extra usage this month with the $50 limit and a dashed projection"> |
 
 ## How it gets the data
 
@@ -235,9 +258,20 @@ $APP --render-preview docs/screenshots/popup-enterprise.png enterprise
 $APP --render-preview docs/screenshots/popup-enterprise-daily.png enterprise daily
 mv docs/screenshots/popup-pro-max.png.label.png docs/screenshots/menubar-pro-max.png
 mv docs/screenshots/popup-enterprise.png.label.png docs/screenshots/menubar-enterprise.png
+$APP --render-preview docs/screenshots/settings-pro-max.png settings extra
+$APP --render-preview docs/screenshots/popup-pro-max-extra.png extra amount
+mv docs/screenshots/popup-pro-max-extra.png.label.png docs/screenshots/menubar-pro-max-extra.png
+$APP --render-preview docs/screenshots/settings-enterprise.png settings enterprise amount
+for v in compact mono "enterprise amount"; do
+  $APP --render-preview /tmp/um.png $v
+  mv /tmp/um.png.label.png "docs/screenshots/menubar-$(echo $v | sed 's/enterprise amount/enterprise-amount/').png"
+done
+rm docs/screenshots/*.label.png /tmp/um.png
 ```
 
-Add `compact` for the Compact menu bar style, `mono` for the Mono palette, `nolabels`, `nopercent`, `nopace` or `noahead` to leave those out, `left` or `early` for the time left or early, `daily` for the per-day bars, `hover` to show the graph's tooltip (`hover=1.5` halfway along the projection), `light` for light mode, or `live` to render your
+Renders never read or change your own settings: they use the arguments, in a throwaway store.
+
+Add `compact` for the Compact menu bar style, `mono` for the Mono palette, `amount` for the budget's amount, `extra` for Pro/Max with extra usage (and its menu bar item), `panel` for the whole popup or `settings` for its settings alone, `nolabels`, `nopercent`, `nopace` or `noahead` to leave those out, `left` or `early` for the time left or early, `daily` for the per-day bars, `hover` to show the graph's tooltip (`hover=1.5` halfway along the projection), `light` for light mode, or `live` to render your
 own current numbers and recorded history instead (don't commit those).
 
 ## Layout

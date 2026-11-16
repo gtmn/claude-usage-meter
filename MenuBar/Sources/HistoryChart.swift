@@ -24,7 +24,14 @@ struct HistoryChart: View {
             if s.isBudgetOnly, let w = s.window("extra_usage"), w.spend != nil {
                 BudgetHistoryChart(window: w, history: model.history, logWeights: model.logWeights, now: asOf)
             } else if s.window("seven_day") != nil || s.window("five_hour") != nil {
-                LimitsHistoryChart(history: model.history, week: s.window("seven_day"), now: asOf)
+                VStack(alignment: .leading, spacing: 12) {
+                    LimitsHistoryChart(history: model.history, week: s.window("seven_day"), now: asOf)
+                    // Pro/Max extra usage: its own $ chart. No log estimates: most Claude Code activity
+                    // is covered by the plan, and the logs can't tell which part was paid extra.
+                    if let w = s.extraUsage {
+                        BudgetHistoryChart(window: w, history: model.history, logWeights: [], now: asOf, extra: true)
+                    }
+                }
             }
         }
     }
@@ -307,6 +314,8 @@ struct BudgetHistoryChart: View {
     let history: UsageHistory
     let logWeights: [UsageWeight]
     let now: Date
+    /// Pro/Max extra usage rather than an Enterprise/Team budget: titled so, and never estimated.
+    var extra = false
     @AppStorage("budgetChartMode") private var savedMode = "total"
     @Environment(\.previewBudgetMode) private var previewMode
 
@@ -324,7 +333,8 @@ struct BudgetHistoryChart: View {
 
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                ChartHeader(title: mode == "daily" ? "Spent per day" : "Spent this \(unit)")
+                ChartHeader(title: extra ? (mode == "daily" ? "Extra usage per day" : "Extra usage this \(unit)")
+                                         : mode == "daily" ? "Spent per day" : "Spent this \(unit)")
                 if mode == "daily" { Text("UTC days").font(.system(size: 10)).foregroundStyle(.secondary) }
                 Spacer()
                 if perDayAllowed {
@@ -337,9 +347,10 @@ struct BudgetHistoryChart: View {
             } else if mode == "daily" {
                 DailySpendBars(window: window, days: UsageHistory.dailySpend(filled), start: start, end: reset, now: now)
             } else {
-                BudgetLine(window: window, points: filled, start: start, reset: reset, now: now)
+                BudgetLine(window: window, points: filled, start: start, reset: reset, now: now,
+                           limitName: extra ? "Limit" : "Budget")
             }
-            if let note = Self.footnote(filled, start: start) {
+            if let note = Self.footnote(filled, start: start, usesLogs: !extra) {
                 Text(note).font(.system(size: 10)).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -347,15 +358,18 @@ struct BudgetHistoryChart: View {
     }
 
     /// Says where the curve isn't recorded: estimated from the logs, or not known at all.
-    static func footnote(_ pts: [HistoryPoint], start: Date) -> String? {
+    /// `usesLogs`: false for Pro/Max extra usage, which is never estimated from the logs.
+    static func footnote(_ pts: [HistoryPoint], start: Date, usesLogs: Bool = true) -> String? {
         var notes: [String] = []
         if pts.contains(where: { $0.estimated == true }) {
             notes.append("Lighter: not recorded; estimated from Claude Code's logs on this Mac, scaled to the real totals.")
         } else if let first = pts.first, first.t.timeIntervalSince(start) > UsageHistory.fillableGap {
-            notes.append("Recorded since \(localDayTime.string(from: first.t)); no Claude Code logs cover the time before.")
+            notes.append("Recorded since \(localDayTime.string(from: first.t))"
+                         + (usesLogs ? "; no Claude Code logs cover the time before." : "."))
         }
         if hasFaintGap(pts, start: start) {
-            notes.append("Faint: not recorded, and no Claude Code activity to place the spending.")
+            notes.append(usesLogs ? "Faint: not recorded, and no Claude Code activity to place the spending."
+                                  : "Faint: not recorded.")
         }
         return notes.isEmpty ? nil : notes.joined(separator: " ")
     }
@@ -373,6 +387,8 @@ private struct BudgetLine: View {
     let window: UsageWindow
     let points: [HistoryPoint]
     let start: Date, reset: Date, now: Date
+    /// What the limit line says: "Budget" (Enterprise/Team) or "Limit" (Pro/Max extra usage).
+    var limitName = "Budget"
     @Environment(\.colorScheme) private var scheme
     @Environment(\.previewHover) private var previewHover
     @ViewState private var hovered: Date?
@@ -407,7 +423,7 @@ private struct BudgetLine: View {
                     .foregroundStyle(ChartInk.muted)
                     .lineStyle(StrokeStyle(lineWidth: 1))
                     .annotation(position: .top, alignment: .leading, spacing: 2) {
-                        Text("Budget \(currency(spend.limit.amount, code))")
+                        Text("\(limitName) \(currency(spend.limit.amount, code))")
                             .font(.system(size: 9)).foregroundStyle(ChartInk.label)
                     }
             }

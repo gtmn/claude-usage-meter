@@ -30,6 +30,16 @@ public struct Money: Equatable {
         f.maximumFractionDigits = exponent
         return f.string(from: NSNumber(value: amount)) ?? String(format: "%.\(exponent)f \(currency)", amount)
     }
+
+    /// Whole units, for tight spaces like the menu bar: "$306", "€1,000", "CHF 50".
+    public var wholeUnits: String {
+        let f = NumberFormatter()
+        f.locale = Locale(identifier: "en_US")
+        f.numberStyle = .currency
+        f.currencyCode = currency
+        f.maximumFractionDigits = 0
+        return f.string(from: NSNumber(value: amount.rounded(.down))) ?? "\(Int(amount)) \(currency)"
+    }
 }
 
 /// A monthly spend budget: the main limit on Enterprise/Team seats, "extra usage" on Pro/Max.

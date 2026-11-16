@@ -12,20 +12,92 @@ struct MenuBarLabel: View {
     @AppStorage(MenuBarImage.Options.Key.ahead) private var showAhead = true
     @AppStorage(MenuBarImage.Options.Key.aheadAs) private var aheadAs = MenuBarImage.AheadAs.points.rawValue
     @AppStorage(MenuBarImage.Options.Key.palette) private var palette = MenuBarImage.Palette.colour.rawValue
+    @AppStorage(MenuBarImage.Options.Key.budgetAs) private var budgetAs = MenuBarImage.BudgetAs.percent.rawValue
+    @AppStorage(MenuBarImage.Options.Key.extra) private var showExtra = false
 
     var body: some View {
-        let rows = model.menuBarRows()
-        let chosen = MenuBarImage.Style(saved: style)
         let options = MenuBarImage.Options(labels: showLabels, percent: showPercent, pace: showPace,
                                            ahead: showAhead, aheadAs: MenuBarImage.AheadAs(saved: aheadAs),
-                                           palette: MenuBarImage.Palette(saved: palette))
-        let rings = model.compactRings()
-        if chosen == .compact, !rings.isEmpty {
-            Image(nsImage: MenuBarImage.makeCompact(rings: rings, options: options))
-        } else if !rows.isEmpty {
-            Image(nsImage: MenuBarImage.make(rows: rows, options: options))
+                                           palette: MenuBarImage.Palette(saved: palette),
+                                           budgetAs: MenuBarImage.BudgetAs(saved: budgetAs), extra: showExtra)
+        if let image = MenuBarImage.item(style: MenuBarImage.Style(saved: style), rows: model.menuBarRows(),
+                                         rings: model.compactRings(), extra: model.extraRow(), options: options) {
+            Image(nsImage: image)
         } else {
             Image(systemName: model.error == nil ? "gauge.with.dots.needle.0percent" : "exclamationmark.circle")
+        }
+    }
+}
+
+/// The popup's menu bar settings: style, palette and what the item shows. Its own view, so the
+/// preview renderer can draw it alone (`settings`).
+struct MenuBarSettings: View {
+    @ObservedObject var model: UsageModel
+    @AppStorage(MenuBarImage.Style.key) private var menuBarStyle = MenuBarImage.Style.bars.rawValue
+    @AppStorage(MenuBarImage.Options.Key.labels) private var showLabels = true
+    @AppStorage(MenuBarImage.Options.Key.percent) private var showPercent = true
+    @AppStorage(MenuBarImage.Options.Key.pace) private var showPace = true
+    @AppStorage(MenuBarImage.Options.Key.ahead) private var showAhead = true
+    @AppStorage(MenuBarImage.Options.Key.aheadAs) private var aheadAs = MenuBarImage.AheadAs.points.rawValue
+    @AppStorage(MenuBarImage.Options.Key.palette) private var palette = MenuBarImage.Palette.colour.rawValue
+    @AppStorage(MenuBarImage.Options.Key.budgetAs) private var budgetAs = MenuBarImage.BudgetAs.percent.rawValue
+    @AppStorage(MenuBarImage.Options.Key.extra) private var showExtra = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(spacing: 6) {
+                Text("Menu bar").font(.system(size: 11))
+                ModeSwitch(mode: Binding(get: { MenuBarImage.Style(saved: menuBarStyle).rawValue },
+                                         set: { menuBarStyle = $0 }),
+                           options: MenuBarImage.Style.allCases.map { ($0.rawValue, $0.name) })
+                    .help("Bars: the session and weekly bars. Compact: rings, the week outside and the session inside "
+                          + "(one budget ring on Enterprise).")
+                ModeSwitch(mode: Binding(get: { MenuBarImage.Palette(saved: palette).rawValue }, set: { palette = $0 }),
+                           options: MenuBarImage.Palette.allCases.map { ($0.rawValue, $0.name) })
+                    .help("Colour: green on or under pace, yellow ahead, orange 15+ points ahead. "
+                          + "Mono: in the menu bar's text colour, like the numbers.")
+                Spacer()
+            }
+            HStack(spacing: 10) {
+                Toggle("Labels", isOn: $showLabels).help("“5h” and “7d” (or “$”) beside the bars or numbers")
+                if model.snapshot?.isBudgetOnly == true {
+                    HStack(spacing: 4) {
+                        Toggle("Used", isOn: $showPercent).help("How much of the budget is used")
+                        ModeSwitch(mode: Binding(get: { MenuBarImage.BudgetAs(saved: budgetAs).rawValue }, set: { budgetAs = $0 }),
+                                   options: MenuBarImage.BudgetAs.allCases.map { ($0.rawValue, $0.name) })
+                            .help("%: the share of the budget used (21%). Amount: the money spent so far, in whole units ($306).")
+                            .disabled(!showPercent).opacity(showPercent ? 1 : 0.5)
+                    }
+                } else {
+                    Toggle("Percent", isOn: $showPercent).help("How much of each limit is used")
+                }
+                Toggle("Pace tick", isOn: $showPace).help("A tick where usage would be by now if spread evenly over the window")
+                Spacer(minLength: 0)
+            }
+            .toggleStyle(.checkbox).controlSize(.small).font(.system(size: 11))
+            if model.snapshot?.extraUsage != nil {
+                HStack(spacing: 4) {
+                    Toggle("Extra usage beside it", isOn: $showExtra)
+                        .toggleStyle(.checkbox).controlSize(.small).font(.system(size: 11))
+                        .help("Your extra usage as its own $ item next to the 5h and 7d one")
+                    ModeSwitch(mode: Binding(get: { MenuBarImage.BudgetAs(saved: budgetAs).rawValue }, set: { budgetAs = $0 }),
+                               options: MenuBarImage.BudgetAs.allCases.map { ($0.rawValue, $0.name) })
+                        .help("%: the share of the extra-usage limit used (25%). Amount: the money spent so far ($12).")
+                        .disabled(!showExtra || !showPercent).opacity(showExtra && showPercent ? 1 : 0.5)
+                    Spacer(minLength: 0)
+                }
+            }
+            HStack(spacing: 6) {
+                Toggle("When well ahead, show", isOn: $showAhead)
+                    .toggleStyle(.checkbox).controlSize(.small).font(.system(size: 11))
+                    .help("Once a limit is 15+ points ahead of pace (orange): how far ahead")
+                ModeSwitch(mode: Binding(get: { MenuBarImage.AheadAs(saved: aheadAs).rawValue }, set: { aheadAs = $0 }),
+                           options: MenuBarImage.AheadAs.allCases.map { ($0.rawValue, $0.name) })
+                    .help("+N: percentage points ahead of pace (% used minus % expected by now, e.g. 52% − 27% = +25). time left: until it runs out at this pace (1.5d left). "
+                          + "early: how long before the reset it runs out (3d early). Half days, whole hours, and minutes only for the 5 h session.")
+                    .disabled(!showAhead).opacity(showAhead ? 1 : 0.5)
+                Spacer(minLength: 0)
+            }
         }
     }
 }
@@ -37,13 +109,6 @@ struct UsagePanel: View {
     static let padding: CGFloat = 12
 
     @ObservedObject var model: UsageModel
-    @AppStorage(MenuBarImage.Style.key) private var menuBarStyle = MenuBarImage.Style.bars.rawValue
-    @AppStorage(MenuBarImage.Options.Key.labels) private var showLabels = true
-    @AppStorage(MenuBarImage.Options.Key.percent) private var showPercent = true
-    @AppStorage(MenuBarImage.Options.Key.pace) private var showPace = true
-    @AppStorage(MenuBarImage.Options.Key.ahead) private var showAhead = true
-    @AppStorage(MenuBarImage.Options.Key.aheadAs) private var aheadAs = MenuBarImage.AheadAs.points.rawValue
-    @AppStorage(MenuBarImage.Options.Key.palette) private var palette = MenuBarImage.Palette.colour.rawValue
     @ViewState private var openAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
@@ -64,37 +129,7 @@ struct UsagePanel: View {
 
             Divider()
 
-            HStack(spacing: 6) {
-                Text("Menu bar").font(.system(size: 11))
-                ModeSwitch(mode: Binding(get: { MenuBarImage.Style(saved: menuBarStyle).rawValue },
-                                         set: { menuBarStyle = $0 }),
-                           options: MenuBarImage.Style.allCases.map { ($0.rawValue, $0.name) })
-                    .help("Bars: the session and weekly bars. Compact: rings, the week outside and the session inside "
-                          + "(one budget ring on Enterprise).")
-                ModeSwitch(mode: Binding(get: { MenuBarImage.Palette(saved: palette).rawValue }, set: { palette = $0 }),
-                           options: MenuBarImage.Palette.allCases.map { ($0.rawValue, $0.name) })
-                    .help("Colour: green on or under pace, yellow ahead, orange 15+ points ahead. "
-                          + "Mono: in the menu bar's text colour, like the numbers.")
-                Spacer()
-            }
-            HStack(spacing: 10) {
-                Toggle("Labels", isOn: $showLabels).help("“5h” and “7d” (or “$”) beside the bars or numbers")
-                Toggle("Percent", isOn: $showPercent).help("How much of each limit is used")
-                Toggle("Pace tick", isOn: $showPace).help("A tick where usage would be by now if spread evenly over the window")
-                Spacer(minLength: 0)
-            }
-            .toggleStyle(.checkbox).controlSize(.small).font(.system(size: 11))
-            HStack(spacing: 6) {
-                Toggle("When well ahead, show", isOn: $showAhead)
-                    .toggleStyle(.checkbox).controlSize(.small).font(.system(size: 11))
-                    .help("Once a limit is 15+ points ahead of pace (orange): how far ahead")
-                ModeSwitch(mode: Binding(get: { MenuBarImage.AheadAs(saved: aheadAs).rawValue }, set: { aheadAs = $0 }),
-                           options: MenuBarImage.AheadAs.allCases.map { ($0.rawValue, $0.name) })
-                    .help("+N: percentage points ahead of pace (% used minus % expected by now, e.g. 52% − 27% = +25). time left: until it runs out at this pace (1.5d left). "
-                          + "early: how long before the reset it runs out (3d early). Half days, whole hours, and minutes only for the 5 h session.")
-                    .disabled(!showAhead).opacity(showAhead ? 1 : 0.5)
-                Spacer(minLength: 0)
-            }
+            MenuBarSettings(model: model)
 
             HStack {
                 if let note = Install.loginNote {
