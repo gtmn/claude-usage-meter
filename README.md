@@ -158,8 +158,9 @@ The app talks only to `api.anthropic.com`. No analytics, no update checks, no ot
 ## Install with Homebrew
 
 ```bash
+brew trust gtmn/tap                       # Homebrew 7 asks for this for third-party taps
 brew install gtmn/tap/claude-usage-meter
-brew services start claude-usage-meter   # opens it now and at every login
+brew services start claude-usage-meter    # opens it now and at every login
 ```
 
 Homebrew builds the app from source on your Mac (about a minute), so no download
@@ -169,6 +170,9 @@ reader as `claude-usage` and the status-line script under
 a Homebrew copy hides the app's **Open at login** switch, which would remember the
 versioned Homebrew folder that changes with every upgrade. Under `brew services` the
 popup says *Opens at login (brew services)* instead.
+
+To update: `brew upgrade claude-usage-meter`. If a new version doesn't show up, run
+`brew update` first: Homebrew refreshes its taps by itself at most once a day.
 
 ## Download
 
@@ -186,11 +190,6 @@ xattr -dr com.apple.quarantine /Applications/UsageMeter.app
 
 Homebrew is still the easier way: no warning, and `brew upgrade` updates it. A download
 doesn't update itself. Turn on **Open at login** in the popup to start it at login.
-
-To make a release: tag the commit (`git tag -a v0.1.9 -m "Usage Meter 0.1.9"`) and push the
-tag. The workflow tests, builds and publishes it in a few minutes. It also builds every push
-to `main`, kept as a downloadable artifact on the run. `.github/package.sh 0.1.9` makes the
-same files locally, in `dist/`.
 
 ## Build and run from a checkout
 
@@ -274,6 +273,21 @@ Renders never read or change your own settings: they use the arguments, in a thr
 Add `compact` for the Compact menu bar style, `mono` for the Mono palette, `amount` for the budget's amount, `extra` for Pro/Max with extra usage (and its menu bar item), `panel` for the whole popup or `settings` for its settings alone, `nolabels`, `nopercent`, `nopace` or `noahead` to leave those out, `left` or `early` for the time left or early, `daily` for the per-day bars, `hover` to show the graph's tooltip (`hover=1.5` halfway along the projection), `light` for light mode, or `live` to render your
 own current numbers and recorded history instead (don't commit those).
 
+## Releasing
+
+1. Tag the commit and push the tag: `git tag -a vX.Y.Z -m "Usage Meter X.Y.Z"`, then
+   `git push origin vX.Y.Z`. The workflow tests, builds and publishes the GitHub release with
+   the zips in a few minutes. (It also builds every push to `main`, kept as a downloadable
+   artifact on the run; `.github/package.sh X.Y.Z` makes the same files locally, in `dist/`.)
+2. Take the sha256 of GitHub's tag tarball
+   (`https://github.com/gtmn/claude-usage-meter/archive/refs/tags/vX.Y.Z.tar.gz`).
+3. Update `url` and `sha256` in `Formula/claude-usage-meter.rb` of the tap
+   ([`gtmn/homebrew-tap`](https://github.com/gtmn/homebrew-tap), checked out locally under
+   `$(brew --repository)/Library/Taps/gtmn/homebrew-tap`), commit as "claude-usage-meter X.Y.Z"
+   and push.
+4. `brew upgrade claude-usage-meter`, `brew test claude-usage-meter`,
+   `brew services restart claude-usage-meter`.
+
 ## Layout
 
 | Path | What |
@@ -286,6 +300,8 @@ own current numbers and recorded history instead (don't commit those).
 | `main.swift` | Command-line reader |
 | `statusline-snapshot.sh` | Claude Code status-line command for the fallback |
 | `tests/` | Scenario checks |
+| `docs/DECISIONS.md` | Why things work the way they do, and what was ruled out |
+| `docs/BACKLOG.md` | What's next and open ideas |
 | `docs/screenshots/` | README images, rendered from sample data |
 | `.github/` | Release workflow and `package.sh`, which builds the release files |
 
