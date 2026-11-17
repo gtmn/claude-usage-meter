@@ -104,6 +104,7 @@ enum PreviewRenderer {
             Key.budgetAs: a.contains("amount") ? "amount" : "percent",
             "budgetChartMode": a.contains("daily") ? "daily" : "total",
             Key.extra: a.contains("extra"),
+            Key.limits: a.contains("only5h") ? "session" : a.contains("only7d") ? "week" : "both",
         ]
         for (k, v) in settings { store.set(v, forKey: k) }
         return store
@@ -151,7 +152,8 @@ enum PreviewRenderer {
                                            aheadAs: args.contains("left") ? .left : args.contains("early") ? .early : .points,
                                            palette: args.contains("mono") ? .mono : .colour,
                                            budgetAs: args.contains("amount") ? .amount : .percent,
-                                           extra: args.contains("extra"))
+                                           extra: args.contains("extra"),
+                                           limits: args.contains("only5h") ? .session : args.contains("only7d") ? .week : .both)
         guard let label = MenuBarImage.item(style: args.contains("compact") ? .compact : .bars, rows: model.menuBarRows(),
                                             rings: model.compactRings(), extra: model.extraRow(), options: options)
         else { return }

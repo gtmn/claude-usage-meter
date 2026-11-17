@@ -550,12 +550,12 @@ public final class UsageReader {
         if let sev = (root["spend"] as? [String: Any])?["severity"] as? String { snap.severity["extra_usage"] = sev }
         snap.serverPace = root["pace"].flatMap { $0 is NSNull ? nil : $0 }
         snap.serverIndicator = root["indicator"].flatMap { $0 is NSNull ? nil : $0 }
-        let kindToKey = ["session": "five_hour", "weekly_all": "seven_day",
-                         "weekly_opus": "seven_day_opus", "weekly_sonnet": "seven_day_sonnet",
-                         "spend": "extra_usage"]
+        // "weekly_opus" → "seven_day_opus", and so on for any model's weekly limit.
+        let kindToKey = ["session": "five_hour", "weekly_all": "seven_day", "spend": "extra_usage"]
         for limit in root["limits"] as? [[String: Any]] ?? [] {
             if let kind = limit["kind"] as? String, let sev = limit["severity"] as? String {
-                snap.severity[kindToKey[kind] ?? kind] = sev
+                let key = kindToKey[kind] ?? (kind.hasPrefix("weekly_") ? "seven_day_" + kind.dropFirst("weekly_".count) : kind)
+                snap.severity[key] = sev
             }
         }
         return snap

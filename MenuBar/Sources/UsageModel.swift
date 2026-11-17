@@ -314,13 +314,19 @@ final class UsageModel: ObservableObject {
 
     // MARK: Derived
 
-    /// Windows in display order: session, week, then model-specific weeks.
+    /// Windows in display order: session, week, then model-specific weeks (Opus, Sonnet, Fable, …),
+    /// then extra usage.
     var orderedWindows: [UsageWindow] {
         guard let s = snapshot else { return [] }
-        let order = ["five_hour", "seven_day", "seven_day_opus", "seven_day_sonnet", "extra_usage"]
-        return s.windows.sorted {
-            (order.firstIndex(of: $0.key) ?? 99, $0.key) < (order.firstIndex(of: $1.key) ?? 99, $1.key)
+        func rank(_ key: String) -> Int {
+            switch key {
+            case "five_hour": return 0
+            case "seven_day": return 1
+            case "extra_usage": return 3
+            default: return key.hasPrefix("seven_day_") ? 2 : 4
+            }
         }
+        return s.windows.sorted { (rank($0.key), $0.key) < (rank($1.key), $1.key) }
     }
 
     /// The rows shown in the menu bar item, with what the pace colouring needs.
@@ -386,9 +392,12 @@ extension UsageWindow: Identifiable {
         switch key {
         case "five_hour":        return "Session · 5 h"
         case "seven_day":        return "Week · all models"
-        case "seven_day_opus":   return "Week · Opus"
-        case "seven_day_sonnet": return "Week · Sonnet"
-        default: return key.replacingOccurrences(of: "_", with: " ").capitalized
+        default:
+            // A model's own weekly limit: "seven_day_opus" → "Week · Opus", "seven_day_fable" → "Week · Fable".
+            if key.hasPrefix("seven_day_") {
+                return "Week · " + key.dropFirst("seven_day_".count).replacingOccurrences(of: "_", with: " ").capitalized
+            }
+            return key.replacingOccurrences(of: "_", with: " ").capitalized
         }
     }
 }

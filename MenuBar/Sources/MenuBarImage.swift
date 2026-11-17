@@ -90,6 +90,27 @@ enum MenuBarImage {
         init(saved: String) { self = BudgetAs(rawValue: saved) ?? .percent }
     }
 
+    /// Pro/Max: which limits the menu bar shows (the popup and graph always show all of them).
+    /// A chosen limit the account doesn't have falls back to what it has.
+    enum Limits: String, CaseIterable {
+        case both, session, week
+        var name: String {
+            switch self {
+            case .both: return "Both"
+            case .session: return "5h"
+            case .week: return "7d"
+            }
+        }
+        init(saved: String) { self = Limits(rawValue: saved) ?? .both }
+
+        /// The rows (or rings) to draw: the chosen one alone, or all when it isn't there.
+        func pick(_ rows: [Row]) -> [Row] {
+            let label: String? = self == .session ? "5h" : self == .week ? "7d" : nil
+            guard let label, rows.contains(where: { $0.label == label }) else { return rows }
+            return rows.filter { $0.label == label }
+        }
+    }
+
     /// What to show besides the bars or rings. Each is a checkbox in the popup.
     struct Options {
         var labels = true, percent = true, pace = true, ahead = true
@@ -98,10 +119,12 @@ enum MenuBarImage {
         var budgetAs = BudgetAs.percent
         /// Pro/Max: the extra usage as its own $ item beside the 5h/7d one.
         var extra = false
+        var limits = Limits.both
         enum Key {
             static let labels = "menuBarShowLabels", percent = "menuBarShowPercent"
             static let pace = "menuBarShowPace", ahead = "menuBarShowAhead", aheadAs = "menuBarAheadAs"
             static let palette = "menuBarPalette", budgetAs = "menuBarBudgetAs", extra = "menuBarShowExtra"
+            static let limits = "menuBarLimits"
         }
     }
 
@@ -302,6 +325,7 @@ enum MenuBarImage {
     /// The item for the chosen style, with Pro/Max extra usage (`extra`) as a second item beside
     /// it: there's no room for a third row in the menu bar's height.
     static func item(style: Style, rows: [Row], rings: [Row], extra: Row?, options o: Options) -> NSImage? {
+        let (rows, rings) = (o.limits.pick(rows), o.limits.pick(rings))
         let main = style == .compact && !rings.isEmpty ? makeCompact(rings: rings, options: o)
             : !rows.isEmpty ? make(rows: rows, options: o) : nil
         guard let main else { return nil }

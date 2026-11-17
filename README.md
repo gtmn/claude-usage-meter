@@ -23,8 +23,8 @@ already keeps on your Mac.
 ## What it shows
 
 - **Menu bar**, in one of two styles, switched under **Menu bar** in the popup:
-  - **Bars** (default): two mini bars, `5h` and `7d`, with percentages, or a single `$` bar
-    on an Enterprise/Team seat.
+  - **Bars** (default): two mini bars, `5h` and `7d`, with percentages (or just one of them,
+    see [Settings](#settings)), or a single `$` bar on an Enterprise/Team seat.
   - **Compact**: rings with their percentages beside them: the week outside and the 5h
     session inside (the week follows the weekly limit furthest ahead of pace), or one budget
     ring on an Enterprise/Team seat.
@@ -107,11 +107,13 @@ The 5-hour session, and any limit without a recorded previous period, says
 
 Under the graph, the popup sets what the menu bar item shows (hover over a control to see
 what it does). On a $ budget, **Percent** becomes **Used**, with a choice of `%` or the amount.
-On Pro/Max with extra usage turned on, **Extra usage beside it** adds a `$` item for it.
+On Pro/Max, **Show** picks both limits or only `5h` or `7d` for the menu bar; the popup and
+the graph keep showing both. An account without a 5-hour limit shows only `7d` anyway.
+With extra usage turned on, **Extra usage beside it** adds a `$` item for it.
 
 | Pro / Max | Enterprise / Team |
 |---|---|
-| <img src="docs/screenshots/settings-pro-max.png" width="356" alt="Settings: Menu bar Bars or Compact, Colour or Mono; checkboxes Labels, Percent, Pace tick; Extra usage beside it, as % or Amount; When well ahead, show +N, time left or early"> | <img src="docs/screenshots/settings-enterprise.png" width="356" alt="The same settings on a budget account: the Percent checkbox reads Used, with a switch between % and Amount"> |
+| <img src="docs/screenshots/settings-pro-max.png" width="356" alt="Settings: Menu bar Bars or Compact, Colour or Mono; Show Both, 5h or 7d; checkboxes Labels, Percent, Pace tick; Extra usage beside it, as % or Amount; When well ahead, show +N, time left or early"> | <img src="docs/screenshots/settings-enterprise.png" width="356" alt="The same settings on a budget account: the Percent checkbox reads Used, with a switch between % and Amount"> |
 
 Some of the combinations, shown enlarged on a dark and a light menu bar:
 
@@ -270,7 +272,7 @@ rm docs/screenshots/*.label.png /tmp/um.png
 
 Renders never read or change your own settings: they use the arguments, in a throwaway store.
 
-Add `compact` for the Compact menu bar style, `mono` for the Mono palette, `amount` for the budget's amount, `extra` for Pro/Max with extra usage (and its menu bar item), `panel` for the whole popup or `settings` for its settings alone, `nolabels`, `nopercent`, `nopace` or `noahead` to leave those out, `left` or `early` for the time left or early, `daily` for the per-day bars, `hover` to show the graph's tooltip (`hover=1.5` halfway along the projection), `light` for light mode, or `live` to render your
+Add `compact` for the Compact menu bar style, `mono` for the Mono palette, `amount` for the budget's amount, `extra` for Pro/Max with extra usage (and its menu bar item), `only5h` or `only7d` for one limit in the menu bar, `panel` for the whole popup or `settings` for its settings alone, `nolabels`, `nopercent`, `nopace` or `noahead` to leave those out, `left` or `early` for the time left or early, `daily` for the per-day bars, `hover` to show the graph's tooltip (`hover=1.5` halfway along the projection), `light` for light mode, or `live` to render your
 own current numbers and recorded history instead (don't commit those).
 
 ## Releasing

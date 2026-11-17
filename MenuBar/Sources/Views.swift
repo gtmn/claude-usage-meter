@@ -14,12 +14,14 @@ struct MenuBarLabel: View {
     @AppStorage(MenuBarImage.Options.Key.palette) private var palette = MenuBarImage.Palette.colour.rawValue
     @AppStorage(MenuBarImage.Options.Key.budgetAs) private var budgetAs = MenuBarImage.BudgetAs.percent.rawValue
     @AppStorage(MenuBarImage.Options.Key.extra) private var showExtra = false
+    @AppStorage(MenuBarImage.Options.Key.limits) private var limits = MenuBarImage.Limits.both.rawValue
 
     var body: some View {
         let options = MenuBarImage.Options(labels: showLabels, percent: showPercent, pace: showPace,
                                            ahead: showAhead, aheadAs: MenuBarImage.AheadAs(saved: aheadAs),
                                            palette: MenuBarImage.Palette(saved: palette),
-                                           budgetAs: MenuBarImage.BudgetAs(saved: budgetAs), extra: showExtra)
+                                           budgetAs: MenuBarImage.BudgetAs(saved: budgetAs), extra: showExtra,
+                                           limits: MenuBarImage.Limits(saved: limits))
         if let image = MenuBarImage.item(style: MenuBarImage.Style(saved: style), rows: model.menuBarRows(),
                                          rings: model.compactRings(), extra: model.extraRow(), options: options) {
             Image(nsImage: image)
@@ -42,6 +44,7 @@ struct MenuBarSettings: View {
     @AppStorage(MenuBarImage.Options.Key.palette) private var palette = MenuBarImage.Palette.colour.rawValue
     @AppStorage(MenuBarImage.Options.Key.budgetAs) private var budgetAs = MenuBarImage.BudgetAs.percent.rawValue
     @AppStorage(MenuBarImage.Options.Key.extra) private var showExtra = false
+    @AppStorage(MenuBarImage.Options.Key.limits) private var limits = MenuBarImage.Limits.both.rawValue
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
@@ -57,6 +60,16 @@ struct MenuBarSettings: View {
                     .help("Colour: green on or under pace, yellow ahead, orange 15+ points ahead. "
                           + "Mono: in the menu bar's text colour, like the numbers.")
                 Spacer()
+            }
+            if model.snapshot?.window("five_hour") != nil && model.snapshot?.window("seven_day") != nil {
+                HStack(spacing: 6) {
+                    Text("Show").font(.system(size: 11))
+                    ModeSwitch(mode: Binding(get: { MenuBarImage.Limits(saved: limits).rawValue }, set: { limits = $0 }),
+                               options: MenuBarImage.Limits.allCases.map { ($0.rawValue, $0.name) })
+                        .help("Which limits the menu bar shows: the 5 h session and the week, or one of them. "
+                              + "The popup and the graph always show both.")
+                    Spacer(minLength: 0)
+                }
             }
             HStack(spacing: 10) {
                 Toggle("Labels", isOn: $showLabels).help("“5h” and “7d” (or “$”) beside the bars or numbers")
