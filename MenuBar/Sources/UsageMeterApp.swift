@@ -5,11 +5,12 @@ struct UsageMeterApp: App {
     @StateObject private var model = UsageModel(
         preview: CommandLine.arguments.contains("--sample")
             ? (CommandLine.arguments.contains("enterprise") ? .sampleEnterprise
-               : CommandLine.arguments.contains("extra") ? .sampleWithExtra : .sample) : nil
+               : (CommandLine.arguments.contains("extra") ? UsageSnapshot.sampleWithExtra : UsageSnapshot.sample)
+                    .withFableIf(CommandLine.arguments.contains("fable"))) : nil
     )
 
     init() {
-        // `UsageMeter --render-preview out.png [live] [offline] [enterprise] [hover] [light] [daily] [seen] [saved] [compact] [mono] [amount] [extra] [panel|settings] [nolabels] [nopercent] [nopace] [noahead] [left|early]` (`hover=0.85`: pointer at 85% of the times): render the panel rows (`panel`: the whole popup; `settings`: its menu bar settings) to a PNG and exit.
+        // `UsageMeter --render-preview out.png [live] [offline] [enterprise] [hover] [light] [daily] [seen] [saved] [compact] [mono] [amount] [extra] [fable] [only5h|only7d] [panel|settings] [nolabels] [nopercent] [nopace] [noahead] [left|early]` (`hover=0.85`: pointer at 85% of the times): render the panel rows (`panel`: the whole popup; `settings`: its menu bar settings) to a PNG and exit.
         let args = CommandLine.arguments
         if let i = args.firstIndex(of: "--render-preview"), i + 1 < args.count {
             PreviewRenderer.run(output: args[i + 1], live: args.contains("live"), offline: args.contains("offline"),
@@ -50,7 +51,8 @@ enum PreviewRenderer {
             snap = (CommandLine.arguments.contains("seen") ? r.confirmingAssumedReset(seen: monthStart) : r)
                 .withPriorPace(from: UsageHistory.load())   // as the app does, for early projections
         } else {
-            snap = enterprise ? .sampleEnterprise : CommandLine.arguments.contains("extra") ? .sampleWithExtra : .sample
+            snap = enterprise ? .sampleEnterprise
+                : (CommandLine.arguments.contains("extra") ? UsageSnapshot.sampleWithExtra : UsageSnapshot.sample).withFableIf(CommandLine.arguments.contains("fable"))
         }
         // Live numbers get the real recorded history; samples get a made-up one.
         let light = CommandLine.arguments.contains("light")
@@ -100,10 +102,11 @@ enum PreviewRenderer {
             Key.labels: !a.contains("nolabels"), Key.percent: !a.contains("nopercent"),
             Key.pace: !a.contains("nopace"), Key.ahead: !a.contains("noahead"),
             Key.aheadAs: a.contains("left") ? "left" : a.contains("early") ? "early" : "points",
-            Key.palette: a.contains("mono") ? "mono" : "colour",
+            Key.palette: a.contains("mono") ? "mono" : a.contains("alerts") ? "alerts" : "colour",
             Key.budgetAs: a.contains("amount") ? "amount" : "percent",
             "budgetChartMode": a.contains("daily") ? "daily" : "total",
             Key.extra: a.contains("extra"),
+            UsagePanel.settingsShownKey: a.contains("panel"),   // the whole popup shows its settings open
             Key.limits: a.contains("only5h") ? "session" : a.contains("only7d") ? "week" : "both",
         ]
         for (k, v) in settings { store.set(v, forKey: k) }
@@ -147,10 +150,10 @@ enum PreviewRenderer {
     /// The menu bar item, enlarged 6x, on a light and a dark menu bar (two stacked strips).
     private static func writeLabelPreview(model: UsageModel, output: String) {
         let args = CommandLine.arguments
-        let options = MenuBarImage.Options(labels: !args.contains("nolabels"), percent: !args.contains("nopercent"),
+        let options = MenuBarImage.Options(labels: !args.contains("nolabels") && model.snapshot?.isBudgetOnly != true, percent: !args.contains("nopercent"),
                                            pace: !args.contains("nopace"), ahead: !args.contains("noahead"),
                                            aheadAs: args.contains("left") ? .left : args.contains("early") ? .early : .points,
-                                           palette: args.contains("mono") ? .mono : .colour,
+                                           palette: args.contains("mono") ? .mono : args.contains("alerts") ? .alerts : .colour,
                                            budgetAs: args.contains("amount") ? .amount : .percent,
                                            extra: args.contains("extra"),
                                            limits: args.contains("only5h") ? .session : args.contains("only7d") ? .week : .both)

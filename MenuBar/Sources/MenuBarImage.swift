@@ -77,9 +77,16 @@ enum MenuBarImage {
 
     /// Colour: the bars and rings show the pace (green, yellow, orange). Mono: they're drawn in
     /// the menu bar's text colour, like the numbers, so the item looks like the system's own.
+    /// Alerts: Mono while on or under pace, the pace colour once ahead of it or nearly full.
     enum Palette: String, CaseIterable {
-        case colour, mono
-        var name: String { self == .colour ? "Colour" : "Mono" }
+        case colour, alerts, mono
+        var name: String {
+            switch self {
+            case .colour: return "Colour"
+            case .alerts: return "Alerts"
+            case .mono: return "Mono"
+            }
+        }
         init(saved: String) { self = Palette(rawValue: saved) ?? .colour }
     }
 
@@ -154,9 +161,14 @@ enum MenuBarImage {
         return PaceLead.wellAhead <= lead ? .far : 0 < lead ? .ahead : .under
     }
 
-    /// The bar's or ring's fill: its pace colour, or the text colour in Mono.
+    /// The bar's or ring's fill: its pace colour, the text colour in Mono, and in Alerts the pace
+    /// colour only once it's ahead of pace or nearly full (yellow or orange).
     static func fillColor(_ row: Row, _ o: Options) -> NSColor {
-        o.palette == .mono ? .labelColor : color(paceState(row))
+        switch o.palette {
+        case .colour: return color(paceState(row))
+        case .mono: return .labelColor
+        case .alerts: return paceState(row) >= .ahead ? color(paceState(row)) : .labelColor
+        }
     }
 
     static func color(_ state: PaceState) -> NSColor {
@@ -249,9 +261,9 @@ enum MenuBarImage {
         }
 
         /// Fonts for the label, % and ahead columns at `size`.
-        static func fonts(size: CGFloat) -> [NSFont] {
-            let fixed = NSFont.monospacedDigitSystemFont(ofSize: size, weight: .semibold)
-            return [fixed, fixed, NSFont.systemFont(ofSize: size, weight: .semibold)]
+        static func fonts(size: CGFloat, weight: NSFont.Weight = .semibold) -> [NSFont] {
+            let fixed = NSFont.monospacedDigitSystemFont(ofSize: size, weight: weight)
+            return [fixed, fixed, NSFont.systemFont(ofSize: size, weight: weight)]
         }
 
         var width: CGFloat { widths.isEmpty ? 0 : widths.reduce(0, +) + Self.gap * CGFloat(widths.count - 1) }
@@ -348,13 +360,17 @@ enum MenuBarImage {
     /// Compact: concentric pace rings (outer first) and their numbers beside them. One ring shows
     /// its number at full size; two (Pro/Max: week outside, session inside) stack theirs like the
     /// Bars rows, session on top.
+    /// One ring: regular, like the system's own menu bar labels (the battery's percentage is the same
+    /// size and regular). Two rings stack 9 pt numbers, which are too thin to read in regular.
+    private static func compactWeight(stacked: Bool) -> NSFont.Weight { stacked ? .semibold : .regular }
+
     static func makeCompact(rings: [Row], options o: Options = Options()) -> NSImage {
         let rings = Array(rings.prefix(2))
         let stacked = rings.count > 1
-        let font = NSFont.monospacedDigitSystemFont(ofSize: stacked ? 9 : 11, weight: .semibold)
         let textRows = stacked ? Array(rings.reversed()) : rings
-        let columns = Columns(textRows.map { cells($0, o, label: o.labels) }, leftAligned: [true, false, false],
-                              fonts: Columns.fonts(size: font.pointSize))
+        let fonts = Columns.fonts(size: stacked ? 9 : 11, weight: compactWeight(stacked: stacked))
+        let numberFont = fonts[1]
+        let columns = Columns(textRows.map { cells($0, o, label: o.labels) }, leftAligned: [true, false, false], fonts: fonts)
         let diameter: CGFloat = stacked ? 16 : 13, line: CGFloat = stacked ? 2.2 : 2.5
         let ringGap: CGFloat = 1
         let textGap: CGFloat = columns.width > 0 ? 3 : 0
@@ -394,7 +410,7 @@ enum MenuBarImage {
                 }
             }
 
-            let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.labelColor]
+            let attrs: [NSAttributedString.Key: Any] = [.font: numberFont, .foregroundColor: NSColor.labelColor]
             let rowHeight = stacked ? Self.rowHeight : height
             let firstBottom = (height + rowHeight * CGFloat(textRows.count)) / 2 - rowHeight
             let textHeight = ("0" as NSString).size(withAttributes: attrs).height

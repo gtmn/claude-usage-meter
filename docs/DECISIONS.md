@@ -23,6 +23,17 @@ options that were ruled out, so they aren't tried again.
 - **The budget resets at 00:00 UTC on the 1st**, as in Claude's own UI (which computes it in the browser). A
   drop within 20 minutes of that time is remembered as confirmation and removes "(assumed)".
 - **Early projections use last period's pace** until 15% of the period has passed, then the current pace.
+  A period counts once a quarter of it is recorded (the pace is usage over the time covered); if the last
+  one has less, the most recent earlier period in the history (40 days) stands in, named "an earlier week's".
+  Not from Claude Code's logs: they cover one Mac, at list prices, without claude.ai, and can't be scaled
+  without real totals.
+
+## Menu bar
+
+- **No Labels setting and no `$` label on a $ budget.** There's only one bar, so a label tells nothing apart,
+  and the amount (`$306`) carries its own `$`.
+- **A model's own weekly limit (Fable) is a third line in the week graph**, not a chart of its own: same 0-100%
+  scale over the same week. Ochre, because violet merges with the blue week line for colour-blind readers.
 
 ## History and estimates
 

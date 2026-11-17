@@ -117,8 +117,10 @@ let nov = UsageHistory(points: [bp("2026-11-10 12:00", 20000), bp("2026-11-30 23
 let novPace = nov.priorPace(for: dec)
 check("last month's pace: November's total over the time it covers",
       novPace.map { abs($0 - 30 / at("2026-11-30 23:50").timeIntervalSince(at("2026-11-01 00:00"))) < 1e-12 } ?? false)
-check("no pace when the history covers only the first half of last month",
-      UsageHistory(points: [bp("2026-11-10 12:00", 20000)]).priorPace(for: dec) == nil)
+check("no pace when the history covers less than a quarter of last month",
+      UsageHistory(points: [bp("2026-11-06 12:00", 20000)]).priorPace(for: dec) == nil)
+check("a third of last month is enough",
+      UsageHistory(points: [bp("2026-11-10 12:00", 20000)]).priorPeriod(for: dec)?.back == 1)
 check("no pace for the 5 h session", nov.priorPace(for: UsageWindow(key: "five_hour", percent: 5, resetsAt: at("2026-12-01 05:00"))) == nil)
 var early = dec; early.priorPace = novPace
 let day1 = at("2026-12-01 03:00")
@@ -142,13 +144,24 @@ var week = UsageWindow(key: "seven_day", percent: 4, resetsAt: at("2026-11-18 05
 week.priorPace = wk.priorPace(for: week)
 check("the weekly limit uses last week's final percentage",
       week.outlook(now: at("2026-11-11 09:00"), calendar: cal).hasPrefix("At last week's pace:"))
+// Last week barely recorded (Mac off): the week before stands in, and the outlook says so.
+let older = UsageHistory(points: [HistoryPoint(t: at("2026-11-03 20:00"), key: "seven_day", percent: 50),
+                                  HistoryPoint(t: at("2026-11-04 06:00"), key: "seven_day", percent: 2)])
+let olderPrior = older.priorPeriod(for: week)
+check("an earlier week stands in when last week has too little (\(olderPrior?.back ?? 0) back)",
+      olderPrior?.back == 2 && olderPrior.map { abs($0.pace - 50 / at("2026-11-03 20:00").timeIntervalSince(at("2026-10-28 05:00"))) < 1e-12 } ?? false)
+var weekOlder = week; weekOlder.priorPace = olderPrior?.pace; weekOlder.priorPeriodsBack = olderPrior?.back ?? 1
+check("…and the outlook names it as an earlier week",
+      weekOlder.outlook(now: at("2026-11-11 09:00"), calendar: cal).hasPrefix("At an earlier week's pace:"))
+check("no stand-in beyond what the history holds",
+      UsageHistory(points: [HistoryPoint(t: at("2026-11-04 06:00"), key: "seven_day", percent: 2)]).priorPeriod(for: week) == nil)
 
 // Saved numbers: the outlook projects from when they were fetched, not from now.
 let novBudget = UsageWindow(key: "extra_usage", percent: 14.519, resetsAt: at("2026-12-01 00:00"),
                             spend: Spend(used: Money(minor: 29038, exponent: 2, currency: "USD"), limit: Money(minor: 200000, exponent: 2, currency: "USD")))
 let fetched = at("2026-11-13 23:11"), monday = at("2026-11-16 09:00")
 check("saved numbers project at the pace up to their fetch time",
-      novBudget.outlook(now: monday, asOf: fetched, calendar: cal) == "Lasts until the 1 Dec reset — on track for about $670")
+      novBudget.outlook(now: monday, asOf: fetched, calendar: cal) == "Lasts until the reset — on track for about $670")
 check("…while treating them as current projects lower (no spending since)",
       (novBudget.projectedPercentAtReset(now: monday) ?? 0) < (novBudget.projectedPercentAtReset(now: fetched) ?? 0))
 let fast = UsageWindow(key: "seven_day", percent: 80, resetsAt: at("2026-11-17 05:00"))

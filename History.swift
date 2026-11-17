@@ -265,35 +265,60 @@ extension UsageSnapshot {
 extension UsageHistory {
     /// The previous period's average pace, in percent of the limit per second, for the limits that
     /// reset on a fixed cycle (the weekly windows and the budget; a 5 h session says little about
-    /// the next one). Taken from the last recorded point before the current period began, which
-    /// must lie in the second half of the previous period. The budget is measured against today's
-    /// limit, so a raised or lowered budget still projects in today's terms.
-    public func priorPace(for w: UsageWindow) -> Double? {
+    /// the next one). Taken from the last recorded point of the most recent earlier period it
+    /// covers well enough (see `priorPeriod`). The budget is measured against today's limit, so a
+    /// raised or lowered budget still projects in today's terms.
+    public func priorPace(for w: UsageWindow) -> Double? { priorPeriod(for: w)?.pace }
+
+    /// The most recent earlier period with enough recorded for a pace (`priorPace`), and how many
+    /// periods back it is. Tries the last period first, then older ones as far as the history goes
+    /// (it keeps 40 days: about five weeks, or one month). A period counts once its last recorded
+    /// point is at least `priorCoverage` of the way through it.
+    public func priorPeriod(for w: UsageWindow) -> (pace: Double, back: Int)? {
         guard w.key == "extra_usage" || w.key.hasPrefix("seven_day"),
               let reset = w.resetsAt, let d = w.duration else { return nil }
         let start = reset.addingTimeInterval(-d)
-        let prevStart = w.key == "extra_usage" && w.spend?.periodLength == nil
-            ? Spend.utc.date(byAdding: .month, value: -1, to: start)!
-            : start.addingTimeInterval(-d)
-        guard let last = points.last(where: { $0.key == w.key && $0.estimated != true && $0.t < start && $0.t > prevStart })
-        else { return nil }
-        let covered = last.t.timeIntervalSince(prevStart)
-        guard covered >= start.timeIntervalSince(prevStart) * 0.5 else { return nil }
-        let used: Double
-        if w.key == "extra_usage" {
-            guard let minor = last.usedMinor, let limit = w.spend?.limit.minor, limit > 0 else { return nil }
-            used = Double(minor) / Double(limit) * 100
-        } else {
-            used = last.percent
+        let monthly = w.key == "extra_usage" && w.spend?.periodLength == nil
+        func periodStart(_ back: Int) -> Date {
+            monthly ? Spend.utc.date(byAdding: .month, value: -back, to: start)! : start.addingTimeInterval(-Double(back) * d)
         }
-        return used / covered
+        let own = points.filter { $0.key == w.key && $0.estimated != true }
+        guard let oldest = own.first?.t else { return nil }
+        var back = 1
+        while back <= 6, periodStart(back - 1) > oldest {
+            let (from, to) = (periodStart(back), periodStart(back - 1))
+            if let last = own.last(where: { $0.t < to && $0.t > from }) {
+                let covered = last.t.timeIntervalSince(from)
+                if covered >= to.timeIntervalSince(from) * Self.priorCoverage {
+                    let used: Double
+                    if w.key == "extra_usage" {
+                        guard let minor = last.usedMinor, let limit = w.spend?.limit.minor, limit > 0 else { return nil }
+                        used = Double(minor) / Double(limit) * 100
+                    } else {
+                        used = last.percent
+                    }
+                    return (used / covered, back)
+                }
+            }
+            back += 1
+        }
+        return nil
     }
+
+    /// How far into a period its last recorded point must be for the period's pace to count.
+    /// The pace is the usage over the time covered, so a quarter still gives a fair rate.
+    public static let priorCoverage = 0.25
 }
 
 extension UsageSnapshot {
     /// Each window with its previous period's pace from the history, for early projections.
     public func withPriorPace(from history: UsageHistory) -> UsageSnapshot {
-        let ws = windows.map { w -> UsageWindow in var w = w; w.priorPace = history.priorPace(for: w); return w }
+        let ws = windows.map { w -> UsageWindow in
+            var w = w
+            let prior = history.priorPeriod(for: w)
+            w.priorPace = prior?.pace; w.priorPeriodsBack = prior?.back ?? 1
+            return w
+        }
         return UsageSnapshot(source: source, capturedAt: capturedAt, windows: ws,
                              serverPace: serverPace, serverIndicator: serverIndicator, severity: severity)
     }

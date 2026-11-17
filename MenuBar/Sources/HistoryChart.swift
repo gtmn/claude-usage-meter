@@ -25,7 +25,8 @@ struct HistoryChart: View {
                 BudgetHistoryChart(window: w, history: model.history, logWeights: model.logWeights, now: asOf)
             } else if s.window("seven_day") != nil || s.window("five_hour") != nil {
                 VStack(alignment: .leading, spacing: 12) {
-                    LimitsHistoryChart(history: model.history, week: s.window("seven_day"), now: asOf)
+                    LimitsHistoryChart(history: model.history, week: s.window("seven_day"), now: asOf,
+                                       models: s.windows.map(\.key).filter { $0.hasPrefix("seven_day_") }.sorted())
                     // Pro/Max extra usage: its own $ chart. No log estimates: most Claude Code activity
                     // is covered by the plan, and the logs can't tell which part was paid extra.
                     if let w = s.extraUsage {
@@ -50,6 +51,14 @@ enum ChartInk {
     static func series2(_ scheme: ColorScheme) -> Color {
         scheme == .dark ? Color(red: 0xd5 / 255, green: 0x51 / 255, blue: 0x81 / 255)
                         : Color(red: 0xe8 / 255, green: 0x7b / 255, blue: 0xa4 / 255)
+    }
+    /// Third series, a model's own weekly limit (Fable): ochre. Violet would merge with the blue
+    /// week line for colour-blind readers (OKLab ΔE under 2 with deuteranopia simulated); ochre keeps
+    /// ΔE 15+ from blue and magenta in dark mode and 10+ in light. Darker than the bars' bright
+    /// "ahead" yellow, and the line keeps its legend entry and end label.
+    static func series3(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color(red: 0xc9 / 255, green: 0xa2 / 255, blue: 0x27 / 255)
+                        : Color(red: 0xb0 / 255, green: 0x8a / 255, blue: 0x10 / 255)
     }
     /// Reference marks (budget line, hover rule): neutral, not a series.
     static let muted = Color.primary.opacity(0.42)
@@ -588,6 +597,8 @@ struct LimitsHistoryChart: View {
     /// The weekly limit (with last week's pace when known): sets the chart's span and the projection.
     var week: UsageWindow? = nil
     let now: Date
+    /// A model's own weekly limits ("seven_day_fable"): a line each, as far as there are colours (one today).
+    var models: [String] = []
     @Environment(\.colorScheme) private var scheme
     @Environment(\.previewHover) private var previewHover
     @ViewState private var hovered: Date?
@@ -604,7 +615,10 @@ struct LimitsHistoryChart: View {
         let lines = [
             Line(key: "seven_day", name: "Week (7 d)", short: "7d", color: weekColor),
             Line(key: "five_hour", name: "Session (5 h)", short: "5h", color: ChartInk.series2(scheme)),
-        ]
+        ] + zip(models, [ChartInk.series3(scheme)]).map { key, color in
+            let model = key.dropFirst("seven_day_".count).replacingOccurrences(of: "_", with: " ").capitalized
+            return Line(key: key, name: "\(model) (7 d)", short: model, color: color)
+        }
         let series = lines.map { l in
             (l, ChartPoint.runs(history.series(l.key, from: start, to: now).map { ($0.t, $0.percent) }))
         }.filter { $0.1.count >= 1 }
@@ -685,7 +699,7 @@ struct LimitsHistoryChart: View {
                             .font(.system(size: 9)).foregroundStyle(ChartInk.label)
                     }
                 }
-                .chartPlotStyle { $0.padding(.trailing, 34) }   // room for the end labels
+                .chartPlotStyle { $0.padding(.trailing, models.isEmpty ? 34 : 50) }   // room for the end labels
                 .modifier(HoverLayer(times: times, future: projection?.span, hovered: $hovered))
                 .padding(.top, projection == nil ? 6 : 14)   // room for the projection label above 100%
                 .frame(height: projection == nil ? 110 : 118)

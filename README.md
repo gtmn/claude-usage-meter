@@ -22,7 +22,7 @@ already keeps on your Mac.
 
 ## What it shows
 
-- **Menu bar**, in one of two styles, switched under **Menu bar** in the popup:
+- **Menu bar**, in one of two styles, switched under **Style** in the popup's settings (the gear button):
   - **Bars** (default): two mini bars, `5h` and `7d`, with percentages (or just one of them,
     see [Settings](#settings)), or a single `$` bar on an Enterprise/Team seat.
   - **Compact**: rings with their percentages beside them: the week outside and the 5h
@@ -32,9 +32,10 @@ already keeps on your Mac.
   Both use the same colours, as ClaudeUsageBar's pace icon: green on or under pace, yellow
   ahead of it, orange 15+ points ahead (about a day early in a week) or nearly full (90%+). Early
   in a window, where a few percent would look far ahead, it stays plain. Switch **Colour** to
-  **Mono** for bars or rings in the menu bar's text colour, like the numbers. On a $ budget,
-  **% / Amount** shows the share used (`21%`) or the money spent so far (`$306`). Checkboxes in the
-  popup turn on or off the `5h`/`7d` **labels**, the **percent**, a **pace tick** where usage
+  **Mono** for bars or rings in the menu bar's text colour, like the numbers, or to **Alerts** for
+  the text colour while on or under pace and yellow or orange only once a limit is ahead or nearly full. On a $ budget,
+  the number can be the share used (`21%`) or the money spent so far (`$306`). The popup's settings
+  turn on or off the `5h`/`7d` **labels**, the **number**, a **pace tick** where usage
   would be if spread evenly over the window, and, once a limit is 15+ points ahead, the points
   ahead of pace (`+24`: % used minus % expected by now), the time left until it runs out
   at that pace (`1.5d left`), or how long before the reset that is (`3d early`). Times are rounded: half days from a day on (`1.5d`),
@@ -43,8 +44,8 @@ already keeps on your Mac.
   - usage bar with a pace marker (how much of the window has passed)
   - for the $ budget: the amount used, the budget and what's left,
     e.g. *$412.80 used of $2,000.00 · $1,587.20 left*
-  - an outlook line, e.g. *Lasts until the reset at 14:00 — on track for about 45%*,
-    or in money for the budget, *Lasts until the 1 Dec reset — on track for about $1,240*
+  - an outlook line, e.g. *Lasts until the reset — on track for about 45%*,
+    or in money for the budget, *Lasts until the reset — on track for about $1,240*
   - reset time
 - **The budget's reset date** isn't part of the usage data. The app takes the real one from
   the [status-line snapshot](#optional-status-line-snapshot) when you've set that up (Claude Code
@@ -60,7 +61,8 @@ already keeps on your Mac.
   - on an Enterprise/Team seat, money spent across the budget period, with a dashed
     projection to the reset (and the budget line once the curve gets near it). Switch to
     **Per day** for a bar per day, in UTC days like Claude's own usage page.
-  - on Pro/Max, the 5h and 7d percentages this week (from the last weekly reset to the next), with a
+  - on Pro/Max, the 5h and 7d percentages this week (from the last weekly reset to the next), plus a
+    line for a model's own weekly limit (Fable) when the plan has one, with a
     dashed projection of the weekly limit to 100% or to the reset, matching the outlook line
   - hover over it for the time and value at any point
 
@@ -98,22 +100,31 @@ window. In the first 15% of a window (45 minutes of the 5-hour window, about a d
 of the week, about 4½ days of the month) that rate alone is too jumpy: $20 in the
 first two hours of a month would project to $7,200. So the week and the budget start
 from the previous period's average pace instead, from the app's own history, e.g.
-*At last month's pace: about $600 by the 1 Jan reset*. As the first 15% goes by,
-this period's own spending counts more and more, and after it only this period counts.
-The 5-hour session, and any limit without a recorded previous period, says
+*At last month's pace: about $600 by the 1 Jan reset*. A period counts once the app
+recorded at least a quarter of it; if the last one has less (the Mac was off), the most
+recent earlier one the history covers stands in (*At an earlier week's pace: …*). As the
+first 15% goes by, this period's own spending counts more and more, and after it only this
+period counts. The 5-hour session, and any limit without such a period, says
 *Too early to project* until then.
 
 ## Settings
 
-Under the graph, the popup sets what the menu bar item shows (hover over a control to see
-what it does). On a $ budget, **Percent** becomes **Used**, with a choice of `%` or the amount.
-On Pro/Max, **Show** picks both limits or only `5h` or `7d` for the menu bar; the popup and
-the graph keep showing both. An account without a 5-hour limit shows only `7d` anyway.
-With extra usage turned on, **Extra usage beside it** adds a `$` item for it.
+The gear button at the top of the popup shows or hides the settings (closed until you open them;
+the app remembers). They sit under the graph: **Menu bar item**, one setting per row, then
+**Open at login** and **Quit** (⌘Q also quits while the popup is open). Hover over a control to
+see what it does.
+- **Style**: Bars or Compact; Colour, Alerts or Mono.
+- **Limits** (Pro/Max): both, or only `5h` or `7d`. The popup and the graph keep showing both.
+  An account without a 5-hour limit shows only `7d` anyway.
+- **Number**: `%` or off; on a $ budget also the amount spent.
+- **Extra usage** (Pro/Max with extra usage turned on): a `$` item beside the limits, as `%` or amount.
+- **When ahead**: off, or how far ahead once a limit is 15+ points ahead of pace.
+- **Labels** and **Pace tick**. On a $ budget there's no Labels setting and no `$` label: one bar
+  needs no label, and the amount (`$306`) has its own `$`.
 
 | Pro / Max | Enterprise / Team |
 |---|---|
-| <img src="docs/screenshots/settings-pro-max.png" width="356" alt="Settings: Menu bar Bars or Compact, Colour or Mono; Show Both, 5h or 7d; checkboxes Labels, Percent, Pace tick; Extra usage beside it, as % or Amount; When well ahead, show +N, time left or early"> | <img src="docs/screenshots/settings-enterprise.png" width="356" alt="The same settings on a budget account: the Percent checkbox reads Used, with a switch between % and Amount"> |
+| <img src="docs/screenshots/settings-pro-max.png" width="356" alt="Menu bar item settings, one per row: Style Bars or Compact and Colour, Alerts or Mono; Limits Both, 5h or 7d; Number % or Off; Extra usage Off, % or Amount; When ahead Off, +N, time left or early; checkboxes Labels and Pace tick"> | <img src="docs/screenshots/settings-enterprise.png" width="356" alt="The same settings on a budget account: Number %, Amount or Off, no Limits or Extra usage rows, and only the Pace tick checkbox"> |
 
 Some of the combinations, shown enlarged on a dark and a light menu bar:
 
@@ -124,6 +135,10 @@ Some of the combinations, shown enlarged on a dark and a light menu bar:
 | Pro/Max with extra usage beside it | The popup with extra usage |
 |---|---|
 | <img src="docs/screenshots/menubar-pro-max-extra.png" width="190" alt="The 5h and 7d bars, and beside them a $ bar with $12"> | <img src="docs/screenshots/popup-pro-max-extra.png" width="356" alt="Popup: Session and Week rows, then Extra usage at 25%, $12.40 used of $50.00, on track for about $24; the 5h/7d graph, and below it a graph of extra usage this month with the $50 limit and a dashed projection"> |
+
+| With a Fable weekly limit |
+|---|
+| <img src="docs/screenshots/popup-pro-max-fable.png" width="356" alt="Popup: Session, Week all models and Week Fable at 35%; the week graph with a third, ochre line for Fable ending at Fable 35%"> |
 
 ## How it gets the data
 
@@ -261,6 +276,7 @@ mv docs/screenshots/popup-pro-max.png.label.png docs/screenshots/menubar-pro-max
 mv docs/screenshots/popup-enterprise.png.label.png docs/screenshots/menubar-enterprise.png
 $APP --render-preview docs/screenshots/settings-pro-max.png settings extra
 $APP --render-preview docs/screenshots/popup-pro-max-extra.png extra amount
+$APP --render-preview docs/screenshots/popup-pro-max-fable.png fable
 mv docs/screenshots/popup-pro-max-extra.png.label.png docs/screenshots/menubar-pro-max-extra.png
 $APP --render-preview docs/screenshots/settings-enterprise.png settings enterprise amount
 for v in compact mono "enterprise amount"; do
@@ -272,7 +288,7 @@ rm docs/screenshots/*.label.png /tmp/um.png
 
 Renders never read or change your own settings: they use the arguments, in a throwaway store.
 
-Add `compact` for the Compact menu bar style, `mono` for the Mono palette, `amount` for the budget's amount, `extra` for Pro/Max with extra usage (and its menu bar item), `only5h` or `only7d` for one limit in the menu bar, `panel` for the whole popup or `settings` for its settings alone, `nolabels`, `nopercent`, `nopace` or `noahead` to leave those out, `left` or `early` for the time left or early, `daily` for the per-day bars, `hover` to show the graph's tooltip (`hover=1.5` halfway along the projection), `light` for light mode, or `live` to render your
+Add `compact` for the Compact menu bar style, `mono` or `alerts` for those palettes, `amount` for the budget's amount, `extra` for Pro/Max with extra usage (and its menu bar item), `only5h` or `only7d` for one limit in the menu bar, `fable` for a Fable weekly limit (and its line in the graph), `panel` for the whole popup or `settings` for its settings alone, `nolabels`, `nopercent`, `nopace` or `noahead` to leave those out, `left` or `early` for the time left or early, `daily` for the per-day bars, `hover` to show the graph's tooltip (`hover=1.5` halfway along the projection), `light` for light mode, or `live` to render your
 own current numbers and recorded history instead (don't commit those).
 
 ## Releasing

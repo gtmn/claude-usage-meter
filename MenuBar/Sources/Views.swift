@@ -17,7 +17,8 @@ struct MenuBarLabel: View {
     @AppStorage(MenuBarImage.Options.Key.limits) private var limits = MenuBarImage.Limits.both.rawValue
 
     var body: some View {
-        let options = MenuBarImage.Options(labels: showLabels, percent: showPercent, pace: showPace,
+        // On a budget there's no Labels setting and no "$" label: a single bar needs none, and the amount ("$412") has its own "$".
+        let options = MenuBarImage.Options(labels: showLabels && model.snapshot?.isBudgetOnly != true, percent: showPercent, pace: showPace,
                                            ahead: showAhead, aheadAs: MenuBarImage.AheadAs(saved: aheadAs),
                                            palette: MenuBarImage.Palette(saved: palette),
                                            budgetAs: MenuBarImage.BudgetAs(saved: budgetAs), extra: showExtra,
@@ -47,71 +48,75 @@ struct MenuBarSettings: View {
     @AppStorage(MenuBarImage.Options.Key.limits) private var limits = MenuBarImage.Limits.both.rawValue
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            HStack(spacing: 6) {
-                Text("Menu bar").font(.system(size: 11))
-                ModeSwitch(mode: Binding(get: { MenuBarImage.Style(saved: menuBarStyle).rawValue },
-                                         set: { menuBarStyle = $0 }),
+        let snapshot = model.snapshot
+        let budget = snapshot?.isBudgetOnly == true
+        VStack(alignment: .leading, spacing: 5) {
+            Text("Menu bar item").font(.system(size: 11, weight: .semibold))
+            row("Style") {
+                ModeSwitch(mode: Binding(get: { MenuBarImage.Style(saved: menuBarStyle).rawValue }, set: { menuBarStyle = $0 }),
                            options: MenuBarImage.Style.allCases.map { ($0.rawValue, $0.name) })
                     .help("Bars: the session and weekly bars. Compact: rings, the week outside and the session inside "
                           + "(one budget ring on Enterprise).")
                 ModeSwitch(mode: Binding(get: { MenuBarImage.Palette(saved: palette).rawValue }, set: { palette = $0 }),
                            options: MenuBarImage.Palette.allCases.map { ($0.rawValue, $0.name) })
                     .help("Colour: green on or under pace, yellow ahead, orange 15+ points ahead. "
-                          + "Mono: in the menu bar's text colour, like the numbers.")
-                Spacer()
+                          + "Alerts: in the text colour while on or under pace, yellow or orange once ahead or nearly full. "
+                          + "Mono: always in the menu bar's text colour, like the numbers.")
             }
-            if model.snapshot?.window("five_hour") != nil && model.snapshot?.window("seven_day") != nil {
-                HStack(spacing: 6) {
-                    Text("Show").font(.system(size: 11))
+            if snapshot?.window("five_hour") != nil && snapshot?.window("seven_day") != nil {
+                row("Limits", help: "Which limits the menu bar shows: the 5 h session and the week, or one of them. "
+                    + "The popup and the graph always show both.") {
                     ModeSwitch(mode: Binding(get: { MenuBarImage.Limits(saved: limits).rawValue }, set: { limits = $0 }),
                                options: MenuBarImage.Limits.allCases.map { ($0.rawValue, $0.name) })
-                        .help("Which limits the menu bar shows: the 5 h session and the week, or one of them. "
-                              + "The popup and the graph always show both.")
-                    Spacer(minLength: 0)
                 }
             }
-            HStack(spacing: 10) {
-                Toggle("Labels", isOn: $showLabels).help("“5h” and “7d” (or “$”) beside the bars or numbers")
-                if model.snapshot?.isBudgetOnly == true {
-                    HStack(spacing: 4) {
-                        Toggle("Used", isOn: $showPercent).help("How much of the budget is used")
-                        ModeSwitch(mode: Binding(get: { MenuBarImage.BudgetAs(saved: budgetAs).rawValue }, set: { budgetAs = $0 }),
-                                   options: MenuBarImage.BudgetAs.allCases.map { ($0.rawValue, $0.name) })
-                            .help("%: the share of the budget used (21%). Amount: the money spent so far, in whole units ($306).")
-                            .disabled(!showPercent).opacity(showPercent ? 1 : 0.5)
-                    }
-                } else {
-                    Toggle("Percent", isOn: $showPercent).help("How much of each limit is used")
+            row("Number", help: budget
+                ? "%: the share of the budget used (21%). Amount: the money spent so far, in whole units ($306). Off: the bar alone."
+                : "How much of each limit is used (60%). Off: the bars alone.") {
+                ModeSwitch(mode: Binding(get: { !showPercent ? "off" : budget ? MenuBarImage.BudgetAs(saved: budgetAs).rawValue : "percent" },
+                                         set: { showPercent = $0 != "off"; if budget && $0 != "off" { budgetAs = $0 } }),
+                           options: (budget ? MenuBarImage.BudgetAs.allCases.map { ($0.rawValue, $0.name) } : [("percent", "%")])
+                               + [("off", "Off")])
+            }
+            if snapshot?.extraUsage != nil {
+                row("Extra usage", help: "Your extra usage as its own $ item next to the 5h and 7d one: as the share of its "
+                    + "limit used (25%) or the money spent so far ($12).") {
+                    ModeSwitch(mode: Binding(get: { showExtra ? MenuBarImage.BudgetAs(saved: budgetAs).rawValue : "off" },
+                                             set: { showExtra = $0 != "off"; if $0 != "off" { budgetAs = $0 } }),
+                               options: [("off", "Off")] + MenuBarImage.BudgetAs.allCases.map { ($0.rawValue, $0.name) })
+                }
+            }
+            row("When ahead", help: "Once a limit is 15+ points ahead of pace (orange). +N: percentage points ahead of pace "
+                + "(% used minus % expected by now, e.g. 52% − 27% = +25). time left: until it runs out at this pace (1.5d left). "
+                + "early: how long before the reset it runs out (3d early). Half days, whole hours, and minutes only for the 5 h session.") {
+                ModeSwitch(mode: Binding(get: { showAhead ? MenuBarImage.AheadAs(saved: aheadAs).rawValue : "off" },
+                                         set: { showAhead = $0 != "off"; if $0 != "off" { aheadAs = $0 } }),
+                           options: [("off", "Off")] + MenuBarImage.AheadAs.allCases.map { ($0.rawValue, $0.name) })
+            }
+            HStack(spacing: 12) {
+                if !budget {
+                    Toggle("Labels", isOn: $showLabels).help("“5h” and “7d” (and “$” for extra usage) beside the bars or numbers")
                 }
                 Toggle("Pace tick", isOn: $showPace).help("A tick where usage would be by now if spread evenly over the window")
-                Spacer(minLength: 0)
             }
             .toggleStyle(.checkbox).controlSize(.small).font(.system(size: 11))
-            if model.snapshot?.extraUsage != nil {
-                HStack(spacing: 4) {
-                    Toggle("Extra usage beside it", isOn: $showExtra)
-                        .toggleStyle(.checkbox).controlSize(.small).font(.system(size: 11))
-                        .help("Your extra usage as its own $ item next to the 5h and 7d one")
-                    ModeSwitch(mode: Binding(get: { MenuBarImage.BudgetAs(saved: budgetAs).rawValue }, set: { budgetAs = $0 }),
-                               options: MenuBarImage.BudgetAs.allCases.map { ($0.rawValue, $0.name) })
-                        .help("%: the share of the extra-usage limit used (25%). Amount: the money spent so far ($12).")
-                        .disabled(!showExtra || !showPercent).opacity(showExtra && showPercent ? 1 : 0.5)
-                    Spacer(minLength: 0)
-                }
-            }
-            HStack(spacing: 6) {
-                Toggle("When well ahead, show", isOn: $showAhead)
-                    .toggleStyle(.checkbox).controlSize(.small).font(.system(size: 11))
-                    .help("Once a limit is 15+ points ahead of pace (orange): how far ahead")
-                ModeSwitch(mode: Binding(get: { MenuBarImage.AheadAs(saved: aheadAs).rawValue }, set: { aheadAs = $0 }),
-                           options: MenuBarImage.AheadAs.allCases.map { ($0.rawValue, $0.name) })
-                    .help("+N: percentage points ahead of pace (% used minus % expected by now, e.g. 52% − 27% = +25). time left: until it runs out at this pace (1.5d left). "
-                          + "early: how long before the reset it runs out (3d early). Half days, whole hours, and minutes only for the 5 h session.")
-                    .disabled(!showAhead).opacity(showAhead ? 1 : 0.5)
-                Spacer(minLength: 0)
-            }
+            .padding(.top, 1)
         }
+    }
+
+    private static let nameWidth: CGFloat = 74
+
+    /// One setting: its name in a fixed column, so the names line up, and its controls beside it.
+    private func row<Control: View>(_ name: String, @ViewBuilder control: () -> Control) -> some View {
+        HStack(spacing: 6) {
+            Text(name).font(.system(size: 11)).frame(width: Self.nameWidth, alignment: .leading)
+            control()
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func row<Control: View>(_ name: String, help: String, @ViewBuilder control: () -> Control) -> some View {
+        row(name, control: control).help(help)
     }
 }
 
@@ -123,12 +128,18 @@ struct UsagePanel: View {
 
     @ObservedObject var model: UsageModel
     @ViewState private var openAtLogin = SMAppService.mainApp.status == .enabled
+    /// The menu bar settings, shown or hidden with the gear button (closed until opened; remembered).
+    @AppStorage(UsagePanel.settingsShownKey) private var settingsShown = false
+    static let settingsShownKey = "settingsShown"
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
             HStack {
                 Text("Claude usage").font(.system(size: 12, weight: .semibold))
                 Spacer()
+                Button { settingsShown.toggle() } label: { Image(systemName: settingsShown ? "gearshape.fill" : "gearshape") }
+                    .buttonStyle(.borderless)
+                    .help(settingsShown ? "Hide the menu bar settings" : "Menu bar settings")
                 if model.isLoading {
                     ProgressView().controlSize(.mini)
                 } else {
@@ -140,28 +151,35 @@ struct UsagePanel: View {
 
             UsageRows(model: model)
 
-            Divider()
-
-            MenuBarSettings(model: model)
-
-            HStack {
-                if let note = Install.loginNote {
-                    Text(note).foregroundStyle(.secondary)
-                } else if !Install.byHomebrew {
-                    Toggle("Open at login", isOn: $openAtLogin)
-                        .toggleStyle(.checkbox)
-                        .onChange(of: openAtLogin) { _, on in setOpenAtLogin(on) }
-                }
-                Spacer()
-                Button("Quit") { NSApp.terminate(nil) }
-                    .keyboardShortcut("q")
+            if settingsShown {
+                Divider()
+                MenuBarSettings(model: model)
+                Divider()
+                appRow
             }
-            .font(.system(size: 11))
-            .controlSize(.small)
         }
+        // ⌘Q quits while the popup is open, also with the settings (and their Quit button) closed.
+        .background { Button("") { NSApp.terminate(nil) }.keyboardShortcut("q").hidden() }
         .padding(Self.padding)
         .frame(width: Self.width)
         .onAppear { model.refreshIfStale() }
+    }
+
+    /// The settings' last row: open at login (or how it's opened) and Quit.
+    private var appRow: some View {
+        HStack {
+            if let note = Install.loginNote {
+                Text(note).foregroundStyle(.secondary)
+            } else if !Install.byHomebrew {
+                Toggle("Open at login", isOn: $openAtLogin)
+                    .toggleStyle(.checkbox)
+                    .onChange(of: openAtLogin) { _, on in setOpenAtLogin(on) }
+            }
+            Spacer()
+            Button("Quit") { NSApp.terminate(nil) }.help("Quit Usage Meter (⌘Q)")
+        }
+        .font(.system(size: 11))
+        .controlSize(.small)
     }
 
     private func setOpenAtLogin(_ on: Bool) {

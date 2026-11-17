@@ -33,6 +33,16 @@ extension UsageSnapshot {
         ])
     }
 
+    /// With a model's own weekly limit added (`fable`): Fable at 35%, resetting with the week.
+    var withSampleFable: UsageSnapshot {
+        guard let week = window("seven_day") else { return self }
+        return UsageSnapshot(source: source, capturedAt: capturedAt, windows: windows + [
+            UsageWindow(key: "seven_day_fable", percent: 35, resetsAt: week.resetsAt),
+        ])
+    }
+
+    func withFableIf(_ on: Bool) -> UsageSnapshot { on ? withSampleFable : self }
+
     /// Extra usage on a Pro/Max account: a $ limit next to the session and week windows.
     var extraUsage: UsageWindow? {
         guard !isBudgetOnly, let w = window("extra_usage"), w.spend != nil else { return nil }
@@ -82,6 +92,7 @@ extension UsageHistory {
             let perUnit = week.percent / max(inWindow, 1)
             let before = zip(times, rates).filter { $0.0 < weekStart }.map(\.1).reduce(0, +)
             let perUnitBefore = 30 / max(before, 1)   // previous week: 55% → 85% by its reset
+            let fable = snap.window("seven_day_fable")   // follows the week's curve, scaled to its own number
             // Before this week's window began, the previous week was already at 55% and rising.
             var weekAcc = 55.0, session = 0.0, sessionEnd = Date.distantPast, inThisWeek = false
             for (t, r) in zip(times, rates) {
@@ -91,10 +102,12 @@ extension UsageHistory {
                 session += r * 2.2
                 pts.append(HistoryPoint(t: t, key: "seven_day", percent: min(weekAcc, 100)))
                 pts.append(HistoryPoint(t: t, key: "five_hour", percent: min(session, 100)))
+                if let f = fable { pts.append(HistoryPoint(t: t, key: f.key, percent: min(weekAcc * f.percent / max(week.percent, 1), 100))) }
             }
             // End exactly on the snapshot's numbers.
             pts.append(HistoryPoint(t: now, key: "seven_day", percent: week.percent))
             if let s = snap.window("five_hour") { pts.append(HistoryPoint(t: now, key: "five_hour", percent: s.percent)) }
+            if let f = fable { pts.append(HistoryPoint(t: now, key: f.key, percent: f.percent)) }
         }
         return UsageHistory(points: pts)
     }

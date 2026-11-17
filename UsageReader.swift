@@ -94,6 +94,9 @@ public struct UsageWindow: Equatable {
     /// The previous period's average pace in percent of the limit per second, from the app's
     /// history (see `UsageHistory.priorPace`). Lets the projection start right after a reset.
     public var priorPace: Double? = nil
+    /// How many periods back `priorPace` comes from: 1 is the last one; more when the history
+    /// didn't cover enough of it and an earlier period stood in.
+    public var priorPeriodsBack = 1
 
     /// Window length, inferred from the key ("five_hour" → 5h, "seven_day*" → 7d,
     /// "extra_usage" → the budget period, by default the calendar month that ends at `resetsAt`).
@@ -171,18 +174,18 @@ public struct UsageWindow: Equatable {
         return percent + pace * max(e.reset.timeIntervalSince(now), 0)
     }
 
-    /// "last month's", "last week's", "yesterday's": the period the prior pace comes from.
+    /// "last month's", "last week's", "yesterday's" (or "an earlier week's", …): the period the
+    /// prior pace comes from.
     var priorPeriodName: String {
-        if key.hasPrefix("seven_day") { return "last week's" }
-        switch spend?.period {
-        case "daily": return "yesterday's"
-        case "weekly": return "last week's"
-        default: return "last month's"
-        }
+        let unit = key.hasPrefix("seven_day") ? "week" : spend?.period == "daily" ? "day"
+            : spend?.period == "weekly" ? "week" : "month"
+        if priorPeriodsBack > 1 { return "an earlier \(unit)'s" }
+        return unit == "day" ? "yesterday's" : "last \(unit)'s"
     }
 
     /// Plain-language outlook, e.g. "Runs out Tuesday night, a day before Thursday's reset"
-    /// or "Lasts until the reset at 03:20 — on track for about 45%".
+    /// or "Lasts until the reset — on track for about 45%". Where it only restates the reset, it
+    /// leaves the date out: the popup and the CLI show the reset time on their own line.
     /// `asOf`: when the numbers were fetched, if earlier than `now` (saved numbers). Projections
     /// run from then, at the pace up to then; the wording ("tonight", "Thursday's reset") is from now.
     public func outlook(now: Date = Date(), asOf: Date? = nil, calendar: Calendar = .current) -> String {
@@ -213,12 +216,7 @@ public struct UsageWindow: Equatable {
             }
             return "Runs out \(HumanTime.moment(hit, now: now, calendar: calendar)), \(early) before \(HumanTime.dayName(reset, now: now, calendar: calendar, possessive: true)) reset"
         }
-        if percent > 0, isTooEarlyToProject(now: at) {
-            let when = reset.timeIntervalSince(now) < 12 * 3600
-                ? "at \(HumanTime.clock(reset, calendar.timeZone))"
-                : resetMoment
-            return "Too early to project — resets \(when)"
-        }
+        if percent > 0, isTooEarlyToProject(now: at) { return "Too early to project" }
         let resetText = reset.timeIntervalSince(now) < 12 * 3600
             ? "the reset at \(HumanTime.clock(reset, calendar.timeZone))"
             : "\(HumanTime.dayName(reset, now: now, calendar: calendar, possessive: true)) reset"
@@ -227,10 +225,10 @@ public struct UsageWindow: Equatable {
                 let amount = spend.map { $0.approx(percent: end) } ?? String(format: "%.0f%%", (end / 5).rounded() * 5)
                 return "At \(priorPeriodName) pace: about \(amount) by \(resetText)"
             }
-            if let spend { return "Lasts until \(resetText) — on track for about \(spend.approx(percent: end))" }
-            return String(format: "Lasts until %@ — on track for about %.0f%%", resetText, (end / 5).rounded() * 5)
+            if let spend { return "Lasts until the reset — on track for about \(spend.approx(percent: end))" }
+            return String(format: "Lasts until the reset — on track for about %.0f%%", (end / 5).rounded() * 5)
         }
-        return "Lasts until \(resetText)"
+        return "Lasts until the reset"
     }
 }
 
