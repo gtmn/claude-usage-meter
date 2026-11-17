@@ -2,14 +2,7 @@
 
 ## Next
 
-1. **Check that the app renews Claude Code's login.** After the login lapses with no Claude Code session
-   running, look for "login renewed" in `~/Library/Logs/UsageMeter.log`. Not yet seen in the app: a manual
-   `claude mcp list` renewed it (2026-11-15), but so far a running Claude Code session always renewed it first.
-   - Cleanest test: a night with Claude Code and the Claude app fully quit.
-   - The log file is only written once the app tries a renewal; if it doesn't exist, no attempt was made.
-   - The app's other messages go to the system log. Claude sessions can't read that, so run this in your
-     own Terminal: `/usr/bin/log show --predicate 'process == "UsageMeter"' --last 1d`.
-2. **"Sign in again" button** (runs `claude auth login`): decide before 2026-12-07, when Claude Code's
+1. **"Sign in again" button** (runs `claude auth login`): decide before 2026-12-07, when Claude Code's
    refresh token here expires.
 
 ## Ideas (not decided)
@@ -24,6 +17,16 @@
 - Developer ID signing and notarization for the download (needs a paid Apple developer account).
 - Bump the tap formula from the release workflow (needs a token with write access to the tap as a secret).
 
-## Not checked with real data
+## Done
+
+- **The app renews Claude Code's login** (confirmed 2026-11-17). With Claude Code and the Claude app quit
+  overnight, `~/Library/Logs/UsageMeter.log` showed two renewals (16 Nov 19:31, 17 Nov 04:40), each after the
+  login had expired; `claude mcp list` exited with 0 and the login was renewed for about 8 hours.
+  If it ever fails: the log file is only written when the app tries a renewal, and the app's other messages
+  go to the system log, which Claude sessions can't read. Run this in your own Terminal:
+  `/usr/bin/log show --predicate 'process == "UsageMeter"' --last 1d`.
+
+## Not checked yet
 
 - Pro/Max extra usage (menu bar item and graph): checked only with sample data so far.
+- Whether the desktop app's Code tab renews Claude Code's login itself (README says it doesn't seem to).
