@@ -48,4 +48,24 @@ let size = (try? FileManager.default.attributesOfItem(atPath: logURL.path)[.size
 let trimmed = (try? String(contentsOf: logURL, encoding: .utf8)) ?? ""
 expect("a big log drops its oldest half (\(size) bytes)", size <= AppLog.maxBytes + 200 && !trimmed.contains(" first\n") && trimmed.hasSuffix(" line 3999 " + String(repeating: "x", count: 60) + "\n"))
 try? FileManager.default.removeItem(at: logURL.deletingLastPathComponent())
+
+print("--- update check")
+expect("0.1.10 is newer than 0.1.9", UpdateCheck.isNewer("0.1.10", than: "0.1.9"))
+expect("the same version isn't newer", !UpdateCheck.isNewer("0.1.11", than: "0.1.11") && !UpdateCheck.isNewer("0.1.11", than: "0.1.11.0"))
+expect("an older one isn't", !UpdateCheck.isNewer("0.1.9", than: "0.1.10"))
+expect("a dev build is never offered one", !UpdateCheck.isNewer("0.2.0", than: "0.1.11-3-gabc1234-dirty") && UpdateCheck.numbers("0.1.11-3-gabc1234") == nil)
+let latestJSON = Data(#"{"tag_name": "v0.1.12", "name": "Usage Meter 0.1.12", "draft": false}"#.utf8)
+let rel = UpdateCheck.release(fromLatest: latestJSON)
+expect("the latest release is read from its tag", rel?.version == "0.1.12")
+expect("…with its files named as package.sh makes them",
+       rel?.appZip.absoluteString == "https://github.com/gtmn/claude-usage-meter/releases/download/v0.1.12/UsageMeter-0.1.12.zip"
+       && rel?.sums.lastPathComponent == "SHA256SUMS.txt" && rel?.page.absoluteString.hasSuffix("/releases/tag/v0.1.12") == true)
+expect("a tag that isn't a version is ignored", UpdateCheck.release(fromLatest: Data(#"{"tag_name": "nightly"}"#.utf8)) == nil)
+let sums = "AB12  claude-usage-0.1.12.zip\ncd34  UsageMeter-0.1.12.zip\n"
+expect("the zip's checksum is found in SHA256SUMS.txt", UpdateCheck.checksum(for: "UsageMeter-0.1.12.zip", in: sums) == "cd34"
+       && UpdateCheck.checksum(for: "missing.zip", in: sums) == nil)
+let sumFile = FileManager.default.temporaryDirectory.appendingPathComponent("usagemeter-sha-test")
+try? Data("abc".utf8).write(to: sumFile)
+expect("sha256 of a file", (try? UpdateCheck.sha256(of: sumFile)) == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
+try? FileManager.default.removeItem(at: sumFile)
 exit(nudgeFailures == 0 ? 0 : 1)

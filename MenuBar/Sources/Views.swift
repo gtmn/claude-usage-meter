@@ -23,12 +23,15 @@ struct MenuBarLabel: View {
                                            palette: MenuBarImage.Palette(saved: palette),
                                            budgetAs: MenuBarImage.BudgetAs(saved: budgetAs), extra: showExtra,
                                            limits: MenuBarImage.Limits(saved: limits))
-        if let image = MenuBarImage.item(style: MenuBarImage.Style(saved: style), rows: model.menuBarRows(),
-                                         rings: model.compactRings(), extra: model.extraRow(), options: options) {
-            Image(nsImage: image)
-        } else {
-            Image(systemName: model.error == nil ? "gauge.with.dots.needle.0percent" : "exclamationmark.circle")
+        Group {
+            if let image = MenuBarImage.item(style: MenuBarImage.Style(saved: style), rows: model.menuBarRows(),
+                                             rings: model.compactRings(), extra: model.extraRow(), options: options) {
+                Image(nsImage: image)
+            } else {
+                Image(systemName: model.error == nil ? "gauge.with.dots.needle.0percent" : "exclamationmark.circle")
+            }
         }
+        .onAppear { Updater.shared.start() }
     }
 }
 
@@ -131,6 +134,8 @@ struct UsagePanel: View {
     /// The menu bar settings, shown or hidden with the gear button (closed until opened; remembered).
     @AppStorage(UsagePanel.settingsShownKey) private var settingsShown = false
     static let settingsShownKey = "settingsShown"
+    @AppStorage(Updater.enabledKey) private var checkForUpdates = false
+    @ObservedObject private var updater = Updater.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
@@ -147,6 +152,10 @@ struct UsagePanel: View {
                         .buttonStyle(.borderless)
                         .help("Refresh now")
                 }
+            }
+
+            if let release = updater.available {
+                UpdateRow(updater: updater, release: release)
             }
 
             UsageRows(model: model)
@@ -167,16 +176,34 @@ struct UsagePanel: View {
 
     /// The settings' last row: open at login (or how it's opened) and Quit.
     private var appRow: some View {
-        HStack {
-            if let note = Install.loginNote {
-                Text(note).foregroundStyle(.secondary)
-            } else if !Install.byHomebrew {
-                Toggle("Open at login", isOn: $openAtLogin)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Toggle("Check for updates", isOn: $checkForUpdates)
                     .toggleStyle(.checkbox)
-                    .onChange(of: openAtLogin) { _, on in setOpenAtLogin(on) }
+                    .onChange(of: checkForUpdates) { _, _ in Task { await updater.check() } }
+                    .help("Once a day, ask GitHub for the latest version (nothing about you or your usage is sent). "
+                          + "Off: the app talks only to api.anthropic.com.")
+                Button("Check now") { Task { await updater.checkNow() } }
+                    .disabled(updater.checking)
+                    .help("Ask GitHub once for the latest version, now (also with the daily check off)")
+                if updater.checking {
+                    ProgressView().controlSize(.mini)
+                } else if let result = updater.checkResult {
+                    Text(result).foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
+                }
+                Spacer(minLength: 0)
             }
-            Spacer()
-            Button("Quit") { NSApp.terminate(nil) }.help("Quit Usage Meter (⌘Q)")
+            HStack {
+                if let note = Install.loginNote {
+                    Text(note).foregroundStyle(.secondary)
+                } else if !Install.byHomebrew {
+                    Toggle("Open at login", isOn: $openAtLogin)
+                        .toggleStyle(.checkbox)
+                        .onChange(of: openAtLogin) { _, on in setOpenAtLogin(on) }
+                }
+                Spacer()
+                Button("Quit") { NSApp.terminate(nil) }.help("Quit Usage Meter (⌘Q)")
+            }
         }
         .font(.system(size: 11))
         .controlSize(.small)
@@ -372,9 +399,41 @@ typealias ViewState<Value> = SwiftUI.State<Value>
 
 /// How this copy was installed. A Homebrew copy hides "Open at login": that switch would remember
 /// this version's Cellar folder, which goes away on the next upgrade; `brew services` does it instead.
+/// A newer release, under the popup's title: what's new, and Update when this copy can install it.
+struct UpdateRow: View {
+    @ObservedObject var updater: Updater
+    let release: UpdateCheck.Release
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.down.circle.fill").foregroundStyle(Color.accentColor)
+                Text("Version \(release.version) available")
+                Link("What's new", destination: release.page)
+                Spacer(minLength: 0)
+                if updater.busy {
+                    ProgressView().controlSize(.mini)
+                } else if updater.canInstall {
+                    Button("Update") { updater.install() }
+                        .help(Install.byHomebrew ? "brew upgrade claude-usage-meter, then restart"
+                              : "Download, check and install it, then restart")
+                }
+            }
+            if let status = updater.status {
+                Text(status).foregroundStyle(updater.failed ? Color.orange : Color.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if !updater.canInstall {
+                Text("A dev build (\(updater.current)) doesn't update itself.").foregroundStyle(.secondary)
+            }
+        }
+        .font(.system(size: 11))
+        .controlSize(.small)
+    }
+}
+
 enum Install {
     static let byHomebrew = Bundle.main.bundleURL.resolvingSymlinksInPath().path.contains("/Cellar/")
     /// launchd names the job in XPC_SERVICE_NAME; `brew services` jobs are "sh.brew.<formula>".
     static let byBrewServices = ProcessInfo.processInfo.environment["XPC_SERVICE_NAME"]?.hasPrefix("sh.brew.") ?? false
-    static var loginNote: String? { byBrewServices ? "Opens at login (brew services)" : nil }
+    static var loginNote: String? { byBrewServices ? "Opens at login (brew)" : nil }
 }

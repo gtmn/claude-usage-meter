@@ -10,8 +10,9 @@ struct UsageMeterApp: App {
     )
 
     init() {
-        // `UsageMeter --render-preview out.png [live] [offline] [enterprise] [hover] [light] [daily] [seen] [saved] [compact] [mono] [amount] [extra] [fable] [only5h|only7d] [panel|settings] [nolabels] [nopercent] [nopace] [noahead] [left|early]` (`hover=0.85`: pointer at 85% of the times): render the panel rows (`panel`: the whole popup; `settings`: its menu bar settings) to a PNG and exit.
+        // `UsageMeter --render-preview out.png [live] [offline] [enterprise] [hover] [light] [daily] [seen] [saved] [compact] [mono] [amount] [extra] [fable] [only5h|only7d] [update] [panel|settings] [nolabels] [nopercent] [nopace] [noahead] [left|early]` (`hover=0.85`: pointer at 85% of the times): render the panel rows (`panel`: the whole popup; `settings`: its menu bar settings) to a PNG and exit.
         let args = CommandLine.arguments
+        if args.contains("--check-update") { Updater.checkFromCommandLine() }
         if let i = args.firstIndex(of: "--render-preview"), i + 1 < args.count {
             PreviewRenderer.run(output: args[i + 1], live: args.contains("live"), offline: args.contains("offline"),
                                 enterprise: args.contains("enterprise"))
@@ -54,6 +55,8 @@ enum PreviewRenderer {
             snap = enterprise ? .sampleEnterprise
                 : (CommandLine.arguments.contains("extra") ? UsageSnapshot.sampleWithExtra : UsageSnapshot.sample).withFableIf(CommandLine.arguments.contains("fable"))
         }
+        // `update`: as if a newer release were out.
+        if CommandLine.arguments.contains("update") { Updater.shared.preview(available: "0.2.0") }
         // Live numbers get the real recorded history; samples get a made-up one.
         let light = CommandLine.arguments.contains("light")
         var logs: [UsageWeight]?
@@ -107,6 +110,7 @@ enum PreviewRenderer {
             "budgetChartMode": a.contains("daily") ? "daily" : "total",
             Key.extra: a.contains("extra"),
             UsagePanel.settingsShownKey: a.contains("panel"),   // the whole popup shows its settings open
+            Updater.enabledKey: a.contains("update"),
             Key.limits: a.contains("only5h") ? "session" : a.contains("only7d") ? "week" : "both",
         ]
         for (k, v) in settings { store.set(v, forKey: k) }

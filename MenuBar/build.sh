@@ -31,7 +31,7 @@ for arch in "${ARCHS[@]}"; do
     swiftc -O -swift-version 5 -parse-as-library \
         -target "$arch-apple-macos14.0" \
         -o "build/UsageMeter-$arch" \
-        ../UsageReader.swift ../History.swift ../ClaudeCodeLogs.swift ../LoginNudge.swift Sources/*.swift
+        ../UsageReader.swift ../History.swift ../ClaudeCodeLogs.swift ../LoginNudge.swift ../UpdateCheck.swift Sources/*.swift
     slices+=("build/UsageMeter-$arch")
 done
 lipo -create "${slices[@]}" -output "$APP/Contents/MacOS/UsageMeter"

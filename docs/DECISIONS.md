@@ -53,5 +53,14 @@ options that were ruled out, so they aren't tried again.
   switch would remember the versioned Cellar folder, which changes with every upgrade.
 - **GitHub releases carry pre-built universal zips**, ad-hoc signed only. Notarizing would need an Apple
   Developer ID.
+- **Updates are opt-in** ("Check for updates", off by default), because the app promised to talk only to
+  `api.anthropic.com`. One unauthenticated request a day to GitHub's latest-release API; **Check now**
+  sends one right away even with the setting off, because the user asked for it. Update installs
+  the way the copy came: Homebrew runs `brew update` + `brew upgrade` and restarts with
+  `launchctl kickstart -k` (launchd restarts the job itself; `brew services restart` from inside the job
+  would be killed halfway); a download is checked against the release's `SHA256SUMS.txt` (catches a
+  broken download, not a compromised GitHub account: the same trust as downloading by hand). Not
+  Sparkle: it needs signing keys, a feed and an embedded framework, and fits badly with ad-hoc signing
+  and a `swiftc`-only build. Worth revisiting with a Developer ID.
 - **Two taps:** the public `gtmn/tap` (repo `gtmn/homebrew-tap`, fresh history, only this app) and a private
   one. Each has its own weekly livecheck workflow (GitHub Actions, Linux).

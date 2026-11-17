@@ -111,8 +111,19 @@ period counts. The 5-hour session, and any limit without such a period, says
 
 The gear button at the top of the popup shows or hides the settings (closed until you open them;
 the app remembers). They sit under the graph: **Menu bar item**, one setting per row, then
-**Open at login** and **Quit** (⌘Q also quits while the popup is open). Hover over a control to
-see what it does.
+**Open at login**, **Check for updates** and **Quit** (⌘Q also quits while the popup is open).
+Hover over a control to see what it does.
+
+**Updates.** With **Check for updates** on, a newer release shows under the popup's title, with
+what's new and an **Update** button that installs it the way your copy came:
+- Homebrew: `brew update` and `brew upgrade claude-usage-meter` (it builds from source, about a
+  minute), then restarts through `brew services`, or opens the new copy.
+- Download: fetches the release zip, checks it against the release's `SHA256SUMS.txt`, replaces the
+  app and reopens it. A file the app downloads itself isn't quarantined, so there's no warning.
+
+**Check now** asks once, right away, also with the daily check off, and says "Up to date" or which
+version is out. A dev build hears about releases but doesn't install them. `UsageMeter --check-update`
+asks once from the command line.
 - **Style**: Bars or Compact; Colour, Alerts or Mono.
 - **Limits** (Pro/Max): both, or only `5h` or `7d`. The popup and the graph keep showing both.
   An account without a 5-hour limit shows only `7d` anyway.
@@ -164,7 +175,9 @@ Some of the combinations, shown enlarged on a dark and a light menu bar:
    The app also uses this file for the budget's reset date (`rate_limits.spend_limit.resets_at`),
    which the usage endpoint doesn't return; a reset that has already passed is ignored.
 
-The app talks only to `api.anthropic.com`. No analytics, no update checks, no other servers.
+The app talks only to `api.anthropic.com`, plus GitHub if you turn on **Check for updates**
+(off by default; once a day) or click **Check now**: it asks for the latest version number, sending
+nothing about you or your usage. No analytics, no other servers.
 
 ## Requirements
 
@@ -186,7 +199,7 @@ reader as `claude-usage` and the status-line script under
 `$(brew --prefix)/share/claude-usage-meter/`. Use `brew services` to open it at login:
 a Homebrew copy hides the app's **Open at login** switch, which would remember the
 versioned Homebrew folder that changes with every upgrade. Under `brew services` the
-popup says *Opens at login (brew services)* instead.
+popup says *Opens at login (brew)* instead.
 
 To update: `brew upgrade claude-usage-meter`. If a new version doesn't show up, run
 `brew update` first: Homebrew refreshes its taps by itself at most once a day.
@@ -205,8 +218,8 @@ then click **Open Anyway** in System Settings → Privacy & Security. Or remove 
 xattr -dr com.apple.quarantine /Applications/UsageMeter.app
 ```
 
-Homebrew is still the easier way: no warning, and `brew upgrade` updates it. A download
-doesn't update itself. Turn on **Open at login** in the popup to start it at login.
+Homebrew is still the easier way: no warning, and `brew upgrade` updates it. Turn on
+**Open at login** in the popup's settings to start it at login.
 
 ## Build and run from a checkout
 
@@ -288,7 +301,7 @@ rm docs/screenshots/*.label.png /tmp/um.png
 
 Renders never read or change your own settings: they use the arguments, in a throwaway store.
 
-Add `compact` for the Compact menu bar style, `mono` or `alerts` for those palettes, `amount` for the budget's amount, `extra` for Pro/Max with extra usage (and its menu bar item), `only5h` or `only7d` for one limit in the menu bar, `fable` for a Fable weekly limit (and its line in the graph), `panel` for the whole popup or `settings` for its settings alone, `nolabels`, `nopercent`, `nopace` or `noahead` to leave those out, `left` or `early` for the time left or early, `daily` for the per-day bars, `hover` to show the graph's tooltip (`hover=1.5` halfway along the projection), `light` for light mode, or `live` to render your
+Add `compact` for the Compact menu bar style, `mono` or `alerts` for those palettes, `amount` for the budget's amount, `extra` for Pro/Max with extra usage (and its menu bar item), `only5h` or `only7d` for one limit in the menu bar, `fable` for a Fable weekly limit (and its line in the graph), `update` for a newer release offered, `panel` for the whole popup or `settings` for its settings alone, `nolabels`, `nopercent`, `nopace` or `noahead` to leave those out, `left` or `early` for the time left or early, `daily` for the per-day bars, `hover` to show the graph's tooltip (`hover=1.5` halfway along the projection), `light` for light mode, or `live` to render your
 own current numbers and recorded history instead (don't commit those).
 
 ## Releasing
@@ -314,6 +327,7 @@ own current numbers and recorded history instead (don't commit those).
 | `History.swift` | Records and stores usage over time for the graph; fills gaps, daily totals |
 | `ClaudeCodeLogs.swift` | Reads request times and token counts from Claude Code's logs, for the estimates |
 | `LoginNudge.swift` | Runs `claude mcp list` when Claude Code's login has expired, so Claude Code renews it |
+| `UpdateCheck.swift` | The opt-in update check's plain parts: versions, release files, checksums |
 | `MenuBar/` | The SwiftUI menu bar app |
 | `main.swift` | Command-line reader |
 | `statusline-snapshot.sh` | Claude Code status-line command for the fallback |
