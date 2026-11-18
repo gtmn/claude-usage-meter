@@ -109,7 +109,57 @@ extension UsageHistory {
             if let s = snap.window("five_hour") { pts.append(HistoryPoint(t: now, key: "five_hour", percent: s.percent)) }
             if let f = fable { pts.append(HistoryPoint(t: now, key: f.key, percent: f.percent)) }
         }
-        return UsageHistory(points: pts)
+        return UsageHistory(points: samplePast(for: snap, now: now) + pts)
+    }
+
+    /// Earlier weeks and months for the sample, so the overview and the ‹ › steps have something to
+    /// show: hourly points on weekday working hours, each period rising to a fixed peak (some run out).
+    private static func samplePast(for snap: UsageSnapshot, now: Date) -> [HistoryPoint] {
+        var cal = Calendar(identifier: .gregorian); cal.timeZone = .current
+        func working(_ t: Date) -> Bool {
+            let h = cal.component(.hour, from: t), wd = cal.component(.weekday, from: t)
+            return (2...6).contains(wd) && (8..<19).contains(h)
+        }
+        /// Rises over `times` to `peak` at their end (or to 100 by `runsOutAt` of the way), then holds.
+        func rise(_ times: [Date], key: String, from: Double = 0, peak: Double, runsOutAt: Double? = nil,
+                  limitMinor: Int64? = nil) -> [HistoryPoint] {
+            let busy = times.map { working($0) ? 1.0 : 0.0 }
+            let cut = runsOutAt.map { Int(Double(times.count) * $0) } ?? times.count
+            let total = max(busy.prefix(cut).reduce(0, +), 1)
+            var acc = 0.0
+            return times.enumerated().map { i, t in
+                if i < cut { acc += busy[i] }
+                let p = from + (peak - from) * min(acc / total, 1)
+                return HistoryPoint(t: t, key: key, percent: p, usedMinor: limitMinor.map { Int64(Double($0) * p / 100) })
+            }
+        }
+        var pts: [HistoryPoint] = []
+        if let week = snap.window("seven_day"), let reset = week.resetsAt {
+            let weekStart = reset.addingTimeInterval(-7 * 86400), sampleStart = now.addingTimeInterval(-7 * 86400)
+            // Peaks of the 11 weeks before last week, oldest first; 100 runs out before the reset.
+            let peaks: [Double] = [62, 100, 78, 45, 91, 100, 70, 52, 83, 100, 66]
+            for (i, peak) in peaks.enumerated() {
+                let start = weekStart.addingTimeInterval(-Double(peaks.count + 1 - i) * 7 * 86400)
+                let times = stride(from: start, to: start.addingTimeInterval(7 * 86400), by: 3600).map { $0 }
+                pts += rise(times, key: "seven_day", peak: peak, runsOutAt: peak == 100 ? 0.75 : nil)
+            }
+            // Last week up to where the detailed sample starts (at 55%).
+            let lastWeek = weekStart.addingTimeInterval(-7 * 86400)
+            pts += rise(stride(from: lastWeek, to: sampleStart, by: 3600).map { $0 }, key: "seven_day", peak: 55)
+        }
+        if let w = snap.window("extra_usage"), let spend = w.spend, w.spend?.periodLength == nil,
+           let current = UsageHistory.periodStart(of: w, back: 0) {
+            // The 5 months before this one, oldest first, as shares of the budget.
+            let shares: [Double] = [48, 71, 100, 62, 55]
+            for (i, share) in shares.enumerated() {
+                guard let start = Spend.utc.date(byAdding: .month, value: -(shares.count - i), to: current),
+                      let end = Spend.utc.date(byAdding: .month, value: 1, to: start) else { continue }
+                let times = stride(from: start, to: end, by: 3600).map { $0 }
+                pts += rise(times, key: w.key, peak: share, runsOutAt: share == 100 ? 0.78 : nil,
+                            limitMinor: spend.limit.minor)
+            }
+        }
+        return pts
     }
 
     /// The sample, but recorded only for the last `recordedDays`: the budget before that becomes
@@ -118,11 +168,14 @@ extension UsageHistory {
                                recordedDays: Double = 2.6) -> (UsageHistory, [UsageWeight]) {
         let full = sample(for: snap, now: now).points
         let cutoff = now.addingTimeInterval(-recordedDays * 86400)
+        // Earlier periods stay recorded; only the current one's start becomes log weights.
+        let periodStart = snap.window("extra_usage").flatMap { UsageHistory.periodStart(of: $0, back: 0) } ?? .distantPast
+        func early(_ p: HistoryPoint) -> Bool { p.key == "extra_usage" && p.t < cutoff && p.t.isAtOrAfter(periodStart) }
         var weights: [UsageWeight] = [], last: Int64 = 0
-        for p in full where p.key == "extra_usage" && p.t < cutoff {
+        for p in full where early(p) {
             if let u = p.usedMinor { if u > last { weights.append(UsageWeight(t: p.t, weight: Double(u - last))) }; last = u }
         }
-        return (UsageHistory(points: full.filter { $0.key != "extra_usage" || $0.t.isAtOrAfter(cutoff) }), weights)
+        return (UsageHistory(points: full.filter { !early($0) }), weights)
     }
 }
 
@@ -147,7 +200,7 @@ final class UsageModel: ObservableObject {
     @Published private(set) var logWeights: [UsageWeight] = []
     private var logsCovered: [ClosedRange<Date>] = []
     private var readingLogs = false
-    /// The last month start at which the app saw the budget reset (kept beyond the 40 days of history).
+    /// The last month start at which the app saw the budget reset (kept apart from the history).
     private var seenReset: Date?
     private static let seenResetKey = "budgetResetSeen"
 

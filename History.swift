@@ -25,8 +25,10 @@ public struct HistoryPoint: Codable, Equatable, Sendable {
 public struct UsageHistory: Equatable, Sendable {
     public private(set) var points: [HistoryPoint] = []
 
-    /// Long enough for a whole month plus a few days of the one before.
-    public static let keep: TimeInterval = 40 * 86400
+    /// Kept without a time limit, so past weeks and months can be looked back at. Points older
+    /// than this are thinned to one per window per hour (`thin`), which keeps a year at about
+    /// 2 MB instead of about 7.
+    public static let fullDetail: TimeInterval = 60 * 86400
     /// One point per window per 10 minutes is plenty for a curve, and keeps the file small.
     /// A drop (a reset) is always recorded, so the curve falls where it really fell.
     public static let minSpacing: TimeInterval = 10 * 60
@@ -49,9 +51,23 @@ public struct UsageHistory: Equatable, Sendable {
         prune(now: t)
     }
 
+    /// Thins points older than `fullDetail` to one per window per hour. Of each hour it keeps the
+    /// highest point, so a period's peak just before its reset survives (where a week or month
+    /// ended); the reset itself still shows, as the next hour's lower point.
     public mutating func prune(now: Date) {
-        let cutoff = now.addingTimeInterval(-Self.keep)
-        points.removeAll { $0.t < cutoff }
+        let cutoff = now.addingTimeInterval(-Self.fullDetail)
+        guard let first = points.first, first.t < cutoff else { return }
+        var kept: [String: [Int: HistoryPoint]] = [:]     // window → hour → highest point
+        var recent: [HistoryPoint] = []
+        for p in points {
+            guard p.t < cutoff else { recent.append(p); continue }
+            let hour = Int(floor(p.t.timeIntervalSince1970 / 3600))
+            if let k = kept[p.key]?[hour], p.percent < k.percent { continue }
+            kept[p.key, default: [:]][hour] = p
+        }
+        let thinned = kept.values.flatMap { $0.values }
+        guard thinned.count + recent.count < points.count else { return }
+        points = (thinned + recent).sorted { $0.t < $1.t }
     }
 
     /// Points for one window between two times, oldest first.
@@ -118,8 +134,9 @@ extension UsageHistory {
     public static let fillableGap: TimeInterval = 3600
 
     /// Budget points for the period, with the current amount appended when it's newer.
-    public func budgetSeries(_ key: String, periodStart: Date, current: HistoryPoint? = nil) -> [HistoryPoint] {
-        var pts = series(key, from: periodStart).filter { $0.usedMinor != nil }
+    public func budgetSeries(_ key: String, periodStart: Date, to end: Date = .distantFuture,
+                             current: HistoryPoint? = nil) -> [HistoryPoint] {
+        var pts = series(key, from: periodStart).filter { $0.usedMinor != nil && $0.t < end }
         if let c = current, c.usedMinor != nil, c.t > (pts.last?.t ?? .distantPast) { pts.append(c) }
         return pts
     }
@@ -271,9 +288,9 @@ extension UsageHistory {
     public func priorPace(for w: UsageWindow) -> Double? { priorPeriod(for: w)?.pace }
 
     /// The most recent earlier period with enough recorded for a pace (`priorPace`), and how many
-    /// periods back it is. Tries the last period first, then older ones as far as the history goes
-    /// (it keeps 40 days: about five weeks, or one month). A period counts once its last recorded
-    /// point is at least `priorCoverage` of the way through it.
+    /// periods back it is. Tries the last period first, then older ones up to `priorLookback` back
+    /// (about six weeks, or one month): an older period says little about the current pace. A
+    /// period counts once its last recorded point is at least `priorCoverage` of the way through it.
     public func priorPeriod(for w: UsageWindow) -> (pace: Double, back: Int)? {
         guard w.key == "extra_usage" || w.key.hasPrefix("seven_day"),
               let reset = w.resetsAt, let d = w.duration else { return nil }
@@ -285,7 +302,8 @@ extension UsageHistory {
         let own = points.filter { $0.key == w.key && $0.estimated != true }
         guard let oldest = own.first?.t else { return nil }
         var back = 1
-        while back <= 6, periodStart(back - 1) > oldest {
+        let earliest = start.addingTimeInterval(-Self.priorLookback)
+        while back <= 6, periodStart(back - 1) > oldest, periodStart(back).isAtOrAfter(earliest) {
             let (from, to) = (periodStart(back), periodStart(back - 1))
             if let last = own.last(where: { $0.t < to && $0.t > from }) {
                 let covered = last.t.timeIntervalSince(from)
@@ -308,6 +326,9 @@ extension UsageHistory {
     /// How far into a period its last recorded point must be for the period's pace to count.
     /// The pace is the usage over the time covered, so a quarter still gives a fair rate.
     public static let priorCoverage = 0.25
+    /// How far back an earlier period may start to stand in for the last one (the history itself
+    /// is kept without a limit).
+    public static let priorLookback: TimeInterval = 45 * 86400
 }
 
 extension UsageSnapshot {
@@ -321,5 +342,63 @@ extension UsageSnapshot {
         }
         return UsageSnapshot(source: source, capturedAt: capturedAt, windows: ws,
                              serverPace: serverPace, serverIndicator: serverIndicator, severity: severity)
+    }
+}
+
+// MARK: Looking back: past periods
+
+/// One reset-to-reset period of a window, summed up for looking back: how high it got and whether
+/// (and when) it ran out. Only what the app recorded counts; estimates from the logs don't.
+public struct PeriodSummary: Equatable, Sendable {
+    public let start: Date
+    /// The reset that ended it (for the current period: the next reset).
+    public let end: Date
+    /// The highest recorded percentage, and the money used at that point (budgets).
+    public let peak: Double
+    public let peakUsedMinor: Int64?
+    /// The first recorded point at 100%.
+    public let ranOutAt: Date?
+    public let firstRecorded: Date, lastRecorded: Date
+
+    /// How long before the reset it ran out.
+    public var early: TimeInterval? { ranOutAt.map { end.timeIntervalSince($0) } }
+    /// The share of the period between its first and last recorded point.
+    public var covered: Double {
+        let length = end.timeIntervalSince(start)
+        return length > 0 ? min(lastRecorded.timeIntervalSince(firstRecorded) / length, 1) : 0
+    }
+}
+
+extension UsageHistory {
+    /// The start of the period `back` periods before the window's current one (0: the current
+    /// one). Calendar months (UTC) for a budget without a stated length, else fixed lengths.
+    public static func periodStart(of w: UsageWindow, back: Int) -> Date? {
+        guard let reset = w.resetsAt, let d = w.duration else { return nil }
+        let start = reset.addingTimeInterval(-d)
+        if w.key == "extra_usage" && w.spend?.periodLength == nil {
+            return Spend.utc.date(byAdding: .month, value: -back, to: start)
+        }
+        return start.addingTimeInterval(-Double(back) * d)
+    }
+
+    /// The window's periods with anything recorded, newest first: the current one (so far) and
+    /// earlier ones, at most `limit`.
+    public func periods(of w: UsageWindow, limit: Int = 520) -> [PeriodSummary] {
+        let own = points.filter { $0.key == w.key && $0.estimated != true }
+        guard let oldest = own.first?.t, let current = Self.periodStart(of: w, back: 0) else { return [] }
+        var out: [PeriodSummary] = []
+        var back = 0
+        var end = w.resetsAt ?? current
+        while out.count < limit, let start = Self.periodStart(of: w, back: back), oldest < end {
+            let pts = own.filter { $0.t.isAtOrAfter(start) && $0.t < end }
+            if let first = pts.first, let last = pts.last, let top = pts.max(by: { $0.percent < $1.percent }) {
+                out.append(PeriodSummary(start: start, end: end, peak: top.percent, peakUsedMinor: top.usedMinor,
+                                         ranOutAt: pts.first { !($0.percent < 99.5) }?.t,
+                                         firstRecorded: first.t, lastRecorded: last.t))
+            }
+            end = start
+            back += 1
+        }
+        return out
     }
 }

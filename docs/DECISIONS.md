@@ -24,7 +24,7 @@ options that were ruled out, so they aren't tried again.
   drop within 20 minutes of that time is remembered as confirmation and removes "(assumed)".
 - **Early projections use last period's pace** until 15% of the period has passed, then the current pace.
   A period counts once a quarter of it is recorded (the pace is usage over the time covered); if the last
-  one has less, the most recent earlier period in the history (40 days) stands in, named "an earlier week's".
+  one has less, the most recent earlier period in the history stands in, named "an earlier week's".
   Not from Claude Code's logs: they cover one Mac, at list prices, without claude.ai, and can't be scaled
   without real totals.
 
@@ -36,6 +36,16 @@ options that were ruled out, so they aren't tried again.
   scale over the same week. Ochre, because violet merges with the blue week line for colour-blind readers.
 
 ## History and estimates
+
+- **History is kept without a time limit** (2026-11-19), so past weeks and months can be looked back at.
+  Points older than 60 days are thinned to one per window per hour, keeping each hour's highest point so a
+  period's peak before its reset survives. About 2 MB a year; it was 40 days before.
+- **Looking back: ‹ › through periods, and one bar per period for the long view** (2026-11-19). A line over
+  months would be a sawtooth (each week climbs and drops at its reset), hard to read; what matters over a
+  long span is how close each period got, so the long view is a bar per period at its peak, orange where
+  it ran out. Periods are reset to reset, stepped back from the current reset (calendar months in UTC for
+  the budget). Only recorded points count; past periods aren't estimated from the logs (they're only read
+  for the current one). The 5 h session is left out of the long view: it resets too often to say much there.
 
 - **Unrecorded stretches are estimated from Claude Code's logs** (`~/.claude/projects/**/*.jsonl`, deduplicated
   by message id + requestId, priced at list prices), scaled to the real totals at both ends of a gap.

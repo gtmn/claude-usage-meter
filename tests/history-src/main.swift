@@ -26,10 +26,48 @@ hb.record(UsageSnapshot(source: .oauth, capturedAt: at("2026-11-10 17:00"),
                         windows: [UsageWindow(key: "extra_usage", percent: spend.percent, resetsAt: nil, spend: spend)]))
 check("budget points keep the money used", hb.points.first?.usedMinor == 11688)
 
-var hp = UsageHistory(points: [HistoryPoint(t: at("2026-09-01 00:00"), key: "seven_day", percent: 5),
-                               HistoryPoint(t: at("2026-10-15 00:00"), key: "seven_day", percent: 6)])
-hp.record(snap("2026-11-10 12:00", [("seven_day", 7)]))
-check("points older than 40 days are pruned", hp.points.map(\.percent) == [6, 7])
+// Old points are kept; past 60 days thinned to the highest point per window per hour.
+var hp = UsageHistory(points: [
+    HistoryPoint(t: at("2025-06-01 00:00"), key: "seven_day", percent: 5),      // over a year old: kept
+    HistoryPoint(t: at("2026-08-01 10:00"), key: "seven_day", percent: 90),     // one hour, three points:
+    HistoryPoint(t: at("2026-08-01 10:20"), key: "seven_day", percent: 98),     // the highest stays (the peak
+    HistoryPoint(t: at("2026-08-01 10:40"), key: "seven_day", percent: 2),      // before a reset)
+    HistoryPoint(t: at("2026-08-01 10:30"), key: "five_hour", percent: 40),     // another window, same hour
+    HistoryPoint(t: at("2026-08-01 11:10"), key: "seven_day", percent: 3),      // the next hour: the reset shows
+    HistoryPoint(t: at("2026-10-01 10:00"), key: "seven_day", percent: 6),      // under 60 days: full detail
+    HistoryPoint(t: at("2026-10-01 10:10"), key: "seven_day", percent: 7)])
+hp.record(snap("2026-11-10 12:00", [("seven_day", 8)]))
+check("old points are kept, thinned to the hourly peak past 60 days",
+      hp.series("seven_day", from: .distantPast).map(\.percent) == [5, 98, 3, 6, 7, 8]
+      && hp.series("five_hour", from: .distantPast).map(\.percent) == [40])
+var hq = hp; hq.prune(now: at("2026-11-10 12:00"))
+check("thinning twice changes nothing", hq == hp)
+
+// Looking back: one summary per reset-to-reset period.
+let weekNow = UsageWindow(key: "seven_day", percent: 30, resetsAt: at("2026-11-19 05:00"))
+let past = UsageHistory(points: [
+    HistoryPoint(t: at("2026-10-30 12:00"), key: "seven_day", percent: 20),    // 29 Oct – 5 Nov: from Thu noon
+    HistoryPoint(t: at("2026-11-04 12:00"), key: "seven_day", percent: 70),
+    HistoryPoint(t: at("2026-11-06 10:00"), key: "seven_day", percent: 40),    // 5–12 Nov: runs out on the 10th
+    HistoryPoint(t: at("2026-11-10 14:00"), key: "seven_day", percent: 100),
+    HistoryPoint(t: at("2026-11-11 09:00"), key: "seven_day", percent: 100),
+    HistoryPoint(t: at("2026-11-12 06:00"), key: "seven_day", percent: 2),     // 12–19 Nov: this week
+    HistoryPoint(t: at("2026-11-15 06:00"), key: "seven_day", percent: 30),
+    HistoryPoint(t: at("2026-11-11 09:00"), key: "five_hour", percent: 99)])   // another window: not counted
+let ps = past.periods(of: weekNow)
+check("periods newest first, one per week with anything recorded",
+      ps.map(\.start) == [at("2026-11-12 05:00"), at("2026-11-05 05:00"), at("2026-10-29 05:00")])
+check("a week's peak and when it ran out, how early",
+      ps[1].peak == 100 && ps[1].ranOutAt == at("2026-11-10 14:00") && ps[1].early == 39 * 3600)
+check("a week that didn't run out", ps[2].peak == 70 && ps[2].ranOutAt == nil)
+check("how much of a week was recorded", abs(ps[2].covered - 5.0 / 7) < 0.001)
+check("no periods without history", UsageHistory().periods(of: weekNow).isEmpty)
+let budgetNow = UsageWindow(key: "extra_usage", percent: 10, resetsAt: at("2026-12-01 00:00"),
+                            spend: Spend(used: Money(minor: 100, exponent: 2, currency: "USD"),
+                                         limit: Money(minor: 1000, exponent: 2, currency: "USD")))
+check("budget periods are calendar months",
+      UsageHistory.periodStart(of: budgetNow, back: 0) == at("2026-11-01 00:00")
+      && UsageHistory.periodStart(of: budgetNow, back: 1) == at("2026-10-01 00:00"))
 
 let dir = FileManager.default.temporaryDirectory.appendingPathComponent("usagemeter-test-\(getpid())")
 let url = dir.appendingPathComponent("history.json")

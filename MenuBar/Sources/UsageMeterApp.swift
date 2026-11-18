@@ -10,7 +10,7 @@ struct UsageMeterApp: App {
     )
 
     init() {
-        // `UsageMeter --render-preview out.png [live] [offline] [enterprise] [hover] [light] [daily] [seen] [saved] [compact] [mono] [amount] [extra] [fable] [only5h|only7d] [update] [panel|settings] [nolabels] [nopercent] [nopace] [noahead] [left|early]` (`hover=0.85`: pointer at 85% of the times): render the panel rows (`panel`: the whole popup; `settings`: its menu bar settings) to a PNG and exit.
+        // `UsageMeter --render-preview out.png [live] [offline] [enterprise] [hover] [light] [daily] [seen] [saved] [compact] [mono] [amount] [extra] [fable] [only5h|only7d] [update] [panel|settings] [nolabels] [nopercent] [nopace] [noahead] [left|early] [overview] [back=N]` (`hover=0.85`: pointer at 85% of the times): render the panel rows (`panel`: the whole popup; `settings`: its menu bar settings) to a PNG and exit.
         let args = CommandLine.arguments
         if args.contains("--check-update") { Updater.checkFromCommandLine() }
         if let i = args.firstIndex(of: "--render-preview"), i + 1 < args.count {
@@ -77,6 +77,8 @@ enum PreviewRenderer {
             .environment(\.colorScheme, light ? .light : .dark)
             .environment(\.previewHover, previewHoverArg)
             .environment(\.previewBudgetMode, CommandLine.arguments.contains("daily") ? "daily" : nil)
+            .environment(\.previewChartScale, CommandLine.arguments.contains("overview") ? "overview" : nil)
+            .environment(\.previewBack, previewBackArg)
             .defaultAppStorage(previewStore)
         // AppKit colours (window background, label colours) follow the drawing appearance.
         NSApplication.shared.appearance = NSAppearance(named: light ? .aqua : .darkAqua)
@@ -133,6 +135,8 @@ enum PreviewRenderer {
             .environment(\.colorScheme, light ? .light : .dark)
             .environment(\.previewHover, previewHoverArg)
             .environment(\.previewBudgetMode, a.contains("daily") ? "daily" : nil)
+            .environment(\.previewChartScale, a.contains("overview") ? "overview" : nil)
+            .environment(\.previewBack, previewBackArg)
             .defaultAppStorage(previewStore))
         host.frame.size = host.fittingSize
         let window = NSWindow(contentRect: host.frame, styleMask: .borderless, backing: .buffered, defer: false)
@@ -181,6 +185,11 @@ enum PreviewRenderer {
             try? png.write(to: URL(fileURLWithPath: output + ".label.png"))
         }
     }
+}
+
+/// `back=2`: the chart two periods (or overview pages) back.
+private var previewBackArg: Int? {
+    CommandLine.arguments.first { $0.hasPrefix("back=") }.flatMap { Int($0.dropFirst(5)) }
 }
 
 /// `hover` puts the preview's pointer at 40% of the recorded times; `hover=0.85` at 85%;

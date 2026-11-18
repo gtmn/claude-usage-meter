@@ -154,7 +154,18 @@ private struct EmptyHistory: View {
 struct PreviewHoverKey: EnvironmentKey { static let defaultValue: Double? = nil }
 /// For `--render-preview … daily`: show the per-day bars without touching the saved choice.
 struct PreviewBudgetModeKey: EnvironmentKey { static let defaultValue: String? = nil }
+/// For `--render-preview … overview` and `back=N`: the overview bars, or a period N back.
+struct PreviewChartScaleKey: EnvironmentKey { static let defaultValue: String? = nil }
+struct PreviewBackKey: EnvironmentKey { static let defaultValue: Int? = nil }
 extension EnvironmentValues {
+    var previewChartScale: String? {
+        get { self[PreviewChartScaleKey.self] }
+        set { self[PreviewChartScaleKey.self] = newValue }
+    }
+    var previewBack: Int? {
+        get { self[PreviewBackKey.self] }
+        set { self[PreviewBackKey.self] = newValue }
+    }
     var previewHover: Double? {
         get { self[PreviewHoverKey.self] }
         set { self[PreviewHoverKey.self] = newValue }
@@ -282,6 +293,133 @@ private struct HoverLayer: ViewModifier {
     }
 }
 
+// MARK: Looking back (shared)
+
+/// "‹ This week ›": steps back through earlier periods (or pages of the overview). The title
+/// returns to now when clicked.
+private struct PeriodStepper: View {
+    let title: String
+    let canGoBack: Bool
+    @Binding var back: Int
+
+    var body: some View {
+        HStack(spacing: 2) {
+            arrow("chevron.left", enabled: canGoBack, help: "Earlier") { back += 1 }
+            Text(title).font(.system(size: 11, weight: .semibold))
+                .onTapGesture { back = 0 }
+                .help(back > 0 ? "Back to now" : "")
+            arrow("chevron.right", enabled: back > 0, help: "Later") { back -= 1 }
+        }
+    }
+
+    private func arrow(_ name: String, enabled: Bool, help: String, _ action: @escaping () -> Void) -> some View {
+        Image(systemName: name).font(.system(size: 9, weight: .semibold))
+            .frame(width: 14, height: 14).contentShape(Rectangle())
+            .foregroundStyle(enabled ? Color.primary : Color.primary.opacity(0.2))
+            .onTapGesture { if enabled { action() } }
+            .help(enabled ? help : "")
+            .accessibilityLabel(help).accessibilityAddTraits(.isButton)
+    }
+}
+
+/// One bar of the overview: a whole period, as high as it got.
+struct PeriodBar: Identifiable {
+    let start: Date, end: Date
+    let value: Double
+    /// Ran out (or reached the budget): drawn in the app's orange.
+    let full: Bool
+    /// The current period (so far) or a partly recorded one: drawn lighter.
+    let light: Bool
+    let tooltip: [String]
+    var id: Date { start }
+    var mid: Date { start.addingTimeInterval(end.timeIntervalSince(start) / 2) }
+}
+
+/// The overview: one bar per period, oldest left.
+private struct PeriodBars: View {
+    let bars: [PeriodBar]
+    let top: Double
+    /// A reference line (the budget), labelled.
+    var limit: (value: Double, label: String)? = nil
+    let yLabel: (Double) -> String
+    let xLabel: DateFormatter
+    let accessibility: String
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.previewHover) private var previewHover
+    @ViewState private var hovered: Date?
+
+    var body: some View {
+        let tint = ChartInk.series1(scheme)
+        let full = Color(nsColor: MenuBarImage.color(.far))
+        let mids = bars.map(\.mid)
+        let active = activeHover(hovered, preview: previewHover, times: mids)
+        // Every bar labelled when few, else every second or third, from the newest back.
+        let every = max(1, Int((Double(bars.count) / 6).rounded(.up)))
+        let labelled = Set(bars.indices.reversed().enumerated().filter { $0.offset % every == 0 }.map { bars[$0.element].mid })
+        let domainStart = bars.first?.start ?? Date(), domainEnd = bars.last?.end ?? Date()
+
+        Chart {
+            if let limit {
+                RuleMark(y: .value("Limit", limit.value)).foregroundStyle(ChartInk.muted).lineStyle(StrokeStyle(lineWidth: 1))
+                    .annotation(position: .top, alignment: .leading, spacing: 2) {
+                        Text(limit.label).font(.system(size: 9)).foregroundStyle(ChartInk.label)
+                    }
+            }
+            ForEach(bars) { b in
+                let inset = b.end.timeIntervalSince(b.start) * 0.15
+                RectangleMark(xStart: .value("Period", b.start.addingTimeInterval(inset)),
+                              xEnd: .value("Period", b.end.addingTimeInterval(-inset)),
+                              yStart: .value("Used", 0), yEnd: .value("Used", max(b.value, top * 0.01)))
+                    .foregroundStyle((b.full ? full : tint)
+                        .opacity((b.light ? 0.45 : 1) * (active != nil && active != b.mid ? 0.45 : 1)))
+            }
+            if let h = active, let b = bars.first(where: { $0.mid == h }) {
+                PointMark(x: .value("Period", b.mid), y: .value("Used", b.value)).symbolSize(0)
+                    .annotation(position: .top, spacing: 4, overflowResolution: .init(x: .fit(to: .chart), y: .fit(to: .chart))) {
+                        Tooltip(lines: b.tooltip)
+                    }
+            }
+        }
+        .chartXScale(domain: domainStart...domainEnd)
+        .chartYScale(domain: 0...top)
+        .chartXAxis {
+            AxisMarks(values: bars.map(\.mid)) { v in
+                AxisValueLabel {
+                    if let d = v.as(Date.self), labelled.contains(d) { Text(xLabel.string(from: d)) }
+                }
+                .font(.system(size: 9)).foregroundStyle(ChartInk.label)
+            }
+        }
+        .chartYAxis {
+            AxisMarks(position: .leading, values: [0, top / 2, top]) { v in
+                AxisGridLine(stroke: StrokeStyle(lineWidth: 1)).foregroundStyle(ChartInk.grid)
+                AxisValueLabel { if let d = v.as(Double.self) { Text(yLabel(d)) } }
+                    .font(.system(size: 9)).foregroundStyle(ChartInk.label)
+            }
+        }
+        .modifier(HoverLayer(times: mids, hovered: $hovered))
+        .padding(.top, 6)
+        .frame(height: 110)
+        .accessibilityLabel(accessibility)
+    }
+}
+
+/// "5–12 Nov", "29 Oct – 5 Nov": a period's days, its end being the reset (so the day before).
+func periodRange(_ start: Date, _ end: Date, timeZone: TimeZone = .current) -> String {
+    let last = end.addingTimeInterval(-1)
+    var cal = Calendar(identifier: .gregorian); cal.timeZone = timeZone
+    let f = DateFormatter(); f.locale = HumanTime.en; f.timeZone = timeZone
+    if cal.component(.month, from: start) == cal.component(.month, from: last) {
+        f.dateFormat = "d"; let a = f.string(from: start)
+        f.dateFormat = "d MMM"; return "\(a)–\(f.string(from: last))"
+    }
+    f.dateFormat = "d MMM"
+    return "\(f.string(from: start)) – \(f.string(from: last))"
+}
+
+/// Periods per page of the overview.
+private let overviewPage = 12
+
 // MARK: Budget
 
 private let utc: TimeZone = TimeZone(identifier: "UTC")!
@@ -327,43 +465,110 @@ struct BudgetHistoryChart: View {
     var extra = false
     @AppStorage("budgetChartMode") private var savedMode = "total"
     @Environment(\.previewBudgetMode) private var previewMode
+    @Environment(\.previewChartScale) private var previewScale
+    @Environment(\.previewBack) private var previewBack
+    /// How many periods back (Total, Per day), or pages of periods back (the overview).
+    @ViewState private var stepBack = 0
 
     var body: some View {
         let spend = window.spend!
         let reset = window.resetsAt ?? now
-        let start = reset.addingTimeInterval(-(window.duration ?? 30 * 86400))
+        let back = previewBack ?? stepBack
+        let currentStart = reset.addingTimeInterval(-(window.duration ?? 30 * 86400))
+        let start = back == 0 ? currentStart : UsageHistory.periodStart(of: window, back: back) ?? currentStart
+        let end = back == 0 ? reset : UsageHistory.periodStart(of: window, back: back - 1) ?? reset
         let period = spend.period
-        let current = HistoryPoint(t: now, key: window.key, percent: window.percent, usedMinor: spend.used.minor)
-        let recorded = history.budgetSeries(window.key, periodStart: start, current: current)
-        let filled = UsageHistory.filledBudget(recorded, periodStart: start, weights: logWeights, limitMinor: spend.limit.minor)
+        let filled = points(back: back, start: start, end: end, spend: spend)
         let perDayAllowed = period != "daily"
-        let mode = perDayAllowed ? (previewMode ?? savedMode) : "total"
+        let overviewAllowed = window.resetsAt != nil
+        let mode = chosenMode(perDayAllowed: perDayAllowed, overviewAllowed: overviewAllowed)
         let unit = period == "weekly" ? "week" : period == "daily" ? "day" : "month"
+        let units = period == "weekly" ? "weeks" : period == "daily" ? "days" : "months"
+        let oldest = history.series(window.key, from: .distantPast).first { $0.estimated != true }?.t
+        let periods = mode == "overview" ? history.periods(of: window) : []
+        let what = extra ? "Extra usage" : "Spent"
+        let title = mode == "overview" ? (back == 0 ? "Recent \(units)" : "Earlier \(units)")
+            : back > 0 ? Self.periodName(start, end, period: period)   // the switch says Total or Per day
+            : mode == "daily" ? "\(what) per day" : "\(what) this \(unit)"
 
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                ChartHeader(title: extra ? (mode == "daily" ? "Extra usage per day" : "Extra usage this \(unit)")
-                                         : mode == "daily" ? "Spent per day" : "Spent this \(unit)")
+                PeriodStepper(title: title,
+                              canGoBack: mode == "overview" ? periods.count > (back + 1) * overviewPage
+                                                            : oldest.map { $0 < start } ?? false,
+                              back: $stepBack)
                 if mode == "daily" { Text("UTC days").font(.system(size: 10)).foregroundStyle(.secondary) }
                 Spacer()
-                if perDayAllowed {
-                    ModeSwitch(mode: Binding(get: { mode }, set: { savedMode = $0 }),
-                               options: [("total", "Total"), ("daily", "Per day")])
+                let options = [("total", "Total")] + (perDayAllowed ? [("daily", "Per day")] : [])
+                    + (overviewAllowed ? [("overview", units.capitalized)] : [])
+                if options.count > 1 {
+                    ModeSwitch(mode: Binding(get: { mode }, set: { savedMode = $0; stepBack = 0 }), options: options)
                 }
             }
-            if filled.count < 2 {
+            if mode == "overview" {
+                if periods.isEmpty {
+                    EmptyHistory()
+                } else {
+                    let page = Array(periods.dropFirst(back * overviewPage).prefix(overviewPage).reversed())
+                    let code = spend.limit.currency, scale = pow(10, Double(spend.limit.exponent))
+                    let values = page.map { Double($0.peakUsedMinor ?? 0) / scale }
+                    let top = niceCeil(max(values.max() ?? 0, spend.limit.amount) * 1.05)
+                    PeriodBars(bars: page.map { Self.bar($0, current: $0.end == reset, spend: spend, period: period, limitName: extra ? "limit" : "budget") },
+                               top: top, limit: (spend.limit.amount, "\(extra ? "Limit" : "Budget") \(currency(spend.limit.amount, code))"),
+                               yLabel: { currency($0, code) }, xLabel: period == "monthly" || period == nil ? Self.monthLabel : Self.dayLabel,
+                               accessibility: "Money spent, one bar per \(unit)")
+                }
+            } else if filled.count < 2 {
                 EmptyHistory()
             } else if mode == "daily" {
-                DailySpendBars(window: window, days: UsageHistory.dailySpend(filled), start: start, end: reset, now: now)
+                DailySpendBars(window: window, days: UsageHistory.dailySpend(filled), start: start, end: end,
+                               now: back == 0 ? now : end)
             } else {
-                BudgetLine(window: window, points: filled, start: start, reset: reset, now: now,
-                           limitName: extra ? "Limit" : "Budget")
+                BudgetLine(window: window, points: filled, start: start, reset: end, now: back == 0 ? now : end,
+                           limitName: extra ? "Limit" : "Budget", past: back > 0)
             }
-            if let note = Self.footnote(filled, start: start, usesLogs: !extra) {
+            if mode != "overview", let note = Self.footnote(filled, start: start, usesLogs: !extra && back == 0) {
                 Text(note).font(.system(size: 10)).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+    }
+
+    /// The current period: recorded, with the unrecorded start estimated from Claude Code's logs.
+    /// A past one: what was recorded, as it was (the logs are only read for the current period).
+    private func points(back: Int, start: Date, end: Date, spend: Spend) -> [HistoryPoint] {
+        guard back == 0 else { return history.budgetSeries(window.key, periodStart: start, to: end) }
+        let current = HistoryPoint(t: now, key: window.key, percent: window.percent, usedMinor: spend.used.minor)
+        let recorded = history.budgetSeries(window.key, periodStart: start, current: current)
+        return UsageHistory.filledBudget(recorded, periodStart: start, weights: logWeights, limitMinor: spend.limit.minor)
+    }
+
+    private func chosenMode(perDayAllowed: Bool, overviewAllowed: Bool) -> String {
+        let mode = previewScale == "overview" ? "overview" : previewMode ?? savedMode
+        if mode == "daily" && !perDayAllowed || mode == "overview" && !overviewAllowed { return "total" }
+        return mode
+    }
+
+    private static let monthLabel = utcFormatter("MMM")
+    private static let dayLabel = utcFormatter("d MMM")
+
+    /// "Oct 2026" for a calendar month, else its days ("5–12 Nov").
+    static func periodName(_ start: Date, _ end: Date, period: String?) -> String {
+        period == "monthly" || period == nil ? utcFormatter("MMM yyyy").string(from: start)
+                                             : periodRange(start, end, timeZone: utc)
+    }
+
+    /// A past (or the current) period as a bar: the money spent, and whether it reached the budget.
+    static func bar(_ p: PeriodSummary, current: Bool, spend: Spend, period: String?, limitName: String = "limit") -> PeriodBar {
+        let code = spend.limit.currency, scale = pow(10, Double(spend.limit.exponent))
+        let amount = Double(p.peakUsedMinor ?? 0) / scale
+        var lines = [periodName(p.start, p.end, period: period),
+                     currency(amount, code) + (current ? " so far" : "") + " · \(Int(p.peak.rounded()))%"]
+        if let out = p.ranOutAt { lines.append("reached the \(limitName) \(utcFormatter("d MMM").string(from: out))") }
+        let partly = !current && p.covered < 0.85
+        if partly { lines.append("partly recorded, from \(utcDay.string(from: p.firstRecorded))") }
+        return PeriodBar(start: p.start, end: p.end, value: amount, full: p.ranOutAt != nil,
+                         light: current || partly, tooltip: lines)
     }
 
     /// Says where the curve isn't recorded: estimated from the logs, or not known at all.
@@ -398,6 +603,8 @@ private struct BudgetLine: View {
     let start: Date, reset: Date, now: Date
     /// What the limit line says: "Budget" (Enterprise/Team) or "Limit" (Pro/Max extra usage).
     var limitName = "Budget"
+    /// A past period: no projection, and the line ends at its last recorded amount.
+    var past = false
     @Environment(\.colorScheme) private var scheme
     @Environment(\.previewHover) private var previewHover
     @ViewState private var hovered: Date?
@@ -410,15 +617,16 @@ private struct BudgetLine: View {
         // Before the first recorded point the period started at zero, so that stretch is a gap too.
         let startsLate = points.first.map { $0.t.timeIntervalSince(start) > UsageHistory.fillableGap } ?? false
         let gaps = ChartGap.gaps((startsLate ? [(start, 0)] : []) + points.map { ($0.t, Double($0.usedMinor ?? 0) / scale) })
-        let projectable = !window.isTooEarlyToProject(now: now)
+        let projectable = !past && !window.isTooEarlyToProject(now: now)
             && (spend.used.minor > 0 || window.projectsFromPriorPace(now: now))
+        let endPoint = past ? (t: line.last?.t ?? start, amount: line.last?.value ?? 0) : (t: now, amount: spend.used.amount)
         let projected = projectable ? window.projectedPercentAtReset(now: now).map { spend.limit.amount * $0 / 100 } : nil
         let projection = projected.map { to in
             // End label rounded like the outlook line ("on track for about $950").
             ChartProjection(now: now, from: spend.used.amount, end: reset, to: to,
                             endLabel: "≈ " + spend.approx(percent: to / spend.limit.amount * 100), hoverText: { "≈ \(currency($0, code)) projected" })
         }
-        let peak = max(spend.used.amount, projected ?? 0)
+        let peak = max(endPoint.amount, projected ?? 0)
         // Show the whole budget only when the curve gets near it; otherwise the line would hug the floor.
         let showLimit = spend.limit.amount <= niceCeil(peak * 1.15) * 1.5
         let top = showLimit ? niceCeil(spend.limit.amount * 1.05) : niceCeil(peak * 1.15)
@@ -451,11 +659,11 @@ private struct BudgetLine: View {
                 projection.marks(color: tint, domain: (start, reset))
             }
             // Value at the line's end.
-            PointMark(x: .value("Time", now), y: .value("Spent", spend.used.amount))
+            PointMark(x: .value("Time", endPoint.t), y: .value("Spent", endPoint.amount))
                 .foregroundStyle(tint).symbolSize(28)
-                .annotation(position: .top, spacing: 3) {
+                .annotation(position: .top, spacing: 3, overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
                     if active == nil {
-                        Text(currency(spend.used.amount, code)).font(.system(size: 10, weight: .semibold))
+                        Text(currency(endPoint.amount, code)).font(.system(size: 10, weight: .semibold))
                             .foregroundStyle(.primary).monospacedDigit()
                     }
                 }
@@ -601,16 +809,26 @@ struct LimitsHistoryChart: View {
     var models: [String] = []
     @Environment(\.colorScheme) private var scheme
     @Environment(\.previewHover) private var previewHover
+    @Environment(\.previewChartScale) private var previewScale
+    @Environment(\.previewBack) private var previewBack
+    @AppStorage("limitsChartScale") private var savedScale = "week"
     @ViewState private var hovered: Date?
+    /// How many weeks back (Week), or pages of weeks back (Weeks).
+    @ViewState private var stepBack = 0
 
     private struct Line { let key, name, short: String; let color: Color }
 
     var body: some View {
         // This week, from the last reset to the next one; without a reset time, the last 7 days.
         let weekReset = week?.resetsAt.flatMap { $0.isAtOrAfter(now) ? $0 : nil }
-        let end = weekReset ?? now
-        let start = end.addingTimeInterval(-7 * 86400)
-        let projection = weekReset.flatMap { r in week.flatMap { Self.projection($0, reset: r, now: now) } }
+        let back = previewBack ?? stepBack
+        let overview = weekReset != nil && (previewScale ?? savedScale) == "overview"
+        let currentEnd = weekReset ?? now
+        let start = currentEnd.addingTimeInterval(-7 * 86400 * Double(back + 1))
+        let end = back == 0 ? currentEnd : start.addingTimeInterval(7 * 86400)
+        let seriesEnd = back == 0 ? now : end
+        let oldest = history.series("seven_day", from: .distantPast).first?.t
+        let projection = back > 0 ? nil : weekReset.flatMap { r in week.flatMap { Self.projection($0, reset: r, now: now) } }
         let weekColor = ChartInk.series1(scheme)
         let lines = [
             Line(key: "seven_day", name: "Week (7 d)", short: "7d", color: weekColor),
@@ -620,25 +838,50 @@ struct LimitsHistoryChart: View {
             return Line(key: key, name: "\(model) (7 d)", short: model, color: color)
         }
         let series = lines.map { l in
-            (l, ChartPoint.runs(history.series(l.key, from: start, to: now).map { ($0.t, $0.percent) }))
+            (l, ChartPoint.runs(history.series(l.key, from: start, to: seriesEnd).map { ($0.t, $0.percent) }))
         }.filter { $0.1.count >= 1 }
+        let weeks = overview ? week.map { history.periods(of: $0) } ?? [] : []
         let times = Array(Set(series.flatMap { $0.1.map(\.t) })).sorted()
         let active = activeHover(hovered, preview: previewHover, times: times, future: projection?.span)
 
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 10) {
-                ChartHeader(title: weekReset == nil ? "Last 7 days" : "This week")
+                if overview {
+                    PeriodStepper(title: back == 0 ? "Recent weeks" : "Earlier weeks",
+                                  canGoBack: weeks.count > (back + 1) * overviewPage, back: $stepBack)
+                } else {
+                    PeriodStepper(title: back > 0 ? periodRange(start, end) : weekReset == nil ? "Last 7 days" : "This week",
+                                  canGoBack: oldest.map { $0 < start } ?? false, back: $stepBack)
+                }
                 Spacer()
+                if weekReset != nil {
+                    ModeSwitch(mode: Binding(get: { overview ? "overview" : "week" },
+                                             set: { savedScale = $0; stepBack = 0 }),
+                               options: [("week", "Week"), ("overview", "Weeks")])
+                }
+            }
+            if !overview {
                 // Legend: a short line key beside each name (identity is never colour alone;
                 // the line ends are labelled too).
-                ForEach(series.map(\.0), id: \.key) { l in
-                    HStack(spacing: 4) {
-                        Capsule().fill(l.color).frame(width: 10, height: 2)
-                        Text(l.name).font(.system(size: 10)).foregroundStyle(.secondary)
+                HStack(spacing: 10) {
+                    ForEach(series.map(\.0), id: \.key) { l in
+                        HStack(spacing: 4) {
+                            Capsule().fill(l.color).frame(width: 10, height: 2)
+                            Text(l.name).font(.system(size: 10)).foregroundStyle(.secondary)
+                        }
                     }
                 }
             }
-            if series.allSatisfy({ $0.1.count < 2 }) {
+            if overview {
+                if weeks.isEmpty {
+                    EmptyHistory()
+                } else {
+                    let page = Array(weeks.dropFirst(back * overviewPage).prefix(overviewPage).reversed())
+                    PeriodBars(bars: page.map { Self.bar($0, current: $0.end == weekReset) },
+                               top: 100, yLabel: { "\(Int($0))%" }, xLabel: Self.weekLabel,
+                               accessibility: "How high the weekly limit got, one bar per week")
+                }
+            } else if series.allSatisfy({ $0.1.count < 2 }) {
                 EmptyHistory()
             } else {
                 Chart {
@@ -703,10 +946,35 @@ struct LimitsHistoryChart: View {
                 .modifier(HoverLayer(times: times, future: projection?.span, hovered: $hovered))
                 .padding(.top, projection == nil ? 6 : 14)   // room for the projection label above 100%
                 .frame(height: projection == nil ? 110 : 118)
-                .accessibilityLabel(weekReset == nil ? "Session and weekly usage over the last 7 days"
+                .accessibilityLabel(back > 0 ? "Session and weekly usage, \(periodRange(start, end))"
+                                    : weekReset == nil ? "Session and weekly usage over the last 7 days"
                                     : "Session and weekly usage this week" + (projection.map { ", projected \($0.endLabel)" } ?? ""))
             }
         }
+    }
+
+    private static let weekLabel: DateFormatter = {
+        let f = DateFormatter(); f.locale = HumanTime.en; f.dateFormat = "d MMM"; return f
+    }()
+
+    /// A past (or the current) week as a bar: how high it got, whether and when it ran out.
+    static func bar(_ p: PeriodSummary, current: Bool) -> PeriodBar {
+        let f = DateFormatter(); f.locale = HumanTime.en; f.dateFormat = "EEE d MMM, HH:mm"
+        var lines = [periodRange(p.start, p.end)]
+        let peak = Int(p.peak.rounded())
+        if let out = p.ranOutAt {
+            lines.append("100% · ran out \(f.string(from: out))")
+            if let early = p.early, early > 3600 { lines.append(MenuBarImage.span(early) + " before the reset") }
+        } else {
+            lines.append(current ? "\(peak)% so far" : "\(peak)% at its highest")
+        }
+        let partly = !current && p.covered < 0.85
+        if partly {
+            let d = DateFormatter(); d.locale = HumanTime.en; d.dateFormat = "EEE d MMM"
+            lines.append("partly recorded, from \(d.string(from: p.firstRecorded))")
+        }
+        return PeriodBar(start: p.start, end: p.end, value: p.peak, full: p.ranOutAt != nil,
+                         light: current || partly, tooltip: lines)
     }
 
     /// Where the weekly line is headed: 100% at the moment it runs out, or the share at the reset.
