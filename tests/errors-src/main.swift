@@ -61,6 +61,16 @@ expect("…with its files named as package.sh makes them",
        rel?.appZip.absoluteString == "https://github.com/gtmn/claude-usage-meter/releases/download/v0.1.12/UsageMeter-0.1.12.zip"
        && rel?.sums.lastPathComponent == "SHA256SUMS.txt" && rel?.page.absoluteString.hasSuffix("/releases/tag/v0.1.12") == true)
 expect("a tag that isn't a version is ignored", UpdateCheck.release(fromLatest: Data(#"{"tag_name": "nightly"}"#.utf8)) == nil)
+let formula = """
+class ClaudeUsageMeter < Formula
+  homepage "https://github.com/gtmn/claude-usage-meter"
+  url "https://github.com/gtmn/claude-usage-meter/archive/refs/tags/v0.1.13.tar.gz"
+  sha256 "cdd6"
+  head "https://github.com/gtmn/claude-usage-meter.git", branch: "main"
+"""
+expect("a Homebrew copy reads the version from the tap's formula", UpdateCheck.release(fromFormula: formula)?.version == "0.1.13")
+expect("…and nothing from a formula without a tagged url",
+       UpdateCheck.release(fromFormula: "class X < Formula\n  url \"https://example.com/x.tar.gz\"\n") == nil)
 let sums = "AB12  claude-usage-0.1.12.zip\ncd34  UsageMeter-0.1.12.zip\n"
 expect("the zip's checksum is found in SHA256SUMS.txt", UpdateCheck.checksum(for: "UsageMeter-0.1.12.zip", in: sums) == "cd34"
        && UpdateCheck.checksum(for: "missing.zip", in: sums) == nil)

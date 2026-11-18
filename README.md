@@ -114,8 +114,10 @@ the app remembers). They sit under the graph: **Menu bar item**, one setting per
 **Open at login**, **Check for updates** and **Quit** (⌘Q also quits while the popup is open).
 Hover over a control to see what it does.
 
-**Updates.** With **Check for updates** on, a newer release shows under the popup's title, with
-what's new and an **Update** button that installs it the way your copy came:
+**Updates.** With **Check for updates** on, a newer version shows under the popup's title, with
+what's new and an **Update** button that installs it the way your copy came. A Homebrew copy
+asks the tap's formula, so it only hears about a version `brew upgrade` can already install; a
+downloaded copy asks for the latest GitHub release.
 - Homebrew: `brew update` and `brew upgrade claude-usage-meter` (it builds from source, about a
   minute), then restarts through `brew services`, or opens the new copy.
 - Download: fetches the release zip, checks it against the release's `SHA256SUMS.txt`, replaces the

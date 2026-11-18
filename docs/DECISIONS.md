@@ -55,7 +55,9 @@ options that were ruled out, so they aren't tried again.
   Developer ID.
 - **Updates are opt-in** ("Check for updates", off by default), because the app promised to talk only to
   `api.anthropic.com`. One unauthenticated request a day to GitHub's latest-release API; **Check now**
-  sends one right away even with the setting off, because the user asked for it. Update installs
+  sends one right away even with the setting off, because the user asked for it. A Homebrew copy reads the
+  version from the tap's formula (through the same API), not the releases: a release goes out minutes before
+  the tap is bumped, and offering it then would end in "Homebrew doesn't have it yet". Update installs
   the way the copy came: Homebrew runs `brew update` + `brew upgrade` and restarts with
   `launchctl kickstart -k` (launchd restarts the job itself; `brew services restart` from inside the job
   would be killed halfway); a download is checked against the release's `SHA256SUMS.txt` (catches a

@@ -64,13 +64,17 @@ final class Updater: ObservableObject {
             : newer ? "\(release.version) is out" : "Up to date (\(current))"
     }
 
-    private static func fetchLatest() async -> UpdateCheck.Release? {
-        var request = URLRequest(url: UpdateCheck.latestURL, timeoutInterval: 20)
-        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+    /// The newest version this copy can install: for a Homebrew copy the one in the tap's formula
+    /// (what `brew upgrade` would get), otherwise GitHub's latest release.
+    nonisolated static func fetchLatest() async -> UpdateCheck.Release? {
+        let brew = Install.byHomebrew
+        var request = URLRequest(url: brew ? UpdateCheck.formulaURL : UpdateCheck.latestURL, timeoutInterval: 20)
+        request.setValue(brew ? "application/vnd.github.raw" : "application/vnd.github+json", forHTTPHeaderField: "Accept")
         request.setValue("UsageMeter", forHTTPHeaderField: "User-Agent")   // GitHub asks for one
         guard let (data, response) = try? await URLSession.shared.data(for: request),
               (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
-        return UpdateCheck.release(fromLatest: data)
+        return brew ? UpdateCheck.release(fromFormula: String(decoding: data, as: UTF8.self))
+            : UpdateCheck.release(fromLatest: data)
     }
 
     func install() {
@@ -161,16 +165,13 @@ final class Updater: ObservableObject {
     nonisolated static func checkFromCommandLine() -> Never {
         let current = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
         let sem = DispatchSemaphore(value: 0)
-        var latest: UpdateCheck.Release?
-        var request = URLRequest(url: UpdateCheck.latestURL, timeoutInterval: 20)
-        request.setValue("UsageMeter", forHTTPHeaderField: "User-Agent")
-        URLSession.shared.dataTask(with: request) { data, _, _ in
-            latest = data.flatMap(UpdateCheck.release(fromLatest:)); sem.signal()
-        }.resume()
+        nonisolated(unsafe) var latest: UpdateCheck.Release?
+        Task.detached { latest = await fetchLatest(); sem.signal() }
         sem.wait()
+        let source = Install.byHomebrew ? "the tap's formula" : "GitHub's latest release"
         guard let latest else { print("this copy: \(current); couldn't reach GitHub"); exit(1) }
         let newer = UpdateCheck.isNewer(latest.version, than: current)
-        print("this copy: \(current); latest release: \(latest.version)\(newer ? " (newer)" : "")")
+        print("this copy: \(current); latest in \(source): \(latest.version)\(newer ? " (newer)" : "")")
         print(Install.byHomebrew ? "installed by Homebrew" : "installed by hand: \(Bundle.main.bundleURL.path)")
         exit(0)
     }

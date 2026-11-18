@@ -8,6 +8,11 @@ public enum UpdateCheck {
     public static let repo = "gtmn/claude-usage-meter"
     /// GitHub's public "latest release" (drafts and pre-releases excluded). No login, no data sent.
     public static let latestURL = URL(string: "https://api.github.com/repos/\(repo)/releases/latest")!
+    /// The Homebrew formula in the tap, as plain text (ask with `Accept: application/vnd.github.raw`).
+    /// A Homebrew copy checks this instead of the releases, so it only hears about a version
+    /// `brew upgrade` can already install: the release goes out minutes before the tap is bumped.
+    public static let formulaURL =
+        URL(string: "https://api.github.com/repos/gtmn/homebrew-tap/contents/Formula/claude-usage-meter.rb")!
 
     /// A release's version and its files, named as `.github/package.sh` makes them.
     public struct Release: Equatable, Sendable {
@@ -46,6 +51,18 @@ public enum UpdateCheck {
         guard let o = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let tag = o["tag_name"] as? String, numbers(tag) != nil else { return nil }
         return Release(version: tag.hasPrefix("v") ? String(tag.dropFirst()) : tag)
+    }
+
+    /// The release a formula builds, from its `url ".../archive/refs/tags/v0.1.12.tar.gz"` line.
+    public static func release(fromFormula text: String) -> Release? {
+        for line in text.split(separator: "\n") {
+            let t = line.trimmingCharacters(in: .whitespaces)
+            guard t.hasPrefix("url \""), let r = t.range(of: "/archive/refs/tags/v"),
+                  let end = t.range(of: ".tar.gz", range: r.upperBound..<t.endIndex) else { continue }
+            let version = String(t[r.upperBound..<end.lowerBound])
+            return numbers(version) != nil ? Release(version: version) : nil
+        }
+        return nil
     }
 
     /// The SHA-256 for `file` in a `shasum -a 256` listing ("<hex>  <name>" per line).
