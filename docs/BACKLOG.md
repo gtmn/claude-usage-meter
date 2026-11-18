@@ -4,6 +4,15 @@
 
 1. **"Sign in again" button** (runs `claude auth login`): decide before 2026-12-07, when Claude Code's
    refresh token here expires.
+2. **Release 0.1.13 and test the Update button** (the first real run of both install paths). `main` has the
+   formula-based check (a164d60) but no release yet.
+   - Order matters once more: the installed 0.1.12 still asks GitHub's releases, not the tap, so it offers
+     0.1.13 as soon as the release is out. Clicking Update before the tap is bumped ends in "Homebrew doesn't
+     have 0.1.13 yet". So: release, bump the tap, then click Update.
+   - Homebrew copy: click Update instead of README's step 4. Check `~/Library/Logs/UsageMeter.log` for
+     "brew upgrade to 0.1.13 exited with 0" and that the app comes back (through `brew services`) as 0.1.13.
+   - Downloaded copy: unpack the 0.1.12 zip into a scratch folder, open that copy, click Update, and check
+     that it replaces itself and reopens as 0.1.13.
 
 ## Ideas (not decided)
 
@@ -16,6 +25,10 @@
   shortcut, and hiding the numbers while on pace (its PR #124).
 - Developer ID signing and notarization for the download (needs a paid Apple developer account).
 - Bump the tap formula from the release workflow (needs a token with write access to the tap as a secret).
+  It would also close the gap between a release going out and Homebrew copies hearing about it.
+- Last month's pace still names the date ("At last month's pace: about $1,990 by the 1 Jan reset"), unlike
+  the other outlooks, which dropped it.
+- Show the settings on first start (they're closed until the gear is clicked).
 
 ## Done
 
