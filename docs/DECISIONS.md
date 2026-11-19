@@ -27,6 +27,11 @@ options that were ruled out, so they aren't tried again.
   one has less, the most recent earlier period in the history stands in, named "an earlier week's".
   Not from Claude Code's logs: they cover one Mac, at list prices, without claude.ai, and can't be scaled
   without real totals.
+- **An early burst isn't "too early"** (2026-11-19): with no earlier period (the 5 h session), the first 15%
+  holds projections back only while usage is at most 15%. Past that it's ahead of an even pace for the
+  whole first 15%, which isn't noise, so it projects at usage ÷ the first 15% (the slowest it can be going:
+  warns without overstating) and the pace colours apply. 58% twenty minutes in: runs out in about 30
+  minutes, where the rate so far would say 15.
 
 ## Menu bar
 

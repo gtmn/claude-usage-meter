@@ -22,6 +22,8 @@ let r5 = at("2026-11-08 15:00")   // 5h window started 10:00; 15% = 10:45
 print("5h 5% at +10 min    →", UsageWindow(key: "five_hour", percent: 5, resetsAt: r5).outlook(now: at("2026-11-08 10:10"), calendar: cal), "| projected:", UsageWindow(key: "five_hour", percent: 5, resetsAt: r5).projectedLimitAt(now: at("2026-11-08 10:10")) != nil)
 print("5h 30% at +44 min   →", UsageWindow(key: "five_hour", percent: 30, resetsAt: r5).outlook(now: at("2026-11-08 10:44"), calendar: cal))
 print("5h 30% at +45 min   →", UsageWindow(key: "five_hour", percent: 30, resetsAt: r5).outlook(now: at("2026-11-08 10:45"), calendar: cal))
+print("5h 58% at +20 min   →", UsageWindow(key: "five_hour", percent: 58, resetsAt: r5).outlook(now: at("2026-11-08 10:20"), calendar: cal), "| early burst, as if over 45 min")
+print("5h 15% at +20 min   →", UsageWindow(key: "five_hour", percent: 15, resetsAt: r5).outlook(now: at("2026-11-08 10:20"), calendar: cal))
 print("5h 100% at +20 min  →", UsageWindow(key: "five_hour", percent: 100, resetsAt: r5).outlook(now: at("2026-11-08 10:20"), calendar: cal))
 print("week 6% at +12 h    →", UsageWindow(key: "seven_day", percent: 6, resetsAt: at("2026-11-15 05:00")).outlook(now: at("2026-11-08 17:00"), calendar: cal))
 print("week 0% at +12 h    →", UsageWindow(key: "seven_day", percent: 0, resetsAt: at("2026-11-15 05:00")).outlook(now: at("2026-11-08 17:00"), calendar: cal))

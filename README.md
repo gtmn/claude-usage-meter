@@ -117,7 +117,10 @@ recorded at least a quarter of it; if the last one has less (the Mac was off), t
 recent earlier one the history covers stands in (*At an earlier week's pace: …*). As the
 first 15% goes by, this period's own spending counts more and more, and after it only this
 period counts. The 5-hour session, and any limit without such a period, says
-*Too early to project* until then.
+*Too early to project* until then, unless more than 15% is already used: that's ahead of
+an even pace for the whole first 15%, so it projects as if that usage had taken all of it
+(the slowest it can be going) and the colours and alerts apply, e.g. 58% twenty minutes
+into a session: *Runs out around 10:52*.
 
 ## Settings
 
@@ -318,7 +321,7 @@ rm docs/screenshots/*.label.png /tmp/um.png
 
 Renders never read or change your own settings: they use the arguments, in a throwaway store.
 
-Add `compact` for the Compact menu bar style, `mono` or `alerts` for those palettes, `amount` for the budget's amount, `extra` for Pro/Max with extra usage (and its menu bar item), `only5h` or `only7d` for one limit in the menu bar, `fable` for a Fable weekly limit (and its line in the graph), `update` for a newer release offered, `panel` for the whole popup or `settings` for its settings alone, `nolabels`, `nopercent`, `nopace` or `noahead` to leave those out, `left` or `early` for the time left or early, `daily` for the per-day bars, `overview` for the Weeks or Months view, `full` for the session at its limit, `back=2` for two periods (or overview pages) back, `hover` to show the graph's tooltip (`hover=1.5` halfway along the projection), `light` for light mode, or `live` to render your
+Add `compact` for the Compact menu bar style, `mono` or `alerts` for those palettes, `amount` for the budget's amount, `extra` for Pro/Max with extra usage (and its menu bar item), `only5h` or `only7d` for one limit in the menu bar, `fable` for a Fable weekly limit (and its line in the graph), `update` for a newer release offered, `panel` for the whole popup or `settings` for its settings alone, `nolabels`, `nopercent`, `nopace` or `noahead` to leave those out, `left` or `early` for the time left or early, `daily` for the per-day bars, `overview` for the Weeks or Months view, `full` for the session at its limit, `burst` for 58% twenty minutes into a session, `back=2` for two periods (or overview pages) back, `hover` to show the graph's tooltip (`hover=1.5` halfway along the projection), `light` for light mode, or `live` to render your
 own current numbers and recorded history instead (don't commit those).
 
 ## Releasing

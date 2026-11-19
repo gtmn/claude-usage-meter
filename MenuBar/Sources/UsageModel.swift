@@ -6,10 +6,11 @@ extension UsageSnapshot {
     /// Fixed numbers for layout checks (`--sample`, `--render-preview`); needs no Keychain access.
     static var sample: UsageSnapshot {
         let now = Date()
-        // `full`: the session at its limit, resetting in 1 h 10 min.
-        let full = CommandLine.arguments.contains("full")
+        // `full`: the session at its limit, resetting in 1 h 10 min. `burst`: 58% twenty minutes in.
+        let full = CommandLine.arguments.contains("full"), burst = CommandLine.arguments.contains("burst")
+        let session = full ? (100.0, 70.0 * 60) : burst ? (58, 280 * 60) : (20, 2 * 3600)
         return UsageSnapshot(source: .oauth, capturedAt: now, windows: [
-            UsageWindow(key: "five_hour", percent: full ? 100 : 20, resetsAt: now.addingTimeInterval(full ? 70 * 60 : 2 * 3600)),
+            UsageWindow(key: "five_hour", percent: session.0, resetsAt: now.addingTimeInterval(session.1)),
             UsageWindow(key: "seven_day", percent: 60, resetsAt: now.addingTimeInterval(3 * 86400)),
         ])
     }

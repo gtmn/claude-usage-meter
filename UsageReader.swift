@@ -133,11 +133,16 @@ public struct UsageWindow: Equatable {
         return (now.timeIntervalSince(reset.addingTimeInterval(-d)), d, reset)
     }
 
-    /// Still in the first 15% with no earlier period to go by.
+    /// Still in the first 15% with no earlier period to go by, and not yet past 15% used. Past it,
+    /// usage is already ahead of an even pace for the whole first 15%: no longer noise, so it
+    /// projects (and alerts) from then on, e.g. 58% twenty minutes into a session.
     public func isTooEarlyToProject(now: Date = Date()) -> Bool {
         guard let e = elapsed(now: now) else { return false }
-        return e.elapsed < e.length * Self.rampShare && priorPace == nil
+        return e.elapsed < e.length * Self.rampShare && priorPace == nil && !usedPastRamp
     }
+
+    /// More used than an even pace would use in the whole first 15% of the window.
+    private var usedPastRamp: Bool { percent > Self.rampShare * 100 }
 
     /// In the first 15%, leaning on the previous period's pace.
     public func projectsFromPriorPace(now: Date = Date()) -> Bool {
@@ -147,12 +152,14 @@ public struct UsageWindow: Equatable {
 
     /// Projection pace in percent per second. After the first 15% of the window: the average so far.
     /// Before that, as if the previous period's pace filled the rest of the first 15%, so the
-    /// projection starts at last period's pace and moves smoothly to this period's own.
+    /// projection starts at last period's pace and moves smoothly to this period's own. With no
+    /// earlier period but already past 15% used: as if that usage took the whole first 15%, the
+    /// slowest it can be going, so an early burst warns without overstating it.
     public func projectionPace(now: Date = Date()) -> Double? {
         guard let e = elapsed(now: now) else { return nil }
         let ramp = e.length * Self.rampShare
         if e.elapsed >= ramp { return percent / e.elapsed }
-        guard let prior = priorPace else { return nil }
+        guard let prior = priorPace else { return usedPastRamp ? percent / ramp : nil }
         return (percent + prior * (ramp - max(e.elapsed, 0))) / ramp
     }
 
