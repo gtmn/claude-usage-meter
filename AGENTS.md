@@ -7,7 +7,7 @@ Read `README.md` (layout, build, tests, releasing), then `docs/DECISIONS.md` (wh
 what was ruled out) and `docs/BACKLOG.md` (what's next).
 
 - Test: `./test.sh`. Build: `MenuBar/build.sh`. Run a dev build: `MenuBar/dev.sh` (stops the Homebrew service,
-  runs the checkout build, restarts the service on exit). Dev builds report `0.0.0-dev` or a `git describe`
+  runs the checkout build, restarts the service on exit; unoptimised, and skipped when nothing changed). Dev builds report `0.0.0-dev` or a `git describe`
   version and never install updates; `UsageMeter --check-update` tests the update check.
 - Releasing (README): bump the tap right after the release. Homebrew copies read the version from the tap's
   formula, so they only hear about a release once the formula has it.

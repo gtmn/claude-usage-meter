@@ -69,6 +69,24 @@ check("budget periods are calendar months",
       UsageHistory.periodStart(of: budgetNow, back: 0) == at("2026-11-01 00:00")
       && UsageHistory.periodStart(of: budgetNow, back: 1) == at("2026-10-01 00:00"))
 
+// Hitting the 5 h limit.
+let sessions = UsageHistory(points: [
+    HistoryPoint(t: at("2026-11-17 13:00"), key: "five_hour", percent: 60),
+    HistoryPoint(t: at("2026-11-17 14:20"), key: "five_hour", percent: 100),    // hit
+    HistoryPoint(t: at("2026-11-17 15:50"), key: "five_hour", percent: 100),
+    HistoryPoint(t: at("2026-11-17 16:00"), key: "five_hour", percent: 0),      // reset: blocked 1 h 40 min
+    HistoryPoint(t: at("2026-11-18 10:00"), key: "five_hour", percent: 99.6),   // hit
+    HistoryPoint(t: at("2026-11-18 11:00"), key: "five_hour", percent: 100),
+    HistoryPoint(t: at("2026-11-18 19:00"), key: "five_hour", percent: 10),     // asleep: reset time unknown
+    HistoryPoint(t: at("2026-11-19 09:00"), key: "seven_day", percent: 100),    // another limit
+    HistoryPoint(t: at("2026-11-19 09:30"), key: "five_hour", percent: 100)])   // still at 100%
+let hits = sessions.limitHits()
+check("each session that reached 100% counts once", hits.map(\.at) == [at("2026-11-17 14:20"), at("2026-11-18 10:00"), at("2026-11-19 09:30")])
+check("blocked until the reset", hits[0].resetAt == at("2026-11-17 16:00") && hits[0].blocked == 100 * 60 && !hits[0].atLeast)
+check("reset unknown after a gap: at least until the last 100%", hits[1].resetAt == nil && hits[1].atLeast && hits[1].blocked == 3600)
+check("still blocked", hits[2].resetSeen == nil)
+check("hits within a time span", sessions.limitHits(from: at("2026-11-18 00:00"), to: at("2026-11-19 00:00")).count == 1)
+
 let dir = FileManager.default.temporaryDirectory.appendingPathComponent("usagemeter-test-\(getpid())")
 let url = dir.appendingPathComponent("history.json")
 try! h.save(to: url)

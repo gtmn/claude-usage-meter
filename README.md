@@ -67,10 +67,15 @@ already keeps on your Mac.
   - hover over it for the time and value at any point
   - **‹ ›** step back through earlier weeks (or budget months) as far as the history goes; click
     the title to return to now. Past periods show how they went, without a projection.
-  - **Weeks** (or **Months**) switches to the longer view: one bar per period showing how high it
-    got, orange where it ran out (or reached the budget), lighter for the current one and for
-    partly recorded ones. Hover a bar for its dates, its peak, and when it ran out and how early.
-    Twelve periods at a time; ‹ › page through older ones.
+  - **Weeks** (or **Months**) switches to the long view: the weekly % (or the money spent) as one
+    line over several periods, a dashed line at each reset with its date, and what each period
+    reached labelled just before its reset (an orange point where it ran out or reached the
+    budget). Hover for the time, the value, the period's dates and when it ran out. Eight weeks
+    (six months) at a time; ‹ › page through older ones.
+  - **5h limit hits** (Pro/Max): each time the 5h session reached 100% is an orange point on the
+    session line in the week view, and an orange tick along the bottom of the long view, where
+    each week's label counts them (`5h ×3`). Hover for when it was hit and how long it was blocked
+    until the session reset ("at least" when the Mac was asleep around the reset).
 
   Claude's usage data only says "now", so the app records its own history from the first
   time it runs: one point per limit about every 10 minutes (and at every reset), in
@@ -246,6 +251,8 @@ To try changes while the Homebrew copy is installed, run `./dev.sh`. It stops th
 Homebrew service and quits any other copy, builds the checkout (stamped with `git describe`),
 and runs it in the terminal. Quit it from its popup or press Ctrl-C, and the Homebrew copy
 is started again. Both use the same history and settings, so your real data carries on.
+Dev builds are unoptimised (about 10 s instead of 30) and skipped when nothing that goes into
+the build changed since the last one; `./dev.sh --rebuild` builds anyway.
 
 ### Optional: status-line snapshot
 
@@ -311,7 +318,7 @@ rm docs/screenshots/*.label.png /tmp/um.png
 
 Renders never read or change your own settings: they use the arguments, in a throwaway store.
 
-Add `compact` for the Compact menu bar style, `mono` or `alerts` for those palettes, `amount` for the budget's amount, `extra` for Pro/Max with extra usage (and its menu bar item), `only5h` or `only7d` for one limit in the menu bar, `fable` for a Fable weekly limit (and its line in the graph), `update` for a newer release offered, `panel` for the whole popup or `settings` for its settings alone, `nolabels`, `nopercent`, `nopace` or `noahead` to leave those out, `left` or `early` for the time left or early, `daily` for the per-day bars, `overview` for the Weeks or Months bars, `back=2` for two periods (or overview pages) back, `hover` to show the graph's tooltip (`hover=1.5` halfway along the projection), `light` for light mode, or `live` to render your
+Add `compact` for the Compact menu bar style, `mono` or `alerts` for those palettes, `amount` for the budget's amount, `extra` for Pro/Max with extra usage (and its menu bar item), `only5h` or `only7d` for one limit in the menu bar, `fable` for a Fable weekly limit (and its line in the graph), `update` for a newer release offered, `panel` for the whole popup or `settings` for its settings alone, `nolabels`, `nopercent`, `nopace` or `noahead` to leave those out, `left` or `early` for the time left or early, `daily` for the per-day bars, `overview` for the Weeks or Months view, `full` for the session at its limit, `back=2` for two periods (or overview pages) back, `hover` to show the graph's tooltip (`hover=1.5` halfway along the projection), `light` for light mode, or `live` to render your
 own current numbers and recorded history instead (don't commit those).
 
 ## Releasing

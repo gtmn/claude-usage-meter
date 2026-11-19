@@ -40,12 +40,21 @@ options that were ruled out, so they aren't tried again.
 - **History is kept without a time limit** (2026-11-19), so past weeks and months can be looked back at.
   Points older than 60 days are thinned to one per window per hour, keeping each hour's highest point so a
   period's peak before its reset survives. About 2 MB a year; it was 40 days before.
-- **Looking back: ‹ › through periods, and one bar per period for the long view** (2026-11-19). A line over
-  months would be a sawtooth (each week climbs and drops at its reset), hard to read; what matters over a
-  long span is how close each period got, so the long view is a bar per period at its peak, orange where
-  it ran out. Periods are reset to reset, stepped back from the current reset (calendar months in UTC for
-  the budget). Only recorded points count; past periods aren't estimated from the logs (they're only read
-  for the current one). The 5 h session is left out of the long view: it resets too often to say much there.
+- **Looking back: ‹ › through periods, and a long view as one line** (2026-11-19). The long view is the weekly
+  % (or the budget's money) as one line over 8 weeks (6 months), a dashed rule at each reset and the value
+  each period reached labelled before it, orange where it ran out. Tried first as one bar per period at its
+  peak; a line reads better, and with the resets marked the sawtooth (climb, drop at the reset) is the
+  point rather than noise. Drawn from one point per hour (the highest). Periods are reset to reset, stepped
+  back from the current reset (calendar months in UTC for the budget). Only recorded points count; past
+  periods aren't estimated from the logs. The 5 h session's line is left out (it resets too often to say
+  much there); its limit hits are shown instead.
+- **5 h limit hits come from the history** (2026-11-19): a session counts once from its first point at 100%
+  until usage drops (the reset). Blocked time runs to that first lower point; if nothing was recorded for
+  over 30 minutes before it, the reset time isn't known and the time counts "at least" to the last 100%.
+- **History stays 10-minute for 60 days, then hourly** (2026-11-19). Finer isn't available: the app fetches
+  every 5 minutes, and more often runs into the rate limit. Keeping 10-minute points beyond 60 days would
+  be about 6 MB a year instead of about 2, rewritten on every fetch, for nothing visible: the long view
+  draws hourly peaks.
 
 - **Unrecorded stretches are estimated from Claude Code's logs** (`~/.claude/projects/**/*.jsonl`, deduplicated
   by message id + requestId, priced at list prices), scaled to the real totals at both ends of a gap.

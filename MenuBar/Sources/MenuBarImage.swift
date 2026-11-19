@@ -36,6 +36,8 @@ enum MenuBarImage {
         var runsOutIn: TimeInterval? = nil
         /// How long before the reset it runs out at that pace (same condition).
         var runsOutEarly: TimeInterval? = nil
+        /// How long until it resets, once it's at 100% (then "left" and "early" say this instead).
+        var resetsInWhenFull: TimeInterval? = nil
         /// The budget's amount used, in whole units ("$306"), shown instead of the % when chosen.
         var amount: String? = nil
 
@@ -49,7 +51,9 @@ enum MenuBarImage {
             tooEarly = w.isTooEarlyToProject(now: now)
             duration = w.duration
             amount = w.spend?.used.wholeUnits
-            if let hit = w.projectedLimitAt(now: now) {
+            if !(w.percent < 99.5) {
+                resetsInWhenFull = w.resetsAt.map { max($0.timeIntervalSince(now), 0) }
+            } else if let hit = w.projectedLimitAt(now: now) {
                 runsOutIn = max(hit.timeIntervalSince(now), 0)
                 runsOutEarly = w.resetsAt.map { max($0.timeIntervalSince(hit), 0) }
             }
@@ -211,8 +215,12 @@ enum MenuBarImage {
 
     private static func cells(_ row: Row, _ o: Options, label: Bool) -> [String] {
         var ahead = ""
-        if o.ahead, let lead = row.lead, PaceLead.wellAhead <= lead {
-            let minutes = (row.duration ?? 0) <= 5 * 3600     // minutes only for the 5 h session
+        let minutes = (row.duration ?? 0) <= 5 * 3600     // minutes only for the 5 h session
+        if o.ahead, o.aheadAs != .points, let wait = row.resetsInWhenFull {
+            // At 100% there's no time left to count down: how long until it resets instead. The
+            // reset time is known, so the session gets hours and minutes ("1h 10m"), not a rounded hour.
+            ahead = (minutes ? hoursMinutes(wait) : span(wait)) + " to reset"
+        } else if o.ahead, let lead = row.lead, PaceLead.wellAhead <= lead {
             switch o.aheadAs {
             case .points: ahead = "+\(lead)"    // percentage points ahead; no unit, to keep it short
             case .left: ahead = row.runsOutIn.map { span($0, minutes: minutes) + " left" } ?? ""
@@ -225,6 +233,12 @@ enum MenuBarImage {
 
     /// Rounded, since it's an estimate: half days from a day on ("1d", "1.5d", "3d"), whole hours
     /// under a day ("5h"), and, only for the 5 h session (`minutes`), 5 minutes under an hour ("45m").
+    /// "40m", "1h 10m", "3h": to 5 minutes, for a known time.
+    static func hoursMinutes(_ s: TimeInterval) -> String {
+        let m = max(5, Int((s / 300).rounded()) * 5)
+        return m < 60 ? "\(m)m" : m % 60 == 0 ? "\(m / 60)h" : "\(m / 60)h \(m % 60)m"
+    }
+
     static func span(_ s: TimeInterval, minutes allowMinutes: Bool = false) -> String {
         let minutes = s / 60
         if minutes < 57.5 {

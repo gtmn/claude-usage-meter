@@ -10,7 +10,7 @@ struct UsageMeterApp: App {
     )
 
     init() {
-        // `UsageMeter --render-preview out.png [live] [offline] [enterprise] [hover] [light] [daily] [seen] [saved] [compact] [mono] [amount] [extra] [fable] [only5h|only7d] [update] [panel|settings] [nolabels] [nopercent] [nopace] [noahead] [left|early] [overview] [back=N]` (`hover=0.85`: pointer at 85% of the times): render the panel rows (`panel`: the whole popup; `settings`: its menu bar settings) to a PNG and exit.
+        // `UsageMeter --render-preview out.png [live] [offline] [enterprise] [hover] [light] [daily] [seen] [saved] [compact] [mono] [amount] [extra] [fable] [only5h|only7d] [update] [panel|settings] [nolabels] [nopercent] [nopace] [noahead] [left|early] [overview] [back=N] [full]` (`hover=0.85`: pointer at 85% of the times): render the panel rows (`panel`: the whole popup; `settings`: its menu bar settings) to a PNG and exit.
         let args = CommandLine.arguments
         if args.contains("--check-update") { Updater.checkFromCommandLine() }
         if let i = args.firstIndex(of: "--render-preview"), i + 1 < args.count {

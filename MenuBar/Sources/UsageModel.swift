@@ -6,8 +6,10 @@ extension UsageSnapshot {
     /// Fixed numbers for layout checks (`--sample`, `--render-preview`); needs no Keychain access.
     static var sample: UsageSnapshot {
         let now = Date()
+        // `full`: the session at its limit, resetting in 1 h 10 min.
+        let full = CommandLine.arguments.contains("full")
         return UsageSnapshot(source: .oauth, capturedAt: now, windows: [
-            UsageWindow(key: "five_hour", percent: 20, resetsAt: now.addingTimeInterval(2 * 3600)),
+            UsageWindow(key: "five_hour", percent: full ? 100 : 20, resetsAt: now.addingTimeInterval(full ? 70 * 60 : 2 * 3600)),
             UsageWindow(key: "seven_day", percent: 60, resetsAt: now.addingTimeInterval(3 * 86400)),
         ])
     }
@@ -138,10 +140,21 @@ extension UsageHistory {
             let weekStart = reset.addingTimeInterval(-7 * 86400), sampleStart = now.addingTimeInterval(-7 * 86400)
             // Peaks of the 11 weeks before last week, oldest first; 100 runs out before the reset.
             let peaks: [Double] = [62, 100, 78, 45, 91, 100, 70, 52, 83, 100, 66]
+            // How often the 5 h session hit its limit in each of those weeks: the busy weeks, mostly.
+            let sessionHits = [0, 3, 1, 0, 2, 4, 0, 0, 1, 3, 0]
             for (i, peak) in peaks.enumerated() {
                 let start = weekStart.addingTimeInterval(-Double(peaks.count + 1 - i) * 7 * 86400)
                 let times = stride(from: start, to: start.addingTimeInterval(7 * 86400), by: 3600).map { $0 }
                 pts += rise(times, key: "seven_day", peak: peak, runsOutAt: peak == 100 ? 0.75 : nil)
+                // Afternoon sessions on the first weekdays: 13:00 at 45%, full by 14:40, reset at 18:00.
+                let weekdays = (0..<7).map { start.addingTimeInterval(Double($0) * 86400) }
+                    .filter { (2...6).contains(cal.component(.weekday, from: $0)) }
+                for day in weekdays.prefix(sessionHits[i]) {
+                    let noon = cal.date(bySettingHour: 13, minute: 0, second: 0, of: day) ?? day
+                    for (h, v) in [(0.0, 45.0), (1.0, 85), (1.67, 100), (3, 100), (4.5, 100), (5, 0)] {
+                        pts.append(HistoryPoint(t: noon.addingTimeInterval(h * 3600), key: "five_hour", percent: v))
+                    }
+                }
             }
             // Last week up to where the detailed sample starts (at 55%).
             let lastWeek = weekStart.addingTimeInterval(-7 * 86400)

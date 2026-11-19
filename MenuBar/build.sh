@@ -5,6 +5,8 @@
 # passes its own); without it, the app gets the version in Info.plist.
 # USAGE_METER_ARCHS="arm64 x86_64" ./build.sh   builds one app for both kinds of Mac (the release
 # workflow does); without it, just this Mac's.
+# USAGE_METER_OPT=-Onone ./build.sh   builds unoptimised, about three times faster (dev.sh does);
+# without it, optimised (-O), as Homebrew and the releases build.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -28,7 +30,7 @@ fi
 ARCHS=(${USAGE_METER_ARCHS:-$(uname -m)})
 slices=()
 for arch in "${ARCHS[@]}"; do
-    swiftc -O -swift-version 5 -parse-as-library \
+    swiftc "${USAGE_METER_OPT:--O}" -swift-version 5 -parse-as-library \
         -target "$arch-apple-macos14.0" \
         -o "build/UsageMeter-$arch" \
         ../UsageReader.swift ../History.swift ../ClaudeCodeLogs.swift ../LoginNudge.swift ../UpdateCheck.swift Sources/*.swift

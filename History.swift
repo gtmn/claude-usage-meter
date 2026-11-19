@@ -402,3 +402,48 @@ extension UsageHistory {
         return out
     }
 }
+
+// MARK: Hitting the 5 h limit
+
+/// A session that ran into its limit: when it reached 100%, and when it reset (usage dropped), so
+/// how long new requests were blocked.
+public struct LimitHit: Equatable, Sendable {
+    /// The first recorded point at 100%.
+    public let at: Date
+    /// The last recorded point at 100% before the reset (or so far).
+    public let lastFull: Date
+    /// The first recorded point after the reset; nil while still at 100%.
+    public let resetSeen: Date?
+
+    /// When it reset, as close as the history says: the first lower point, unless nothing was
+    /// recorded for more than `resetUnknownAfter` before it (the Mac was asleep or off).
+    public var resetAt: Date? {
+        guard let seen = resetSeen, seen.timeIntervalSince(lastFull) <= Self.resetUnknownAfter else { return nil }
+        return seen
+    }
+    /// How long it was blocked; when the reset time isn't known, at least this long (`atLeast`).
+    public var blocked: TimeInterval { (resetAt ?? lastFull).timeIntervalSince(at) }
+    public var atLeast: Bool { resetAt == nil }
+    public static let resetUnknownAfter: TimeInterval = 30 * 60
+}
+
+extension UsageHistory {
+    /// The times a limit (by default the 5 h session) reached 100%, oldest first, each session
+    /// once; those that reached it between `from` and `to`.
+    public func limitHits(_ key: String = "five_hour", from: Date = .distantPast, to: Date = .distantFuture) -> [LimitHit] {
+        var hits: [LimitHit] = []
+        var at: Date?, lastFull: Date?
+        for p in points where p.key == key && p.estimated != true {
+            let full = !(p.percent < 99.5)
+            if full {
+                if at == nil { at = p.t }
+                lastFull = p.t
+            } else if let a = at, let l = lastFull {
+                hits.append(LimitHit(at: a, lastFull: l, resetSeen: p.t))
+                at = nil; lastFull = nil
+            }
+        }
+        if let a = at, let l = lastFull { hits.append(LimitHit(at: a, lastFull: l, resetSeen: nil)) }
+        return hits.filter { $0.at.isAtOrAfter(from) && $0.at < to }
+    }
+}

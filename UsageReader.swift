@@ -197,8 +197,14 @@ public struct UsageWindow: Equatable {
             ? HumanTime.moment(reset, now: now, calendar: calendar)
             : HumanTime.onDay(reset, now: now, calendar: calendar)
         if percent >= 100 || (spend?.limitReached ?? false) {
-            let what = spend == nil ? "Limit reached" : "Budget used up"
-            return "\(what) — resets \(resetMoment)"
+            // Nothing to estimate any more: the exact reset ("at 13:50, in 1 h 10 min",
+            // "tomorrow at 05:00"). A budget keeps its day ("on 1 Dec").
+            guard spend == nil else { return "Budget used up — resets \(resetMoment)" }
+            let clock = HumanTime.clock(reset, calendar.timeZone)
+            let day = HumanTime.dayName(reset, now: now, calendar: calendar)
+            let when = day == "today" ? "at \(clock), in \(HumanTime.exactSpan(reset.timeIntervalSince(now)))"
+                                      : "\(day) at \(clock)"
+            return "Limit reached — resets \(when)"
         }
         let fromPrior = projectsFromPriorPace(now: at)
         if let hit = projectedLimitAt(now: at) {
@@ -238,6 +244,13 @@ enum HumanTime {
 
     static func clock(_ d: Date, _ tz: TimeZone = .current) -> String {
         let f = DateFormatter(); f.locale = en; f.timeZone = tz; f.dateFormat = "HH:mm"; return f.string(from: d)
+    }
+
+    /// Exact to the minute, for a known time: "40 min", "1 h 10 min", "3 h".
+    static func exactSpan(_ s: TimeInterval) -> String {
+        let mins = max(Int((s / 60).rounded(.up)), 1)
+        if mins < 60 { return "\(mins) min" }
+        return mins % 60 == 0 ? "\(mins / 60) h" : "\(mins / 60) h \(mins % 60) min"
     }
 
     /// Rounded to one unit, since these are estimates: "40 min", "5 h", "a day", "3 days".
