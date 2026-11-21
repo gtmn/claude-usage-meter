@@ -3,8 +3,8 @@ import Foundation
 
 /// "Check for updates" (off by default): once at launch and then daily, asks GitHub for the latest
 /// release. When it's newer, the popup offers it; Update installs it the way this copy came:
-/// - Homebrew: `brew update` + `brew upgrade` (builds from source, about a minute), then restarts
-///   through `brew services` (or opens the new copy).
+/// - Homebrew: `brew update` + `brew upgrade` (builds from source, about a minute), then
+///   `brew services restart` (or opens the new copy).
 /// - Downloaded: fetches the release zip, checks it against the release's SHA256SUMS.txt, swaps the
 ///   app in place and reopens it. A file the app downloads itself isn't quarantined.
 /// Dev builds (versions like "0.1.11-3-gabc1234") are told about a release but don't install it.
@@ -108,9 +108,16 @@ final class Updater: ObservableObject {
         }
         status = "Restarting…"
         if Install.byBrewServices {
-            // launchd restarts the job itself (with the new copy behind the opt link), even though
-            // stopping this process also ends anything it started.
-            _ = try? await Self.run("/bin/launchctl", ["kickstart", "-k", "gui/\(getuid())/sh.brew.claude-usage-meter"])
+            // `brew services restart` unloads and reloads the job. A plain restart (`launchctl kickstart`)
+            // won't do: launchd keeps the code signature it recorded when the job was loaded, and an
+            // ad-hoc signed rebuild no longer matches it, so the new copy is refused
+            // (OS_REASON_CODESIGNING). Unloading ends everything the job started, so the restart
+            // runs in a session of its own; this copy just waits to be stopped.
+            let log = AppLog.url.path
+            try Self.detach("/bin/sh", ["-c", "\"$0\" services restart claude-usage-meter >/dev/null 2>&1; "
+                + "echo \"$(date +%Y-%m-%dT%H:%M:%S%z) update: brew services restart exited with $?\" >> \"$1\"", brew, log])
+            try await Task.sleep(for: .seconds(60))
+            throw UpdateFailure("\(installed) is installed but didn't start. Run brew services restart claude-usage-meter in Terminal.")
         } else {
             reopen(prefix + Self.brewOpt)
         }
@@ -185,6 +192,26 @@ final class Updater: ObservableObject {
         NSApp.terminate(nil)
     }
 
+    /// Starts a command in a session of its own and doesn't wait for it, so it outlives this copy
+    /// and its launchd job.
+    private static func detach(_ tool: String, _ args: [String]) throws {
+        var attr: posix_spawnattr_t?
+        posix_spawnattr_init(&attr)
+        defer { posix_spawnattr_destroy(&attr) }
+        posix_spawnattr_setflags(&attr, Int16(POSIX_SPAWN_SETSID))
+        var env = ProcessInfo.processInfo.environment
+        env["PATH"] = Self.path
+        env["XPC_SERVICE_NAME"] = nil   // not part of the job any more
+        let argv = ([tool] + args).map { strdup($0) } + [nil]
+        let envp = env.map { strdup("\($0.key)=\($0.value)") } + [nil]
+        defer { (argv + envp).forEach { free($0) } }
+        var pid: pid_t = 0
+        let rc = posix_spawn(&pid, tool, nil, &attr, argv, envp)
+        guard rc == 0 else { throw UpdateFailure("Couldn't restart (error \(rc)). Run brew services restart claude-usage-meter in Terminal.") }
+    }
+
+    private static let path = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+
     /// Runs a command to the end, output discarded; returns its exit code.
     private static func run(_ tool: String, _ args: [String]) async throws -> Int32 {
         try await withCheckedThrowingContinuation { cont in
@@ -192,7 +219,7 @@ final class Updater: ObservableObject {
             p.executableURL = URL(fileURLWithPath: tool)
             p.arguments = args
             var env = ProcessInfo.processInfo.environment
-            env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+            env["PATH"] = Self.path
             p.environment = env
             p.standardOutput = FileHandle.nullDevice
             p.standardError = FileHandle.nullDevice

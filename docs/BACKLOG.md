@@ -4,15 +4,16 @@
 
 1. **"Sign in again" button** (runs `claude auth login`): decide before 2026-12-07, when Claude Code's
    refresh token here expires.
-2. **Release 0.1.13 and test the Update button** (the first real run of both install paths). `main` has the
-   formula-based check (a164d60) but no release yet.
-   - Order matters once more: the installed 0.1.12 still asks GitHub's releases, not the tap, so it offers
-     0.1.13 as soon as the release is out. Clicking Update before the tap is bumped ends in "Homebrew doesn't
-     have 0.1.13 yet". So: release, bump the tap, then click Update.
-   - Homebrew copy: click Update instead of README's step 4. Check `~/Library/Logs/UsageMeter.log` for
-     "brew upgrade to 0.1.13 exited with 0" and that the app comes back (through `brew services`) as 0.1.13.
-   - Downloaded copy: unpack the 0.1.12 zip into a scratch folder, open that copy, click Update, and check
-     that it replaces itself and reopens as 0.1.13.
+2. **Test the Update button's restart with 0.1.14 → 0.1.15.** 0.1.12 → 0.1.13 installed fine (2026-11-21,
+   "brew upgrade to 0.1.13 exited with 0") but the new copy didn't start: `launchctl kickstart` kept the old
+   code signature (see DECISIONS, Distribution). Fixed with a detached `brew services restart`, which ships in
+   0.1.14; the update *to* 0.1.14 still runs 0.1.13's restart, so run `brew services restart
+   claude-usage-meter` after it. On the next one, check the log for "brew services restart exited with 0"
+   and that the app comes back by itself.
+3. **Test the downloaded copy's Update** (still untested): unpack an older release zip into a scratch folder,
+   open that copy, click Update, and check that it replaces itself and reopens as the new version. Also check
+   whether its Open at login item still works after the swap (macOS may have recorded the old signature
+   there too).
 
 ## Ideas (not decided)
 

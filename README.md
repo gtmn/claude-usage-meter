@@ -161,7 +161,9 @@ what's new and an **Update** button that installs it the way your copy came. A H
 asks the tap's formula, so it only hears about a version `brew upgrade` can already install; a
 downloaded copy asks for the latest GitHub release.
 - Homebrew: `brew update` and `brew upgrade claude-usage-meter` (it builds from source, about a
-  minute), then restarts through `brew services`, or opens the new copy.
+  minute), then restarts through `brew services`, or opens the new copy. Updating from 0.1.13
+  needs one manual step: that version's restart doesn't work, so run
+  `brew services restart claude-usage-meter` after it says it's restarting.
 - Download: fetches the release zip, checks it against the release's `SHA256SUMS.txt`, replaces the
   app and reopens it. A file the app downloads itself isn't quarantined, so there's no warning.
 
@@ -338,8 +340,9 @@ own current numbers and recorded history instead (don't commit those).
    and push.
 4. `brew upgrade claude-usage-meter`, `brew test claude-usage-meter`,
    `brew services restart claude-usage-meter`.
-   From 0.1.13 on, the popup's **Update** button can stand in for the upgrade and restart (with
-   **Check for updates** on or after **Check now**); `brew test` still runs by hand.
+   The popup's **Update** button can stand in for the upgrade and restart (with **Check for
+   updates** on or after **Check now**); from 0.1.13 also run `brew services restart` yourself
+   (see Updates). `brew test` still runs by hand.
 
 ## Layout
 

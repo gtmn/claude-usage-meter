@@ -82,9 +82,13 @@ options that were ruled out, so they aren't tried again.
   sends one right away even with the setting off, because the user asked for it. A Homebrew copy reads the
   version from the tap's formula (through the same API), not the releases: a release goes out minutes before
   the tap is bumped, and offering it then would end in "Homebrew doesn't have it yet". Update installs
-  the way the copy came: Homebrew runs `brew update` + `brew upgrade` and restarts with
-  `launchctl kickstart -k` (launchd restarts the job itself; `brew services restart` from inside the job
-  would be killed halfway); a download is checked against the release's `SHA256SUMS.txt` (catches a
+  the way the copy came: Homebrew runs `brew update` + `brew upgrade`, then `brew services restart`
+  in a session of its own (`posix_spawn` with `POSIX_SPAWN_SETSID`). Not `launchctl kickstart -k`: launchd
+  keeps the code signature it recorded when the job was loaded, an ad-hoc signed rebuild doesn't match it,
+  and the new copy is refused (`OS_REASON_CODESIGNING`, seen on the 0.1.12 → 0.1.13 update). Only unloading
+  and reloading the job records the new one. In its own session because unloading ends everything in the
+  job's process group: started normally, the restart dies halfway and leaves the job unloaded (both checked
+  with a throwaway launch agent). A download is checked against the release's `SHA256SUMS.txt` (catches a
   broken download, not a compromised GitHub account: the same trust as downloading by hand). Not
   Sparkle: it needs signing keys, a feed and an embedded framework, and fits badly with ad-hoc signing
   and a `swiftc`-only build. Worth revisiting with a Developer ID.
