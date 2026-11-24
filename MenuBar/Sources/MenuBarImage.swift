@@ -466,7 +466,8 @@ enum MenuBarImage {
         // Alone (no text beside it) at the single-line size: the full menu bar height looked too big.
         let glyphSize: CGFloat = columns.width == 0 ? 14 : small ? 15 : 14
         let gauge = glyph.flatMap { glyphImage($0, rows, o, pointSize: glyphSize) }
-        let dotSpace = gauge.map { $0.size.width + (columns.width > 0 ? 3 : 0) } ?? (hasDot ? dot + 2 : 0)
+        // Apple's symbols carry their own side margin, so 1 pt is enough between glyph and text.
+        let dotSpace = gauge.map { $0.size.width + (columns.width > 0 ? 1 : 0) } ?? (hasDot ? dot + 2 : 0)
         let size = NSSize(width: max(dotSpace + columns.width, dot), height: height)
         let rowHeight = small ? Self.rowHeight : height
         return NSImage(size: size, flipped: false) { _ in
