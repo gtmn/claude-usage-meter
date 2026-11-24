@@ -107,4 +107,11 @@ let bSpend = Spend(used: Money(minor: 41280, exponent: 2, currency: "USD"), limi
 let bWin = UsageWindow(key: "extra_usage", percent: bSpend.percent, resetsAt: at("2026-12-01 00:00"), spend: bSpend)
 check("budget as amount, like the outlook's about $530", bWin.menuBarProjection(now: at("2026-11-24 09:51"), amount: true), "→$530")
 check("budget as %", bWin.menuBarProjection(now: at("2026-11-24 09:51")), "→25%")
+// Saved numbers project at the pace up to their fetch time, as the outlook does: 40% two days into the
+// week is 20%/day (→140%); taken as current four days in, it would look like 10%/day (→70%).
+check("saved numbers project from their fetch time", UsageWindow(key: "seven_day", percent: 40, resetsAt: wk)
+    .menuBarProjection(now: at("2026-11-09 05:00"), asOf: at("2026-11-07 05:00")), "→140%")
+// Rounding never shows less than is already used: 41% with 2 h left ends near 41.5, which rounds to 40.
+check("never below the % used", UsageWindow(key: "seven_day", percent: 41, resetsAt: wk).menuBarProjection(now: at("2026-11-12 03:00")), "→41%")
+check("never below the amount used", bWin.menuBarProjection(now: at("2026-11-30 23:00"), amount: true), "→$412")
 if failures > 0 { exit(1) }

@@ -185,12 +185,19 @@ public struct UsageWindow: Equatable {
     /// outlook and not capped ("→35%", "→140%" when it runs out first), or with `amount` on a $
     /// limit, the rounded amount ("→$530"). nil where the outlook gives no figure either: no reset,
     /// at the limit, too early, or nothing used and no earlier pace.
-    public func menuBarProjection(now: Date = Date(), amount: Bool = false) -> String? {
-        guard resetsAt != nil, percent < 99.5, !(spend?.limitReached ?? false), !isTooEarlyToProject(now: now),
-              percent > 0 || projectsFromPriorPace(now: now),
-              let end = projectedPercentAtReset(now: now) else { return nil }
-        if amount, let spend { return "→" + spend.approx(percent: end) }
-        return String(format: "→%.0f%%", (end / 5).rounded() * 5)
+    /// `asOf`: when saved numbers were fetched; like the outlook, it projects at the pace up to then.
+    public func menuBarProjection(now: Date = Date(), asOf: Date? = nil, amount: Bool = false) -> String? {
+        let at = min(asOf ?? now, now)
+        guard resetsAt != nil, percent < 99.5, !(spend?.limitReached ?? false), !isTooEarlyToProject(now: at),
+              percent > 0 || projectsFromPriorPace(now: at),
+              let end = projectedPercentAtReset(now: at) else { return nil }
+        // Rounding never shows less than is already used ("41% →40%" late in a window).
+        if amount, let spend {
+            let units = spend.limit.amount * end / 100
+            let rounded = units >= 100 ? (units / 10).rounded() * 10 : units.rounded()
+            return "→" + (rounded < spend.used.amount.rounded(.down) ? spend.used.wholeUnits : spend.approx(percent: end))
+        }
+        return String(format: "→%.0f%%", max((end / 5).rounded() * 5, percent.rounded()))
     }
 
     /// "last month's", "last week's", "yesterday's" (or "an earlier week's", …): the period the

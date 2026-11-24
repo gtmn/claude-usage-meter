@@ -47,8 +47,9 @@ enum MenuBarImage {
         var projectedAmount: String? = nil
 
         /// One limit's row: everything the pace colouring needs. Shared by the menu bar and the
-        /// popup's bars, so both always show the same colour.
-        init(_ w: UsageWindow, label: String, severity: String?, now: Date) {
+        /// popup's bars, so both always show the same colour. `asOf`: when saved numbers were
+        /// fetched, so the projection runs at the pace up to then, as the popup's outlook does.
+        init(_ w: UsageWindow, label: String, severity: String?, now: Date, asOf: Date? = nil) {
             self.label = label
             percent = w.percent
             expected = w.expectedPercent(now: now)
@@ -56,8 +57,8 @@ enum MenuBarImage {
             tooEarly = w.isTooEarlyToProject(now: now)
             duration = w.duration
             amount = w.spend?.used.wholeUnits
-            projectedPercent = w.menuBarProjection(now: now)
-            projectedAmount = w.spend == nil ? nil : w.menuBarProjection(now: now, amount: true)
+            projectedPercent = w.menuBarProjection(now: now, asOf: asOf)
+            projectedAmount = w.spend == nil ? nil : w.menuBarProjection(now: now, asOf: asOf, amount: true)
             if !(w.percent < 99.5) {
                 resetsInWhenFull = w.resetsAt.map { max($0.timeIntervalSince(now), 0) }
             } else if let hit = w.projectedLimitAt(now: now) {

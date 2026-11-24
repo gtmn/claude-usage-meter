@@ -413,19 +413,23 @@ final class UsageModel: ObservableObject {
     func menuBarRows(now: Date = Date()) -> [MenuBarImage.Row] {
         guard let s = snapshot else { return [] }
         if s.isBudgetOnly, let w = s.window("extra_usage") {
-            return [MenuBarImage.Row(w, label: "$", severity: s.severity["extra_usage"], now: now)]
+            return [MenuBarImage.Row(w, label: "$", severity: s.severity["extra_usage"], now: now, asOf: savedAt)]
         }
         return [("five_hour", "5h"), ("seven_day", "7d")].compactMap { key, label in
-            s.window(key).map { MenuBarImage.Row($0, label: label, severity: s.severity[key], now: now) }
+            s.window(key).map { MenuBarImage.Row($0, label: label, severity: s.severity[key], now: now, asOf: savedAt) }
         }
     }
 }
 
 extension UsageModel {
+    /// When the numbers shown were fetched, while they're saved ones (rate-limited, offline):
+    /// projections run from then, as in the popup.
+    var savedAt: Date? { showingSaved ? snapshot?.capturedAt : nil }
+
     /// The menu bar's extra-usage item on a Pro/Max account, when it has extra usage turned on.
     func extraRow(now: Date = Date()) -> MenuBarImage.Row? {
         guard let s = snapshot, let w = s.extraUsage else { return nil }
-        return MenuBarImage.Row(w, label: "$", severity: s.severity["extra_usage"], now: now)
+        return MenuBarImage.Row(w, label: "$", severity: s.severity["extra_usage"], now: now, asOf: savedAt)
     }
 
     /// The Compact style's rings, outer first: the budget alone on an Enterprise/Team seat;
@@ -441,7 +445,7 @@ extension UsageModel {
 
     private func worstWeek(_ s: UsageSnapshot, now: Date) -> MenuBarImage.Row? {
         let weeks = s.windows.filter { $0.key.hasPrefix("seven_day") && $0.resetsAt != nil }.map { w in
-            MenuBarImage.Row(w, label: "7d", severity: s.severity[w.key], now: now)
+            MenuBarImage.Row(w, label: "7d", severity: s.severity[w.key], now: now, asOf: savedAt)
         }
         func gap(_ r: MenuBarImage.Row) -> Double { r.expected.map { r.percent - $0 } ?? 0 }
         let worst = weeks.max { a, b in
