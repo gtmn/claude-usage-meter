@@ -181,6 +181,18 @@ public struct UsageWindow: Equatable {
         return percent + pace * max(e.reset.timeIntervalSince(now), 0)
     }
 
+    /// The menu bar's Projection setting: where usage lands at the reset, rounded to 5% like the
+    /// outlook and not capped ("→35%", "→140%" when it runs out first), or with `amount` on a $
+    /// limit, the rounded amount ("→$530"). nil where the outlook gives no figure either: no reset,
+    /// at the limit, too early, or nothing used and no earlier pace.
+    public func menuBarProjection(now: Date = Date(), amount: Bool = false) -> String? {
+        guard resetsAt != nil, percent < 99.5, !(spend?.limitReached ?? false), !isTooEarlyToProject(now: now),
+              percent > 0 || projectsFromPriorPace(now: now),
+              let end = projectedPercentAtReset(now: now) else { return nil }
+        if amount, let spend { return "→" + spend.approx(percent: end) }
+        return String(format: "→%.0f%%", (end / 5).rounded() * 5)
+    }
+
     /// "last month's", "last week's", "yesterday's" (or "an earlier week's", …): the period the
     /// prior pace comes from.
     var priorPeriodName: String {

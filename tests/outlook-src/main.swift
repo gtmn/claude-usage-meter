@@ -89,3 +89,22 @@ let slOnly = slFuture.window("extra_usage")!
 print("  status-line fallback window: \(slOnly.spend.map { "\($0.used.formatted) of \($0.limit.formatted)" } ?? "no $"), \(String(format: "%.0f%%", slOnly.percent)), assumed=\(slOnly.resetIsAssumed)")
 print("--- pace marker tooltip")
 for (u, e) in [(41.0, 24.0), (8.0, 9.0), (20.0, 60.0), (95.0, 93.0), (0.0, 0.4)] { print(HumanTime.paceSummary(used: u, expected: e)) }
+print("--- menu bar projection")
+var failures = 0
+func check(_ name: String, _ got: String?, _ want: String?) {
+    let ok = got == want; print(ok ? "ok  " : "FAIL", name, got ?? "nil"); if !ok { failures += 1 }
+}
+let wk = at("2026-11-12 05:00"), r5h = at("2026-11-08 15:00")
+check("week 48%: runs out, not capped", UsageWindow(key: "seven_day", percent: 48, resetsAt: wk).menuBarProjection(now: now), "→120%")
+check("week 20%: rounded to 5", UsageWindow(key: "seven_day", percent: 20, resetsAt: wk).menuBarProjection(now: now), "→50%")
+check("amount on a % limit falls back to %", UsageWindow(key: "seven_day", percent: 20, resetsAt: wk).menuBarProjection(now: now, amount: true), "→50%")
+check("5h 58% at +20 min: early burst", UsageWindow(key: "five_hour", percent: 58, resetsAt: r5h).menuBarProjection(now: at("2026-11-08 10:20")), "→420%")
+check("5h 5% at +10 min: too early", UsageWindow(key: "five_hour", percent: 5, resetsAt: r5h).menuBarProjection(now: at("2026-11-08 10:10")), nil)
+check("5h at 100%: nothing to project", UsageWindow(key: "five_hour", percent: 100, resetsAt: r5h).menuBarProjection(now: at("2026-11-08 10:20")), nil)
+check("week 0% at +12 h", UsageWindow(key: "seven_day", percent: 0, resetsAt: at("2026-11-15 05:00")).menuBarProjection(now: at("2026-11-08 17:00")), nil)
+check("no reset time", UsageWindow(key: "seven_day", percent: 48, resetsAt: nil).menuBarProjection(now: now), nil)
+let bSpend = Spend(used: Money(minor: 41280, exponent: 2, currency: "USD"), limit: Money(minor: 200000, exponent: 2, currency: "USD"))
+let bWin = UsageWindow(key: "extra_usage", percent: bSpend.percent, resetsAt: at("2026-12-01 00:00"), spend: bSpend)
+check("budget as amount, like the outlook's about $530", bWin.menuBarProjection(now: at("2026-11-24 09:51"), amount: true), "→$530")
+check("budget as %", bWin.menuBarProjection(now: at("2026-11-24 09:51")), "→25%")
+if failures > 0 { exit(1) }
