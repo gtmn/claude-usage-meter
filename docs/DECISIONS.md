@@ -43,14 +43,15 @@ options that were ruled out, so they aren't tried again.
   With Number off it takes the number's column, and the plain number shows until there's a projection: a
   bar with no text early in every window would look broken. (0.1.14 had Instead and Beside; both load as On.) The menu bar's amounts have no thousands separator
   (`$1990`): it only takes room, and a budget stays in four digits; the popup keeps it (`$1,990`).
-- **Indicator: Bars, Circle, Dots, Icon or Off** (2026-11-24). Was "Style"; Off is the numbers alone (saved as
+- **Indicator: Bars, Circle, Dots, Gauge, Network or Off** (2026-11-24). Was "Style"; Off is the numbers alone (saved as
   `text`, its first name), Circle the earlier Compact (still saved as `compact`). On a $ budget the names are
   singular (Bar, Dot). Dots puts a dot before each row for the pace colour, since the text stays in the text
   colour; Mono has no dots, Alerts shows one only once ahead. Without a dot the text starts at the edge: kept
   room read as a gap, and the width changes with the numbers anyway. The dot is small (4 pt stacked, 5 pt on
-  one line, 2 pt gap). Icon is Apple's gauge symbol (also shown when there's no data), tinted like the worst
-  limit, its needle at the highest use; not the Claude logo, which is Anthropic's mark and would suggest an
-  official app. With Dots or Off nothing else is sure to show, so the popup greys out combinations that would
+  one line, 2 pt gap). Gauge (saved as `icon`) is Apple's gauge symbol (also shown when there's no data),
+  tinted like the worst limit, its needle at the highest use. Network (saved as `splash`, after a short-lived
+  paint splash) is our own drawing: a hub with six linked nodes, in the same colour. Neither is, or imitates,
+  the Claude logo: it's Anthropic's mark, and a lookalike would suggest an official app. With Dots or Off nothing else is sure to show, so the popup greys out combinations that would
   leave the item empty (nothing to click); settings saved before that show the plain number. The palette has
   its own row (Colours), hidden with Off.
 - **A model's own weekly limit (Fable) is a third line in the week graph**, not a chart of its own: same 0-100%

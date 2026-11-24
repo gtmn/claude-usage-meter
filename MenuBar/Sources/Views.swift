@@ -68,7 +68,8 @@ struct MenuBarSettings: View {
                            disabled: !showPercent && !projectionOn ? ["dots": empty, "text": empty] : [:])
                     .help("Bars: the session and weekly bars. Circle: rings, the week outside and the session inside "
                           + "(one budget ring on Enterprise). Dots: the numbers, each after a dot in its pace colour. "
-                          + "Icon: a gauge in the pace colour before the numbers. Off: the numbers alone.")
+                          + "Gauge: a gauge in the pace colour, its needle at the highest use. Network: a hub with linked nodes in the pace colour. "
+                          + "Off: the numbers alone.")
             }
             // Text has nothing to colour.
             if style != .text {
