@@ -451,16 +451,22 @@ enum MenuBarImage {
         // Never an empty item (nothing to click to open the popup): settings saved before the
         // popup blocked such combinations show the plain number.
         let hasDot = dots && rows.contains { dotColor($0, o) != nil }
-        if glyph == nil, !hasDot, textRows.allSatisfy({ $0[1].isEmpty && $0[2].isEmpty }) {
+        let noValues = textRows.allSatisfy { $0[1].isEmpty && $0[2].isEmpty }
+        if glyph == nil, !hasDot, noValues {
             var shown = o; shown.percent = true
             textRows = lines(rows.map { cells($0, shown, label: o.labels) }, shown)
         }
+        // A gauge or network with no number beside it stands alone: labels ("5h", "7d") with no value
+        // say nothing next to a single glyph.
+        if glyph != nil, noValues { textRows = textRows.map { _ in ["", "", "", ""] } }
         let small = textRows.count > 1
         let fonts = Columns.fonts(size: small ? 9 : 11, weight: compactWeight(stacked: small))
         let columns = Columns(textRows, leftAligned: [true, false, false, false], fonts: fonts)
         let dot: CGFloat = small ? 4 : 5
-        let gauge = glyph == .icon ? gaugeImage(rows, o, pointSize: small ? 15 : 14)
-            : glyph == .splash ? splashImage(rows, o, size: small ? 15 : 14) : nil
+        // Alone (no text beside it) the glyph fills the menu bar's height, like the system's own icons.
+        let glyphSize: CGFloat = columns.width == 0 ? 17 : small ? 15 : 14
+        let gauge = glyph == .icon ? gaugeImage(rows, o, pointSize: glyphSize)
+            : glyph == .splash ? splashImage(rows, o, size: glyphSize) : nil
         let dotSpace = gauge.map { $0.size.width + (columns.width > 0 ? 3 : 0) } ?? (hasDot ? dot + 2 : 0)
         let size = NSSize(width: max(dotSpace + columns.width, dot), height: height)
         let rowHeight = small ? Self.rowHeight : height
@@ -507,8 +513,8 @@ enum MenuBarImage {
         }
     }
 
-    /// The network: a hub joined to six nodes at uneven distances, some nodes also linked to their
-    /// neighbour. A generic network sign of our own, deliberately not a starburst like the Claude logo.
+    /// The network: a hub joined to six nodes at uneven distances. A generic network sign of our own,
+    /// deliberately not a starburst like the Claude logo.
     static func networkPieces(in rect: NSRect) -> (lines: NSBezierPath, nodes: [NSBezierPath]) {
         let w = rect.width
         let c = NSPoint(x: rect.midX, y: rect.midY)
@@ -520,7 +526,6 @@ enum MenuBarImage {
         let lines = NSBezierPath()
         lines.lineWidth = max(1, w * 0.075); lines.lineCapStyle = .round
         for n in nodes { lines.move(to: c); lines.line(to: n) }
-        for (i, j) in [(0, 1), (2, 3), (4, 5)] { lines.move(to: nodes[i]); lines.line(to: nodes[j]) }
         func dot(_ p: NSPoint, _ r: CGFloat) -> NSBezierPath { NSBezierPath(ovalIn: NSRect(x: p.x - r, y: p.y - r, width: 2 * r, height: 2 * r)) }
         return (lines, [dot(c, w * 0.15)] + nodes.map { dot($0, w * 0.085) })
     }

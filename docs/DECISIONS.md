@@ -50,7 +50,8 @@ options that were ruled out, so they aren't tried again.
   room read as a gap, and the width changes with the numbers anyway. The dot is small (4 pt stacked, 5 pt on
   one line, 2 pt gap). Gauge (saved as `icon`) is Apple's gauge symbol (also shown when there's no data),
   tinted like the worst limit, its needle at the highest use. Network (saved as `splash`, after a short-lived
-  paint splash) is our own drawing: a hub with six linked nodes, in the same colour. Neither is, or imitates,
+  paint splash) is our own drawing: a hub with six spokes to round nodes, in the same colour. Without numbers beside
+  it, a gauge or network stands alone at the menu bar's full height (labels with no value are left out). Neither is, or imitates,
   the Claude logo: it's Anthropic's mark, and a lookalike would suggest an official app. With Dots or Off nothing else is sure to show, so the popup greys out combinations that would
   leave the item empty (nothing to click); settings saved before that show the plain number. The palette has
   its own row (Colours), hidden with Off.
