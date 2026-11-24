@@ -15,7 +15,8 @@ import AppKit
 /// used), the pace tick (where usage
 /// would be if spread evenly over the window), and, once well ahead, the points ahead ("+24"),
 /// the time left until it runs out at that pace ("1.5d left"), or how long before the reset
-/// that is ("3d early"). Text sits in aligned columns (see Columns).
+/// that is ("3d early"). The projection at the reset ("→35%", "→140%") can replace the number or
+/// follow it. Text sits in aligned columns (see Columns).
 ///
 /// It can't be a template image, because those are single-colour. Instead it uses a
 /// drawing handler with dynamic colours, which AppKit re-runs for the menu bar's
@@ -40,6 +41,10 @@ enum MenuBarImage {
         var resetsInWhenFull: TimeInterval? = nil
         /// The budget's amount used, in whole units ("$306"), shown instead of the % when chosen.
         var amount: String? = nil
+        /// Where it's heading at the reset ("→35%", "→140%"), and on a $ limit as an amount ("→$530"),
+        /// when there's a projection (see UsageWindow.menuBarProjection).
+        var projectedPercent: String? = nil
+        var projectedAmount: String? = nil
 
         /// One limit's row: everything the pace colouring needs. Shared by the menu bar and the
         /// popup's bars, so both always show the same colour.
@@ -51,6 +56,8 @@ enum MenuBarImage {
             tooEarly = w.isTooEarlyToProject(now: now)
             duration = w.duration
             amount = w.spend?.used.wholeUnits
+            projectedPercent = w.menuBarProjection(now: now)
+            projectedAmount = w.spend == nil ? nil : w.menuBarProjection(now: now, amount: true)
             if !(w.percent < 99.5) {
                 resetsInWhenFull = w.resetsAt.map { max($0.timeIntervalSince(now), 0) }
             } else if let hit = w.projectedLimitAt(now: now) {
@@ -131,12 +138,21 @@ enum MenuBarImage {
         /// Pro/Max: the extra usage as its own $ item beside the 5h/7d one.
         var extra = false
         var limits = Limits.both
+        var projection = Projection.off
         enum Key {
             static let labels = "menuBarShowLabels", percent = "menuBarShowPercent"
             static let pace = "menuBarShowPace", ahead = "menuBarShowAhead", aheadAs = "menuBarAheadAs"
             static let palette = "menuBarPalette", budgetAs = "menuBarBudgetAs", extra = "menuBarShowExtra"
-            static let limits = "menuBarLimits"
+            static let limits = "menuBarLimits", projection = "menuBarProjection"
         }
+    }
+
+    /// Where each limit is heading at its reset: not shown, in place of the number, or after it
+    /// (on a second line beside a single Compact ring).
+    enum Projection: String, CaseIterable {
+        case off, instead, beside
+        var name: String { rawValue.capitalized }
+        init(saved: String) { self = Projection(rawValue: saved) ?? .off }
     }
 
     /// How "well ahead" is shown: points ahead of pace ("+24"), the time until it runs out at
@@ -205,13 +221,21 @@ enum MenuBarImage {
         ctx.restoreGraphicsState()
     }
 
-    /// The text beside a bar or ring, as cells: the label, the %, and how far ahead once well
-    /// ahead ("+24", "1.5d left", or "3d early"). Empty when not shown.
+    /// The text beside a bar or ring, as cells: the label, the %, the projection ("→35%"), and how
+    /// far ahead once well ahead ("+24", "1.5d left", or "3d early"). Empty when not shown.
     /// A budget's amount instead of its %, when chosen.
     private static func showsAmount(_ row: Row, _ o: Options) -> Bool { o.budgetAs == .amount && row.amount != nil }
 
     /// The amount carries its currency, so the "$" label beside it would only repeat it.
-    private static func showsLabel(_ row: Row, _ o: Options) -> Bool { o.labels && !(o.percent && showsAmount(row, o)) }
+    private static func showsLabel(_ row: Row, _ o: Options) -> Bool {
+        o.labels && !((o.percent || !projection(row, o).isEmpty) && showsAmount(row, o))
+    }
+
+    /// The projection as shown, in the number's unit; empty when off or there's none.
+    private static func projection(_ row: Row, _ o: Options) -> String {
+        guard o.projection != .off else { return "" }
+        return (showsAmount(row, o) ? row.projectedAmount : row.projectedPercent) ?? ""
+    }
 
     private static func cells(_ row: Row, _ o: Options, label: Bool) -> [String] {
         var ahead = ""
@@ -228,7 +252,12 @@ enum MenuBarImage {
             }
         }
         let number = showsAmount(row, o) ? row.amount! : "\(Int(row.percent.rounded()))%"
-        return [label && showsLabel(row, o) ? row.label : "", o.percent ? number : "", ahead]
+        let labelCell = label && showsLabel(row, o) ? row.label : ""
+        let projected = projection(row, o)
+        // Instead: in the number's own column, so a row without a projection (its plain number)
+        // lines up with one that has it.
+        if o.projection == .instead, !projected.isEmpty { return [labelCell, projected, "", ahead] }
+        return [labelCell, o.percent ? number : "", o.projection == .beside ? projected : "", ahead]
     }
 
     /// Rounded, since it's an estimate: half days from a day on ("1d", "1.5d", "3d"), whole hours
@@ -274,10 +303,10 @@ enum MenuBarImage {
             self.fonts = used.map { fonts[$0] }
         }
 
-        /// Fonts for the label, % and ahead columns at `size`.
+        /// Fonts for the label, %, projection and ahead columns at `size`.
         static func fonts(size: CGFloat, weight: NSFont.Weight = .semibold) -> [NSFont] {
             let fixed = NSFont.monospacedDigitSystemFont(ofSize: size, weight: weight)
-            return [fixed, fixed, NSFont.systemFont(ofSize: size, weight: weight)]
+            return [fixed, fixed, fixed, NSFont.systemFont(ofSize: size, weight: weight)]
         }
 
         var width: CGFloat { widths.isEmpty ? 0 : widths.reduce(0, +) + Self.gap * CGFloat(widths.count - 1) }
@@ -310,7 +339,7 @@ enum MenuBarImage {
         let labelled = rows.filter { showsLabel($0, o) }
         let labelWidth = ceil(labelled.map { ($0.label as NSString).size(withAttributes: measure).width }.max() ?? 0)
         let barX = labelled.isEmpty ? 0 : labelWidth + 3
-        let columns = Columns(rows.map { cells($0, o, label: false) }, leftAligned: [true, false, false],
+        let columns = Columns(rows.map { cells($0, o, label: false) }, leftAligned: [true, false, false, false],
                               fonts: Columns.fonts(size: font.pointSize))
         let textX = barX + barWidth + 3
         let size = NSSize(width: columns.width > 0 ? textX + columns.width : barX + barWidth, height: height)
@@ -381,10 +410,16 @@ enum MenuBarImage {
     static func makeCompact(rings: [Row], options o: Options = Options()) -> NSImage {
         let rings = Array(rings.prefix(2))
         let stacked = rings.count > 1
-        let textRows = stacked ? Array(rings.reversed()) : rings
-        let fonts = Columns.fonts(size: stacked ? 9 : 11, weight: compactWeight(stacked: stacked))
+        var textRows = (stacked ? Array(rings.reversed()) : rings).map { cells($0, o, label: o.labels) }
+        // One ring with its number and the projection beside it: the projection on a second line,
+        // stacked like two rings' numbers, since one row has no room for both at full size.
+        if !stacked, o.projection == .beside, let c = textRows.first, !c[1].isEmpty, !c[2].isEmpty {
+            textRows = [[c[0], c[1], "", c[3]], ["", c[2], "", ""]]
+        }
+        let small = textRows.count > 1
+        let fonts = Columns.fonts(size: small ? 9 : 11, weight: compactWeight(stacked: small))
         let numberFont = fonts[1]
-        let columns = Columns(textRows.map { cells($0, o, label: o.labels) }, leftAligned: [true, false, false], fonts: fonts)
+        let columns = Columns(textRows, leftAligned: [true, false, false, false], fonts: fonts)
         let diameter: CGFloat = stacked ? 16 : 13, line: CGFloat = stacked ? 2.2 : 2.5
         let ringGap: CGFloat = 1
         let textGap: CGFloat = columns.width > 0 ? 3 : 0
@@ -425,7 +460,7 @@ enum MenuBarImage {
             }
 
             let attrs: [NSAttributedString.Key: Any] = [.font: numberFont, .foregroundColor: NSColor.labelColor]
-            let rowHeight = stacked ? Self.rowHeight : height
+            let rowHeight = small ? Self.rowHeight : height
             let firstBottom = (height + rowHeight * CGFloat(textRows.count)) / 2 - rowHeight
             let textHeight = ("0" as NSString).size(withAttributes: attrs).height
             for i in textRows.indices {

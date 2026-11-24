@@ -10,7 +10,7 @@ struct UsageMeterApp: App {
     )
 
     init() {
-        // `UsageMeter --render-preview out.png [live] [offline] [enterprise] [hover] [light] [daily] [seen] [saved] [compact] [mono] [amount] [extra] [fable] [only5h|only7d] [update] [panel|settings] [nolabels] [nopercent] [nopace] [noahead] [left|early] [overview] [back=N] [full|burst]` (`hover=0.85`: pointer at 85% of the times): render the panel rows (`panel`: the whole popup; `settings`: its menu bar settings) to a PNG and exit.
+        // `UsageMeter --render-preview out.png [live] [offline] [enterprise] [hover] [light] [daily] [seen] [saved] [compact] [mono] [amount] [extra] [fable] [only5h|only7d] [projected|beside] [update] [panel|settings] [nolabels] [nopercent] [nopace] [noahead] [left|early] [overview] [back=N] [full|burst]` (`hover=0.85`: pointer at 85% of the times): render the panel rows (`panel`: the whole popup; `settings`: its menu bar settings) to a PNG and exit.
         let args = CommandLine.arguments
         if args.contains("--check-update") { Updater.checkFromCommandLine() }
         if let i = args.firstIndex(of: "--render-preview"), i + 1 < args.count {
@@ -164,7 +164,8 @@ enum PreviewRenderer {
                                            palette: args.contains("mono") ? .mono : args.contains("alerts") ? .alerts : .colour,
                                            budgetAs: args.contains("amount") ? .amount : .percent,
                                            extra: args.contains("extra"),
-                                           limits: args.contains("only5h") ? .session : args.contains("only7d") ? .week : .both)
+                                           limits: args.contains("only5h") ? .session : args.contains("only7d") ? .week : .both,
+                                           projection: args.contains("projected") ? .instead : args.contains("beside") ? .beside : .off)
         guard let label = MenuBarImage.item(style: args.contains("compact") ? .compact : .bars, rows: model.menuBarRows(),
                                             rings: model.compactRings(), extra: model.extraRow(), options: options)
         else { return }
