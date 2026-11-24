@@ -353,8 +353,8 @@ own current numbers and recorded history instead (don't commit those).
 
 1. Tag the commit and push the tag: `git tag -a vX.Y.Z -m "Usage Meter X.Y.Z"`, then
    `git push origin vX.Y.Z`. The workflow tests, builds and publishes the GitHub release with
-   the zips in a few minutes. (It also builds every push to `main`, kept as a downloadable
-   artifact on the run; `.github/package.sh X.Y.Z` makes the same files locally, in `dist/`.)
+   the zips in a few minutes. (It also builds every push to `main` that changes more than docs, kept as a
+   downloadable artifact on the run; `.github/package.sh X.Y.Z` makes the same files locally, in `dist/`.)
 2. Take the sha256 of GitHub's tag tarball
    (`https://github.com/gtmn/claude-usage-meter/archive/refs/tags/vX.Y.Z.tar.gz`).
 3. Update `url` and `sha256` in `Formula/claude-usage-meter.rb` of the tap
