@@ -20,9 +20,9 @@ in plain words whether you'll run out before the reset. It handles both kinds of
 
 Each one is a setting in the popup (see [Settings](#settings)), shown enlarged on a dark and a light menu bar.
 
-| Bars | Circle | Dots | Mono | Alerts |
-|---|---|---|---|---|
-| <img src="docs/screenshots/menubar-pro-max.png" width="140" alt="Menu bar item with 5h and 7d bars at 20% (green, under pace) and 60% (yellow, ahead of pace), each with a pace tick, on a dark and a light menu bar"> | <img src="docs/screenshots/menubar-compact.png" width="110" alt="Circle style: two rings, the week outside in yellow and the session inside in green, with 5h 20% and 7d 60% beside them"> | <img src="docs/screenshots/menubar-dots.png" width="94" alt="Dots style: no bars, 5h 20% and 7d 60% as text, each after a dot in its pace colour, green and yellow"> | <img src="docs/screenshots/menubar-mono.png" width="140" alt="Mono palette: the 5h and 7d bars filled in the text colour instead of green and yellow"> | <img src="docs/screenshots/menubar-alerts.png" width="140" alt="Alerts palette: the 5h bar in the text colour while on pace, the 7d bar yellow because it is ahead of pace"> |
+| Bars | Circle | Dots | Text | Mono | Alerts |
+|---|---|---|---|---|---|
+| <img src="docs/screenshots/menubar-pro-max.png" width="140" alt="Menu bar item with 5h and 7d bars at 20% (green, under pace) and 60% (yellow, ahead of pace), each with a pace tick, on a dark and a light menu bar"> | <img src="docs/screenshots/menubar-compact.png" width="110" alt="Circle style: two rings, the week outside in yellow and the session inside in green, with 5h 20% and 7d 60% beside them"> | <img src="docs/screenshots/menubar-dots.png" width="94" alt="Dots style: no bars, 5h 20% and 7d 60% as text, each after a dot in its pace colour, green and yellow"> | <img src="docs/screenshots/menubar-text.png" width="82" alt="Text style: 5h 20% and 7d 60% as text only, no bars and no colour"> | <img src="docs/screenshots/menubar-mono.png" width="140" alt="Mono palette: the 5h and 7d bars filled in the text colour instead of green and yellow"> | <img src="docs/screenshots/menubar-alerts.png" width="140" alt="Alerts palette: the 5h bar in the text colour while on pace, the 7d bar yellow because it is ahead of pace"> |
 
 | Projection on | Projection on, Number off | Only the 5 h limit |
 |---|---|---|
@@ -40,15 +40,16 @@ already keeps on your Mac.
 
 ## What it shows
 
-- **Menu bar**, in one of three styles, switched under **Style** in the popup's settings (the gear button):
+- **Menu bar**, in one of four styles, switched under **Style** in the popup's settings (the gear button):
   - **Bars** (default): two mini bars, `5h` and `7d`, with percentages (or just one of them,
     see [Settings](#settings)), or a single `$` bar on an Enterprise/Team seat.
   - **Circle**: rings with their percentages beside them: the week outside and the 5h
     session inside (the week follows the weekly limit furthest ahead of pace), or one budget
     ring on an Enterprise/Team seat.
   - **Dots**: no bars, just the numbers, each after a small dot in its pace colour.
+  - **Text**: just the numbers, no graphic and no colour.
 
-  All three use the same colours, as ClaudeUsageBar's pace icon: green on or under pace, yellow
+  Bars, Circle and Dots use the same colours, as ClaudeUsageBar's pace icon: green on or under pace, yellow
   ahead of it, orange 15+ points ahead (about a day early in a week) or nearly full (90%+). Early
   in a window, where a few percent would look far ahead, it stays plain. Switch **Colour** to
   **Mono** for bars or rings in the menu bar's text colour, like the numbers, or to **Alerts** for
@@ -148,8 +149,8 @@ the app remembers). They sit under the graph: **Menu bar item**, one setting per
 **Open at login**, **Check for updates** and **Quit** (⌘Q also quits while the popup is open).
 Hover over a control to see what it does.
 
-- **Style**: Bars, Circle or Dots.
-- **Colours**: Colour, Alerts or Mono. In Dots, Mono has no dots and Alerts shows one only once ahead.
+- **Style**: Bars, Circle, Dots or Text.
+- **Colours** (not for Text): Colour, Alerts or Mono. In Dots, Mono has no dots and Alerts shows one only once ahead.
 - **Limits** (Pro/Max): both, or only `5h` or `7d`. The popup and the graph keep showing both.
   An account without a 5-hour limit shows only `7d` anyway.
 - **Number**: `%` or off; on a $ budget also the amount spent.
@@ -158,12 +159,12 @@ Hover over a control to see what it does.
   it takes the number's place, and the number shows until there's a projection (early in a window, or at 100%).
 - **Extra usage** (Pro/Max with extra usage turned on): a `$` item beside the limits, as `%` or amount.
 - **When ahead**: off, or how far ahead once a limit is 15+ points ahead of pace.
-- **Labels** and **Pace tick** (not for Dots, which has no bar to put it on). On a $ budget there's no Labels setting and no `$` label: one bar
+- **Labels** and **Pace tick** (only for Bars and Circle, which have a bar or ring to put it on). On a $ budget there's no Labels setting and no `$` label: one bar
   needs no label, and the amount (`$306`) has its own `$`.
 
 | Pro / Max | Enterprise / Team |
 |---|---|
-| <img src="docs/screenshots/settings-pro-max.png" width="356" alt="Menu bar item settings, one per row: Style Bars, Circle or Dots; Colours Colour, Alerts or Mono; Limits Both, 5h or 7d; Number % or Off; Projection Off or On; Extra usage Off, % or Amount; When ahead Off, +N, time left or early; checkboxes Labels and Pace tick"> | <img src="docs/screenshots/settings-enterprise.png" width="356" alt="The same settings on a budget account: Number %, Amount or Off, Projection Off or On, no Limits or Extra usage rows, and only the Pace tick checkbox"> |
+| <img src="docs/screenshots/settings-pro-max.png" width="356" alt="Menu bar item settings, one per row: Style Bars, Circle, Dots or Text; Colours Colour, Alerts or Mono; Limits Both, 5h or 7d; Number % or Off; Projection Off or On; Extra usage Off, % or Amount; When ahead Off, +N, time left or early; checkboxes Labels and Pace tick"> | <img src="docs/screenshots/settings-enterprise.png" width="356" alt="The same settings on a budget account: Number %, Amount or Off, Projection Off or On, no Limits or Extra usage rows, and only the Pace tick checkbox"> |
 
 **Updates.** With **Check for updates** on, a newer version shows under the popup's title, with
 what's new and an **Update** button that installs it the way your copy came. A Homebrew copy
@@ -326,7 +327,7 @@ $APP --render-preview docs/screenshots/popup-pro-max-fable.png fable
 mv docs/screenshots/popup-pro-max-extra.png.label.png docs/screenshots/menubar-pro-max-extra.png
 $APP --render-preview docs/screenshots/settings-enterprise.png settings enterprise amount
 $APP --render-preview docs/screenshots/hero.png scene beside
-for v in compact dots mono alerts beside projected only5h "enterprise amount" "compact enterprise amount beside"; do
+for v in compact dots text mono alerts beside projected only5h "enterprise amount" "compact enterprise amount beside"; do
   $APP --render-preview /tmp/um.png $v
   case "$v" in
     beside) name=projection-beside ;; projected) name=projection-only ;;
@@ -341,7 +342,7 @@ rm docs/screenshots/*.label.png /tmp/um.png
 Renders never read or change your own settings: they use the arguments, in a throwaway store.
 
 `scene` draws the whole popup opened under the item on a plain menu bar (the README's first image).
-Add `compact` for the Circle menu bar style, `dots` for Dots, `beside` for Projection on (`projected`: on, with Number off), `mono` or `alerts` for those palettes, `amount` for the budget's amount, `extra` for Pro/Max with extra usage (and its menu bar item), `only5h` or `only7d` for one limit in the menu bar, `fable` for a Fable weekly limit (and its line in the graph), `update` for a newer release offered, `panel` for the whole popup or `settings` for its settings alone, `nolabels`, `nopercent`, `nopace` or `noahead` to leave those out, `left` or `early` for the time left or early, `daily` for the per-day bars, `overview` for the Weeks or Months view, `full` for the session at its limit, `burst` for 58% twenty minutes into a session, `back=2` for two periods (or overview pages) back, `hover` to show the graph's tooltip (`hover=1.5` halfway along the projection), `light` for light mode, or `live` to render your
+Add `compact` for the Circle menu bar style, `dots` for Dots, `text` for Text, `beside` for Projection on (`projected`: on, with Number off), `mono` or `alerts` for those palettes, `amount` for the budget's amount, `extra` for Pro/Max with extra usage (and its menu bar item), `only5h` or `only7d` for one limit in the menu bar, `fable` for a Fable weekly limit (and its line in the graph), `update` for a newer release offered, `panel` for the whole popup or `settings` for its settings alone, `nolabels`, `nopercent`, `nopace` or `noahead` to leave those out, `left` or `early` for the time left or early, `daily` for the per-day bars, `overview` for the Weeks or Months view, `full` for the session at its limit, `burst` for 58% twenty minutes into a session, `back=2` for two periods (or overview pages) back, `hover` to show the graph's tooltip (`hover=1.5` halfway along the projection), `light` for light mode, or `live` to render your
 own current numbers and recorded history instead (don't commit those).
 
 ## Releasing

@@ -1,11 +1,12 @@
 import AppKit
 
-/// Draws the menu bar item in one of three styles, with the same colour coding:
+/// Draws the menu bar item in one of four styles, with the same colour coding (none in Text):
 /// - Bars: stacked "5h ▬▬ 8%" / "7d ▬▬ 60%" rows (one "$" row on an Enterprise/Team seat).
 /// - Circle (saved as "compact"): rings with their numbers beside them. Pro/Max: the week outside (the weekly limit
 ///   furthest ahead of pace, see UsageModel.compactRings) and the session inside;
 ///   Enterprise/Team: one ring for the budget.
 /// - Dots: the text alone, with a small pace-coloured dot before each row.
+/// - Text: the text alone.
 ///
 /// Colour coding, as ClaudeUsageBar's pace icon (see PaceLead): green on or under pace, yellow
 /// ahead of it, orange well ahead (15+ points) or nearly full, and plain (text colour) early in a
@@ -80,9 +81,10 @@ enum MenuBarImage {
         }
     }
 
-    /// Bars, Circle (rings; saved as "compact", its earlier name) or Dots (text with a pace dot).
+    /// Bars, Circle (rings; saved as "compact", its earlier name), Dots (text with a pace dot) or
+    /// Text (the text alone, no graphic and no colour).
     enum Style: String, CaseIterable {
-        case bars, compact, dots
+        case bars, compact, dots, text
         static let key = "menuBarStyle"
         var name: String { self == .compact ? "Circle" : rawValue.capitalized }
         /// A saved style that no longer exists (the short-lived "pace") reads as Bars.
@@ -398,12 +400,13 @@ enum MenuBarImage {
     static func item(style: Style, rows: [Row], rings: [Row], extra: Row?, options o: Options) -> NSImage? {
         let (rows, rings) = (o.limits.pick(rows), o.limits.pick(rings))
         let main = style == .compact && !rings.isEmpty ? makeCompact(rings: rings, options: o)
-            : style == .dots && !rows.isEmpty ? makeDots(rows: rows, options: o)
+            : (style == .dots || style == .text) && !rows.isEmpty ? makeDots(rows: rows, options: o, dots: style == .dots)
             : !rows.isEmpty ? make(rows: rows, options: o) : nil
         guard let main else { return nil }
         guard o.extra, let extra else { return main }
         let extraItem = style == .compact ? makeCompact(rings: [extra], options: o)
-            : style == .dots ? makeDots(rows: [extra], options: o) : make(rows: [extra], options: o)
+            : style == .dots || style == .text ? makeDots(rows: [extra], options: o, dots: style == .dots)
+            : make(rows: [extra], options: o)
         return beside(main, extraItem)
     }
 
@@ -422,14 +425,15 @@ enum MenuBarImage {
     /// Dots: the text alone, with a small dot before each row in its pace colour, since the text
     /// stays in the text colour. Mono has no dots; Alerts shows one only once ahead or nearly full,
     /// and takes no room without one. One row is a single 11 pt line, like the system's own
-    /// labels; more rows (or one with the projection under it) stack at 9 pt.
-    static func makeDots(rows: [Row], options o: Options = Options()) -> NSImage {
+    /// labels; more rows (or one with the projection under it) stack at 9 pt. `dots: false` is the
+    /// Text style: the same text, no dots.
+    static func makeDots(rows: [Row], options o: Options = Options(), dots: Bool = true) -> NSImage {
         let textRows = lines(rows.map { cells($0, o, label: o.labels) }, o)
         let small = textRows.count > 1
         let fonts = Columns.fonts(size: small ? 9 : 11, weight: compactWeight(stacked: small))
         let columns = Columns(textRows, leftAligned: [true, false, false, false], fonts: fonts)
         let dot: CGFloat = small ? 4 : 5
-        let dotSpace = rows.contains { dotColor($0, o) != nil } ? dot + 2 : 0
+        let dotSpace = dots && rows.contains { dotColor($0, o) != nil } ? dot + 2 : 0
         let size = NSSize(width: max(dotSpace + columns.width, dot), height: height)
         let rowHeight = small ? Self.rowHeight : height
         return NSImage(size: size, flipped: false) { _ in
@@ -437,7 +441,7 @@ enum MenuBarImage {
             let textHeight = ("0" as NSString).size(withAttributes: attrs).height
             // A dot per limit, centred on its line; one limit over two lines gets it centred on both.
             let barRowsBottom = (height + rowHeight * CGFloat(rows.count)) / 2 - rowHeight
-            for (i, row) in rows.enumerated() {
+            for (i, row) in rows.enumerated() where dots {
                 guard let color = dotColor(row, o) else { continue }
                 let y = rows.count == 1 ? height / 2 : barRowsBottom - CGFloat(i) * rowHeight + rowHeight / 2
                 color.setFill()

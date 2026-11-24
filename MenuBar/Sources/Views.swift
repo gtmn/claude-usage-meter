@@ -62,14 +62,17 @@ struct MenuBarSettings: View {
                 ModeSwitch(mode: Binding(get: { MenuBarImage.Style(saved: menuBarStyle).rawValue }, set: { menuBarStyle = $0 }),
                            options: MenuBarImage.Style.allCases.map { ($0.rawValue, $0.name) })
                     .help("Bars: the session and weekly bars. Circle: rings, the week outside and the session inside "
-                          + "(one budget ring on Enterprise). Dots: the numbers alone, each with a dot in its pace colour.")
+                          + "(one budget ring on Enterprise). Dots: the numbers alone, each with a dot in its pace colour. Text: the numbers alone.")
             }
-            row("Colours") {
-                ModeSwitch(mode: Binding(get: { MenuBarImage.Palette(saved: palette).rawValue }, set: { palette = $0 }),
-                           options: MenuBarImage.Palette.allCases.map { ($0.rawValue, $0.name) })
-                    .help("Colour: green on or under pace, yellow ahead, orange 15+ points ahead. "
-                          + "Alerts: in the text colour while on or under pace, yellow or orange once ahead or nearly full. "
-                          + "Mono: always in the menu bar's text colour, like the numbers.")
+            // Text has nothing to colour.
+            if MenuBarImage.Style(saved: menuBarStyle) != .text {
+                row("Colours") {
+                    ModeSwitch(mode: Binding(get: { MenuBarImage.Palette(saved: palette).rawValue }, set: { palette = $0 }),
+                               options: MenuBarImage.Palette.allCases.map { ($0.rawValue, $0.name) })
+                        .help("Colour: green on or under pace, yellow ahead, orange 15+ points ahead. "
+                              + "Alerts: in the text colour while on or under pace, yellow or orange once ahead or nearly full. "
+                              + "Mono: always in the menu bar's text colour, like the numbers.")
+                }
             }
             if snapshot?.window("five_hour") != nil && snapshot?.window("seven_day") != nil {
                 row("Limits", help: "Which limits the menu bar shows: the 5 h session and the week, or one of them. "
@@ -111,7 +114,7 @@ struct MenuBarSettings: View {
                 if !budget {
                     Toggle("Labels", isOn: $showLabels).help("“5h” and “7d” (and “$” for extra usage) beside the bars or numbers")
                 }
-                if MenuBarImage.Style(saved: menuBarStyle) != .dots {
+                if MenuBarImage.Style(saved: menuBarStyle) == .bars || MenuBarImage.Style(saved: menuBarStyle) == .compact {
                     Toggle("Pace tick", isOn: $showPace).help("A tick where usage would be by now if spread evenly over the window")
                 }
             }

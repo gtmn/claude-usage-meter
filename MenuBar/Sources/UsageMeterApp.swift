@@ -10,7 +10,7 @@ struct UsageMeterApp: App {
     )
 
     init() {
-        // `UsageMeter --render-preview out.png [live] [offline] [enterprise] [hover] [light] [daily] [seen] [saved] [compact|dots] [mono] [amount] [extra] [fable] [only5h|only7d] [beside|projected] [update] [panel|settings|scene] [nolabels] [nopercent] [nopace] [noahead] [left|early] [overview] [back=N] [full|burst]` (`hover=0.85`: pointer at 85% of the times): render the panel rows (`panel`: the whole popup; `settings`: its menu bar settings; `scene`: the whole popup opened under the item on a plain menu bar) to a PNG and exit.
+        // `UsageMeter --render-preview out.png [live] [offline] [enterprise] [hover] [light] [daily] [seen] [saved] [compact|dots|text] [mono] [amount] [extra] [fable] [only5h|only7d] [beside|projected] [update] [panel|settings|scene] [nolabels] [nopercent] [nopace] [noahead] [left|early] [overview] [back=N] [full|burst]` (`hover=0.85`: pointer at 85% of the times): render the panel rows (`panel`: the whole popup; `settings`: its menu bar settings; `scene`: the whole popup opened under the item on a plain menu bar) to a PNG and exit.
         let args = CommandLine.arguments
         if args.contains("--check-update") { Updater.checkFromCommandLine() }
         if let i = args.firstIndex(of: "--render-preview"), i + 1 < args.count {
@@ -103,7 +103,7 @@ enum PreviewRenderer {
         store.removePersistentDomain(forName: previewSuite)
         typealias Key = MenuBarImage.Options.Key
         let settings: [String: Any] = [
-            MenuBarImage.Style.key: a.contains("compact") ? "compact" : a.contains("dots") ? "dots" : "bars",
+            MenuBarImage.Style.key: a.contains("compact") ? "compact" : a.contains("dots") ? "dots" : a.contains("text") ? "text" : "bars",
             Key.labels: !a.contains("nolabels"), Key.percent: !a.contains("nopercent") && !a.contains("projected"),
             Key.pace: !a.contains("nopace"), Key.ahead: !a.contains("noahead"),
             Key.aheadAs: a.contains("left") ? "left" : a.contains("early") ? "early" : "points",
@@ -228,7 +228,7 @@ enum PreviewRenderer {
                                            extra: args.contains("extra"),
                                            limits: args.contains("only5h") ? .session : args.contains("only7d") ? .week : .both,
                                            projection: args.contains("projected") || args.contains("beside") ? .on : .off)
-        return MenuBarImage.item(style: args.contains("compact") ? .compact : args.contains("dots") ? .dots : .bars, rows: model.menuBarRows(),
+        return MenuBarImage.item(style: args.contains("compact") ? .compact : args.contains("dots") ? .dots : args.contains("text") ? .text : .bars, rows: model.menuBarRows(),
                                  rings: model.compactRings(), extra: model.extraRow(), options: options)
     }
 

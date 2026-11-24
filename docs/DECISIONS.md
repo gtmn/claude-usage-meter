@@ -43,7 +43,9 @@ options that were ruled out, so they aren't tried again.
   With Number off it takes the number's column, and the plain number shows until there's a projection: a
   bar with no text early in every window would look broken. (0.1.14 had Instead and Beside; both load as On.) The menu bar's amounts have no thousands separator
   (`$1990`): it only takes room, and a budget stays in four digits; the popup keeps it (`$1,990`).
-- **Styles: Bars, Circle and Dots** (2026-11-24). Circle is the earlier Compact, renamed; it's still saved
+- **Styles: Bars, Circle, Dots and Text** (2026-11-24). Text is the numbers alone, for a menu bar with no
+  graphic: no Colours row and no Pace tick then, and When ahead (`+24`) is the only warning. Dots with Mono
+  looks the same, but Text says it plainly. Circle is the earlier Compact, renamed; it's still saved
   as `compact`. Dots is the text without bars, with a dot before each row for the pace colour, since the
   text stays in the text colour; Mono has no dots, Alerts shows one only once ahead. Without a dot the text
   starts at the edge: kept room read as a gap in the menu bar, and the width changes with the numbers anyway.
