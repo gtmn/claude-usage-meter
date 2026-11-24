@@ -251,6 +251,39 @@ enum PreviewRenderer {
            let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
             try? png.write(to: URL(fileURLWithPath: output + ".label.png"))
         }
+        writeMenuBarStrip(label: label, model: model, output: output + ".bar.png")
+    }
+
+    /// The item at its real size in a slice of menu bar, dark above light, with only the time beside
+    /// it (the sample's fetch time): how it looks in place. Drawn at 2x, like a Retina screen.
+    private static func writeMenuBarStrip(label: NSImage, model: UsageModel, output: String) {
+        let (barHeight, pad, gap): (CGFloat, CGFloat, CGFloat) = (24, 10, 14)
+        // Just the time: with the date, three strips no longer fit side by side at real size.
+        let f = DateFormatter(); f.locale = HumanTime.en; f.dateFormat = "HH:mm"
+        let clock = f.string(from: model.snapshot?.capturedAt ?? Date()) as NSString
+        let font = NSFont.systemFont(ofSize: 13, weight: .medium)
+        let clockWidth = ceil(clock.size(withAttributes: [.font: font]).width)
+        let size = NSSize(width: pad + ceil(label.size.width) + gap + clockWidth + pad, height: barHeight * 2)
+        guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(size.width * 2), pixelsHigh: Int(size.height * 2),
+                                         bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                         colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { return }
+        rep.size = size
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+        for (i, (name, white)) in [(NSAppearance.Name.aqua, 0.93), (.darkAqua, 0.13)].enumerated() {
+            let y = CGFloat(i) * barHeight
+            NSAppearance(named: name)!.performAsCurrentDrawingAppearance {
+                NSColor(white: white, alpha: 1).setFill()
+                NSRect(x: 0, y: y, width: size.width, height: barHeight).fill()
+                label.draw(in: NSRect(x: pad, y: y + (barHeight - label.size.height) / 2,
+                                      width: label.size.width, height: label.size.height))
+                let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.labelColor]
+                let textHeight = clock.size(withAttributes: attrs).height
+                clock.draw(at: NSPoint(x: pad + ceil(label.size.width) + gap, y: y + (barHeight - textHeight) / 2), withAttributes: attrs)
+            }
+        }
+        NSGraphicsContext.restoreGraphicsState()
+        try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: output))
     }
 }
 

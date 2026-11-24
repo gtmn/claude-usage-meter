@@ -3,13 +3,14 @@
 macOS menu bar app and `claude-usage` CLI showing Claude usage (Pro/Max limits, Enterprise/Team $ budget,
 history graph). Swift + SwiftUI + Swift Charts, built with `swiftc`, released through the Homebrew tap `gtmn/tap`.
 
-Read `README.md` (layout, build, tests, releasing), then `docs/DECISIONS.md` (why things are the way they are,
+Read `README.md` (what it does, layout), `docs/DEVELOPMENT.md` (build, tests, screenshots, releasing) and
+`docs/GUIDE.md` (every feature and setting), then `docs/DECISIONS.md` (why things are the way they are,
 what was ruled out) and `docs/BACKLOG.md` (what's next).
 
 - Test: `./test.sh`. Build: `MenuBar/build.sh`. Run a dev build: `MenuBar/dev.sh` (stops the Homebrew service,
   runs the checkout build, restarts the service on exit; unoptimised, and skipped when nothing changed). Dev builds report `0.0.0-dev` or a `git describe`
   version and never install updates; `UsageMeter --check-update` tests the update check.
-- Releasing (README): bump the tap right after the release. Homebrew copies read the version from the tap's
+- Releasing (`docs/DEVELOPMENT.md`): bump the tap right after the release. Homebrew copies read the version from the tap's
   formula, so they only hear about a release once the formula has it.
 - Public repo: no employer/client names, no real usage numbers or `live` renders in commits.
 - Never print, log or refresh the Claude Code OAuth token; read it only via `/usr/bin/security`.
