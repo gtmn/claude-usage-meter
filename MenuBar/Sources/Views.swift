@@ -61,8 +61,10 @@ struct MenuBarSettings: View {
             row("Style") {
                 ModeSwitch(mode: Binding(get: { MenuBarImage.Style(saved: menuBarStyle).rawValue }, set: { menuBarStyle = $0 }),
                            options: MenuBarImage.Style.allCases.map { ($0.rawValue, $0.name) })
-                    .help("Bars: the session and weekly bars. Compact: rings, the week outside and the session inside "
-                          + "(one budget ring on Enterprise).")
+                    .help("Bars: the session and weekly bars. Circle: rings, the week outside and the session inside "
+                          + "(one budget ring on Enterprise). Dots: the numbers alone, each with a dot in its pace colour.")
+            }
+            row("Colours") {
                 ModeSwitch(mode: Binding(get: { MenuBarImage.Palette(saved: palette).rawValue }, set: { palette = $0 }),
                            options: MenuBarImage.Palette.allCases.map { ($0.rawValue, $0.name) })
                     .help("Colour: green on or under pace, yellow ahead, orange 15+ points ahead. "
@@ -85,8 +87,8 @@ struct MenuBarSettings: View {
                                + [("off", "Off")])
             }
             row("Projection", help: "Where each limit is heading at its reset, at the pace so far: →35%, or →140% when it "
-                + "runs out first. Instead: in place of the number. Beside: after it, on a second line beside a single bar or ring. "
-                + "Until there's a projection (early in a window, or at 100%), the number alone.") {
+                + "runs out first. On: after the number, on a second line for a single limit. With Number off, in the number's place, "
+                + "and the number alone until there's a projection (early in a window, or at 100%).") {
                 ModeSwitch(mode: Binding(get: { MenuBarImage.Projection(saved: projection).rawValue }, set: { projection = $0 }),
                            options: MenuBarImage.Projection.allCases.map { ($0.rawValue, $0.name) })
             }
@@ -109,7 +111,9 @@ struct MenuBarSettings: View {
                 if !budget {
                     Toggle("Labels", isOn: $showLabels).help("“5h” and “7d” (and “$” for extra usage) beside the bars or numbers")
                 }
-                Toggle("Pace tick", isOn: $showPace).help("A tick where usage would be by now if spread evenly over the window")
+                if MenuBarImage.Style(saved: menuBarStyle) != .dots {
+                    Toggle("Pace tick", isOn: $showPace).help("A tick where usage would be by now if spread evenly over the window")
+                }
             }
             .toggleStyle(.checkbox).controlSize(.small).font(.system(size: 11))
             .padding(.top, 1)

@@ -10,7 +10,7 @@ struct UsageMeterApp: App {
     )
 
     init() {
-        // `UsageMeter --render-preview out.png [live] [offline] [enterprise] [hover] [light] [daily] [seen] [saved] [compact] [mono] [amount] [extra] [fable] [only5h|only7d] [projected|beside] [update] [panel|settings|scene] [nolabels] [nopercent] [nopace] [noahead] [left|early] [overview] [back=N] [full|burst]` (`hover=0.85`: pointer at 85% of the times): render the panel rows (`panel`: the whole popup; `settings`: its menu bar settings; `scene`: the whole popup opened under the item on a plain menu bar) to a PNG and exit.
+        // `UsageMeter --render-preview out.png [live] [offline] [enterprise] [hover] [light] [daily] [seen] [saved] [compact|dots] [mono] [amount] [extra] [fable] [only5h|only7d] [beside|projected] [update] [panel|settings|scene] [nolabels] [nopercent] [nopace] [noahead] [left|early] [overview] [back=N] [full|burst]` (`hover=0.85`: pointer at 85% of the times): render the panel rows (`panel`: the whole popup; `settings`: its menu bar settings; `scene`: the whole popup opened under the item on a plain menu bar) to a PNG and exit.
         let args = CommandLine.arguments
         if args.contains("--check-update") { Updater.checkFromCommandLine() }
         if let i = args.firstIndex(of: "--render-preview"), i + 1 < args.count {
@@ -103,8 +103,8 @@ enum PreviewRenderer {
         store.removePersistentDomain(forName: previewSuite)
         typealias Key = MenuBarImage.Options.Key
         let settings: [String: Any] = [
-            MenuBarImage.Style.key: a.contains("compact") ? "compact" : "bars",
-            Key.labels: !a.contains("nolabels"), Key.percent: !a.contains("nopercent"),
+            MenuBarImage.Style.key: a.contains("compact") ? "compact" : a.contains("dots") ? "dots" : "bars",
+            Key.labels: !a.contains("nolabels"), Key.percent: !a.contains("nopercent") && !a.contains("projected"),
             Key.pace: !a.contains("nopace"), Key.ahead: !a.contains("noahead"),
             Key.aheadAs: a.contains("left") ? "left" : a.contains("early") ? "early" : "points",
             Key.palette: a.contains("mono") ? "mono" : a.contains("alerts") ? "alerts" : "colour",
@@ -114,7 +114,8 @@ enum PreviewRenderer {
             UsagePanel.settingsShownKey: a.contains("panel") || a.contains("scene"),   // the whole popup shows its settings open
             Updater.enabledKey: a.contains("update"),
             Key.limits: a.contains("only5h") ? "session" : a.contains("only7d") ? "week" : "both",
-            Key.projection: a.contains("projected") ? "instead" : a.contains("beside") ? "beside" : "off",
+            // `beside`: Projection on; `projected`: on, with Number off (the projection in its place).
+            Key.projection: a.contains("projected") || a.contains("beside") ? "on" : "off",
         ]
         for (k, v) in settings { store.set(v, forKey: k) }
         return store
@@ -218,15 +219,16 @@ enum PreviewRenderer {
     /// The menu bar item as the arguments set it up.
     private static func labelImage(model: UsageModel) -> NSImage? {
         let args = CommandLine.arguments
-        let options = MenuBarImage.Options(labels: !args.contains("nolabels") && model.snapshot?.isBudgetOnly != true, percent: !args.contains("nopercent"),
+        let options = MenuBarImage.Options(labels: !args.contains("nolabels") && model.snapshot?.isBudgetOnly != true,
+                                           percent: !args.contains("nopercent") && !args.contains("projected"),
                                            pace: !args.contains("nopace"), ahead: !args.contains("noahead"),
                                            aheadAs: args.contains("left") ? .left : args.contains("early") ? .early : .points,
                                            palette: args.contains("mono") ? .mono : args.contains("alerts") ? .alerts : .colour,
                                            budgetAs: args.contains("amount") ? .amount : .percent,
                                            extra: args.contains("extra"),
                                            limits: args.contains("only5h") ? .session : args.contains("only7d") ? .week : .both,
-                                           projection: args.contains("projected") ? .instead : args.contains("beside") ? .beside : .off)
-        return MenuBarImage.item(style: args.contains("compact") ? .compact : .bars, rows: model.menuBarRows(),
+                                           projection: args.contains("projected") || args.contains("beside") ? .on : .off)
+        return MenuBarImage.item(style: args.contains("compact") ? .compact : args.contains("dots") ? .dots : .bars, rows: model.menuBarRows(),
                                  rings: model.compactRings(), extra: model.extraRow(), options: options)
     }
 

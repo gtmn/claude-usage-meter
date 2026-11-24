@@ -1,10 +1,11 @@
 import AppKit
 
-/// Draws the menu bar item in one of two styles, with the same colour coding:
+/// Draws the menu bar item in one of three styles, with the same colour coding:
 /// - Bars: stacked "5h ▬▬ 8%" / "7d ▬▬ 60%" rows (one "$" row on an Enterprise/Team seat).
-/// - Compact: rings with their numbers beside them. Pro/Max: the week outside (the weekly limit
+/// - Circle (saved as "compact"): rings with their numbers beside them. Pro/Max: the week outside (the weekly limit
 ///   furthest ahead of pace, see UsageModel.compactRings) and the session inside;
 ///   Enterprise/Team: one ring for the budget.
+/// - Dots: the text alone, with a small pace-coloured dot before each row.
 ///
 /// Colour coding, as ClaudeUsageBar's pace icon (see PaceLead): green on or under pace, yellow
 /// ahead of it, orange well ahead (15+ points) or nearly full, and plain (text colour) early in a
@@ -15,8 +16,8 @@ import AppKit
 /// used), the pace tick (where usage
 /// would be if spread evenly over the window), and, once well ahead, the points ahead ("+24"),
 /// the time left until it runs out at that pace ("1.5d left"), or how long before the reset
-/// that is ("3d early"). The projection at the reset ("→35%", "→140%") can replace the number or
-/// follow it (under it, beside a single bar or ring). Text sits in aligned columns (see Columns).
+/// that is ("3d early"). The projection at the reset ("→35%", "→140%") follows the number (under
+/// it, beside a single bar or ring), or with Number off stands in its place. Text sits in aligned columns (see Columns).
 ///
 /// It can't be a template image, because those are single-colour. Instead it uses a
 /// drawing handler with dynamic colours, which AppKit re-runs for the menu bar's
@@ -79,10 +80,11 @@ enum MenuBarImage {
         }
     }
 
+    /// Bars, Circle (rings; saved as "compact", its earlier name) or Dots (text with a pace dot).
     enum Style: String, CaseIterable {
-        case bars, compact
+        case bars, compact, dots
         static let key = "menuBarStyle"
-        var name: String { rawValue.capitalized }
+        var name: String { self == .compact ? "Circle" : rawValue.capitalized }
         /// A saved style that no longer exists (the short-lived "pace") reads as Bars.
         init(saved: String) { self = Style(rawValue: saved) ?? .bars }
     }
@@ -148,12 +150,13 @@ enum MenuBarImage {
         }
     }
 
-    /// Where each limit is heading at its reset: not shown, in place of the number, or after it
-    /// (on a second line beside a single Compact ring).
+    /// Where each limit is heading at its reset. On: after the number (under it, beside a single
+    /// bar or ring); with Number off, in its place, and the plain number until there is a projection.
     enum Projection: String, CaseIterable {
-        case off, instead, beside
+        case off, on
         var name: String { rawValue.capitalized }
-        init(saved: String) { self = Projection(rawValue: saved) ?? .off }
+        /// 0.1.14 saved "instead" or "beside": both read as On.
+        init(saved: String) { self = saved == "off" || saved.isEmpty ? .off : .on }
     }
 
     /// How "well ahead" is shown: points ahead of pace ("+24"), the time until it runs out at
@@ -229,7 +232,7 @@ enum MenuBarImage {
 
     /// The amount carries its currency, so the "$" label beside it would only repeat it.
     private static func showsLabel(_ row: Row, _ o: Options) -> Bool {
-        o.labels && !((o.percent || !projection(row, o).isEmpty) && showsAmount(row, o))
+        o.labels && !((o.percent || o.projection == .on) && showsAmount(row, o))
     }
 
     /// The projection as shown, in the number's unit; empty when off or there's none.
@@ -255,17 +258,17 @@ enum MenuBarImage {
         let number = showsAmount(row, o) ? row.amount! : "\(Int(row.percent.rounded()))%"
         let labelCell = label && showsLabel(row, o) ? row.label : ""
         let projected = projection(row, o)
-        // Instead: in the number's own column, so a row without a projection (its plain number)
-        // lines up with one that has it.
-        if o.projection == .instead, !projected.isEmpty { return [labelCell, projected, "", ahead] }
-        return [labelCell, o.percent ? number : "", o.projection == .beside ? projected : "", ahead]
+        // Number off: the projection in the number's own column, and the plain number until there
+        // is one, so rows line up and the item never goes without text early in a window.
+        if o.projection == .on, !o.percent { return [labelCell, projected.isEmpty ? number : projected, "", ahead] }
+        return [labelCell, o.percent ? number : "", projected, ahead]
     }
 
     /// One bar or ring with its number and the projection beside it: the projection on a second line
     /// under the number, stacked like two rows, since one row has no room for both (a ring's single
     /// line is larger). Anything else keeps one line per bar or ring.
     private static func lines(_ cells: [[String]], _ o: Options) -> [[String]] {
-        guard cells.count == 1, o.projection == .beside, let c = cells.first, !c[1].isEmpty, !c[2].isEmpty else { return cells }
+        guard cells.count == 1, o.projection == .on, let c = cells.first, !c[1].isEmpty, !c[2].isEmpty else { return cells }
         return [[c[0], c[1], "", c[3]], ["", c[2], "", ""]]
     }
 
@@ -395,10 +398,13 @@ enum MenuBarImage {
     static func item(style: Style, rows: [Row], rings: [Row], extra: Row?, options o: Options) -> NSImage? {
         let (rows, rings) = (o.limits.pick(rows), o.limits.pick(rings))
         let main = style == .compact && !rings.isEmpty ? makeCompact(rings: rings, options: o)
+            : style == .dots && !rows.isEmpty ? makeDots(rows: rows, options: o)
             : !rows.isEmpty ? make(rows: rows, options: o) : nil
         guard let main else { return nil }
         guard o.extra, let extra else { return main }
-        return beside(main, style == .compact ? makeCompact(rings: [extra], options: o) : make(rows: [extra], options: o))
+        let extraItem = style == .compact ? makeCompact(rings: [extra], options: o)
+            : style == .dots ? makeDots(rows: [extra], options: o) : make(rows: [extra], options: o)
+        return beside(main, extraItem)
     }
 
     /// Two items side by side. Both keep their drawing handlers, so their colours still follow
@@ -410,6 +416,49 @@ enum MenuBarImage {
             b.draw(in: NSRect(x: a.size.width + gap, y: (size.height - b.size.height) / 2,
                               width: b.size.width, height: b.size.height))
             return true
+        }
+    }
+
+    /// Dots: the text alone, with a small dot before each row in its pace colour, since the text
+    /// stays in the text colour. Mono has no dots; Alerts shows one only once ahead or nearly full,
+    /// but keeps its room, so the text doesn't shift. One row is a single 11 pt line, like the
+    /// system's own labels; more rows (or one with the projection under it) stack at 9 pt.
+    static func makeDots(rows: [Row], options o: Options = Options()) -> NSImage {
+        let textRows = lines(rows.map { cells($0, o, label: o.labels) }, o)
+        let small = textRows.count > 1
+        let fonts = Columns.fonts(size: small ? 9 : 11, weight: compactWeight(stacked: small))
+        let columns = Columns(textRows, leftAligned: [true, false, false, false], fonts: fonts)
+        let dot: CGFloat = small ? 5 : 6
+        let dotSpace = o.palette == .mono ? 0 : dot + 3
+        let size = NSSize(width: max(dotSpace + columns.width, dot), height: height)
+        let rowHeight = small ? Self.rowHeight : height
+        return NSImage(size: size, flipped: false) { _ in
+            let attrs: [NSAttributedString.Key: Any] = [.font: fonts[1], .foregroundColor: NSColor.labelColor]
+            let textHeight = ("0" as NSString).size(withAttributes: attrs).height
+            // A dot per limit, centred on its line; one limit over two lines gets it centred on both.
+            let barRowsBottom = (height + rowHeight * CGFloat(rows.count)) / 2 - rowHeight
+            for (i, row) in rows.enumerated() {
+                guard let color = dotColor(row, o) else { continue }
+                let y = rows.count == 1 ? height / 2 : barRowsBottom - CGFloat(i) * rowHeight + rowHeight / 2
+                color.setFill()
+                NSBezierPath(ovalIn: NSRect(x: 0, y: y - dot / 2, width: dot, height: dot)).fill()
+            }
+            let firstBottom = (height + rowHeight * CGFloat(textRows.count)) / 2 - rowHeight
+            for i in textRows.indices {
+                let y = firstBottom - CGFloat(i) * rowHeight + (rowHeight - textHeight) / 2
+                columns.draw(row: i, x: dotSpace, y: y, color: .labelColor)
+            }
+            return true
+        }
+    }
+
+    /// The Dots style's dot: the pace colour, none in Mono, and in Alerts only once it's ahead of
+    /// pace or nearly full.
+    private static func dotColor(_ row: Row, _ o: Options) -> NSColor? {
+        switch o.palette {
+        case .mono: return nil
+        case .alerts: return paceState(row) >= .ahead ? color(paceState(row)) : nil
+        case .colour: return color(paceState(row))
         }
     }
 

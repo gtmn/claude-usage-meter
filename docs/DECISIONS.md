@@ -38,10 +38,15 @@ options that were ruled out, so they aren't tried again.
 - **No Labels setting and no `$` label on a $ budget.** There's only one bar, so a label tells nothing apart,
   and the amount (`$306`) carries its own `$`.
 - **The Projection setting is text only, rounded to 5% and not capped** (2026-11-24): the bars and colours
-  stay on current usage. `→140%` says it runs out, as When ahead says in time. Instead puts it in the number's
-  column, so a row without a projection (its plain number) lines up. A single bar or ring shows Beside on a
-  second line: one row has no room for two numbers. The menu bar's amounts have no thousands separator
+  stay on current usage. `→140%` says it runs out, as When ahead says in time. Just Off and On: On puts it
+  after the number, and on a second line beside a single bar or ring (one row has no room for two numbers).
+  With Number off it takes the number's column, and the plain number shows until there's a projection: a
+  bar with no text early in every window would look broken. (0.1.14 had Instead and Beside; both load as On.) The menu bar's amounts have no thousands separator
   (`$1990`): it only takes room, and a budget stays in four digits; the popup keeps it (`$1,990`).
+- **Styles: Bars, Circle and Dots** (2026-11-24). Circle is the earlier Compact, renamed; it's still saved
+  as `compact`. Dots is the text without bars, with a dot before each row for the pace colour, since the
+  text stays in the text colour; Mono has no dots, Alerts shows one only once ahead but keeps its room so the
+  text doesn't shift. The palette got its own row (Colours): three styles and three palettes don't fit in one.
 - **A model's own weekly limit (Fable) is a third line in the week graph**, not a chart of its own: same 0-100%
   scale over the same week. Ochre, because violet merges with the blue week line for colour-blind readers.
 
