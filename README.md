@@ -133,6 +133,8 @@ Hover over a control to see what it does.
 - **Limits** (Pro/Max): both, or only `5h` or `7d`. The popup and the graph keep showing both.
   An account without a 5-hour limit shows only `7d` anyway.
 - **Number**: `%` or off; on a $ budget also the amount spent.
+- **Projection**: off, or where each limit is heading at its reset (`→35%`, `→140%` when it runs out
+  first), instead of the number or beside it. A single Compact ring puts it on a second line.
 - **Extra usage** (Pro/Max with extra usage turned on): a `$` item beside the limits, as `%` or amount.
 - **When ahead**: off, or how far ahead once a limit is 15+ points ahead of pace.
 - **Labels** and **Pace tick**. On a $ budget there's no Labels setting and no `$` label: one bar
@@ -140,13 +142,13 @@ Hover over a control to see what it does.
 
 | Pro / Max | Enterprise / Team |
 |---|---|
-| <img src="docs/screenshots/settings-pro-max.png" width="356" alt="Menu bar item settings, one per row: Style Bars or Compact and Colour, Alerts or Mono; Limits Both, 5h or 7d; Number % or Off; Extra usage Off, % or Amount; When ahead Off, +N, time left or early; checkboxes Labels and Pace tick"> | <img src="docs/screenshots/settings-enterprise.png" width="356" alt="The same settings on a budget account: Number %, Amount or Off, no Limits or Extra usage rows, and only the Pace tick checkbox"> |
+| <img src="docs/screenshots/settings-pro-max.png" width="356" alt="Menu bar item settings, one per row: Style Bars or Compact and Colour, Alerts or Mono; Limits Both, 5h or 7d; Number % or Off; Projection Off, Instead or Beside; Extra usage Off, % or Amount; When ahead Off, +N, time left or early; checkboxes Labels and Pace tick"> | <img src="docs/screenshots/settings-enterprise.png" width="356" alt="The same settings on a budget account: Number %, Amount or Off, Projection Off, Instead or Beside, no Limits or Extra usage rows, and only the Pace tick checkbox"> |
 
 Some of the combinations, shown enlarged on a dark and a light menu bar:
 
-| Compact | Mono | Amount (budget) |
-|---|---|---|
-| <img src="docs/screenshots/menubar-compact.png" width="110" alt="Compact style: two rings, the week outside in yellow and the session inside in green, with 5h 20% and 7d 60% beside them"> | <img src="docs/screenshots/menubar-mono.png" width="140" alt="Mono palette: the 5h and 7d bars filled in the text colour instead of green and yellow"> | <img src="docs/screenshots/menubar-enterprise-amount.png" width="120" alt="A budget bar with $412 beside it instead of 21%"> |
+| Compact | Mono | Amount (budget) | Projection beside (budget, Compact) |
+|---|---|---|---|
+| <img src="docs/screenshots/menubar-compact.png" width="110" alt="Compact style: two rings, the week outside in yellow and the session inside in green, with 5h 20% and 7d 60% beside them"> | <img src="docs/screenshots/menubar-mono.png" width="140" alt="Mono palette: the 5h and 7d bars filled in the text colour instead of green and yellow"> | <img src="docs/screenshots/menubar-enterprise-amount.png" width="120" alt="A budget bar with $412 beside it instead of 21%"> | <img src="docs/screenshots/menubar-projection.png" width="97" alt="Compact style on a budget: one ring, with $412 on top and →$530 below it, where the budget is heading at the reset"> |
 
 | Pro/Max with extra usage beside it | The popup with extra usage |
 |---|---|
@@ -316,9 +318,9 @@ $APP --render-preview docs/screenshots/popup-pro-max-extra.png extra amount
 $APP --render-preview docs/screenshots/popup-pro-max-fable.png fable
 mv docs/screenshots/popup-pro-max-extra.png.label.png docs/screenshots/menubar-pro-max-extra.png
 $APP --render-preview docs/screenshots/settings-enterprise.png settings enterprise amount
-for v in compact mono "enterprise amount"; do
+for v in compact mono "enterprise amount" "compact enterprise amount beside"; do
   $APP --render-preview /tmp/um.png $v
-  mv /tmp/um.png.label.png "docs/screenshots/menubar-$(echo $v | sed 's/enterprise amount/enterprise-amount/').png"
+  mv /tmp/um.png.label.png "docs/screenshots/menubar-$(echo $v | sed 's/compact enterprise amount beside/projection/; s/enterprise amount/enterprise-amount/').png"
 done
 rm docs/screenshots/*.label.png /tmp/um.png
 ```

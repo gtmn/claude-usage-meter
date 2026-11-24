@@ -15,6 +15,7 @@ struct MenuBarLabel: View {
     @AppStorage(MenuBarImage.Options.Key.budgetAs) private var budgetAs = MenuBarImage.BudgetAs.percent.rawValue
     @AppStorage(MenuBarImage.Options.Key.extra) private var showExtra = false
     @AppStorage(MenuBarImage.Options.Key.limits) private var limits = MenuBarImage.Limits.both.rawValue
+    @AppStorage(MenuBarImage.Options.Key.projection) private var projection = MenuBarImage.Projection.off.rawValue
 
     var body: some View {
         // On a budget there's no Labels setting and no "$" label: a single bar needs none, and the amount ("$412") has its own "$".
@@ -22,7 +23,8 @@ struct MenuBarLabel: View {
                                            ahead: showAhead, aheadAs: MenuBarImage.AheadAs(saved: aheadAs),
                                            palette: MenuBarImage.Palette(saved: palette),
                                            budgetAs: MenuBarImage.BudgetAs(saved: budgetAs), extra: showExtra,
-                                           limits: MenuBarImage.Limits(saved: limits))
+                                           limits: MenuBarImage.Limits(saved: limits),
+                                           projection: MenuBarImage.Projection(saved: projection))
         Group {
             if let image = MenuBarImage.item(style: MenuBarImage.Style(saved: style), rows: model.menuBarRows(),
                                              rings: model.compactRings(), extra: model.extraRow(), options: options) {
@@ -49,6 +51,7 @@ struct MenuBarSettings: View {
     @AppStorage(MenuBarImage.Options.Key.budgetAs) private var budgetAs = MenuBarImage.BudgetAs.percent.rawValue
     @AppStorage(MenuBarImage.Options.Key.extra) private var showExtra = false
     @AppStorage(MenuBarImage.Options.Key.limits) private var limits = MenuBarImage.Limits.both.rawValue
+    @AppStorage(MenuBarImage.Options.Key.projection) private var projection = MenuBarImage.Projection.off.rawValue
 
     var body: some View {
         let snapshot = model.snapshot
@@ -80,6 +83,12 @@ struct MenuBarSettings: View {
                                          set: { showPercent = $0 != "off"; if budget && $0 != "off" { budgetAs = $0 } }),
                            options: (budget ? MenuBarImage.BudgetAs.allCases.map { ($0.rawValue, $0.name) } : [("percent", "%")])
                                + [("off", "Off")])
+            }
+            row("Projection", help: "Where each limit is heading at its reset, at the pace so far: →35%, or →140% when it "
+                + "runs out first. Instead: in place of the number. Beside: after it, on a second line for a single Compact ring. "
+                + "Until there's a projection (early in a window, or at 100%), the number alone.") {
+                ModeSwitch(mode: Binding(get: { MenuBarImage.Projection(saved: projection).rawValue }, set: { projection = $0 }),
+                           options: MenuBarImage.Projection.allCases.map { ($0.rawValue, $0.name) })
             }
             if snapshot?.extraUsage != nil {
                 row("Extra usage", help: "Your extra usage as its own $ item next to the 5h and 7d one: as the share of its "

@@ -114,6 +114,7 @@ enum PreviewRenderer {
             UsagePanel.settingsShownKey: a.contains("panel"),   // the whole popup shows its settings open
             Updater.enabledKey: a.contains("update"),
             Key.limits: a.contains("only5h") ? "session" : a.contains("only7d") ? "week" : "both",
+            Key.projection: a.contains("projected") ? "instead" : a.contains("beside") ? "beside" : "off",
         ]
         for (k, v) in settings { store.set(v, forKey: k) }
         return store

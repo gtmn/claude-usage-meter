@@ -37,6 +37,10 @@ options that were ruled out, so they aren't tried again.
 
 - **No Labels setting and no `$` label on a $ budget.** There's only one bar, so a label tells nothing apart,
   and the amount (`$306`) carries its own `$`.
+- **The Projection setting is text only, rounded to 5% and not capped** (2026-11-24): the bars and colours
+  stay on current usage. `→140%` says it runs out, as When ahead says in time. Instead puts it in the number's
+  column, so a row without a projection (its plain number) lines up. A single Compact ring shows Beside on a
+  second line: one row has no room for two numbers at 11 pt.
 - **A model's own weekly limit (Fable) is a third line in the week graph**, not a chart of its own: same 0-100%
   scale over the same week. Ochre, because violet merges with the blue week line for colour-blind readers.
 
