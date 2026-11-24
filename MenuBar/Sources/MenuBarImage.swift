@@ -7,7 +7,7 @@ import AppKit
 ///   Enterprise/Team: one ring for the budget.
 /// - Dots: the text alone, with a small pace-coloured dot before each row.
 /// - Gauge (saved as "icon"): a gauge in the worst pace colour, its needle at the highest use, then the text.
-/// - Network (saved as "splash"): a hub with linked nodes in the worst pace colour, then the text.
+/// - Sparkle (saved as "splash"): Apple's sparkle symbol in the worst pace colour, then the text.
 /// - Off (saved as "text"): the text alone.
 ///
 /// Colour coding, as ClaudeUsageBar's pace icon (see PaceLead): green on or under pace, yellow
@@ -84,8 +84,8 @@ enum MenuBarImage {
     }
 
     /// The Indicator setting: Bars, Circle (rings; saved as "compact", its earlier name), Dots (text
-    /// with a pace dot), Gauge (saved as "icon"), Network (saved as "splash"; a gauge or a small
-    /// network in the pace colour) or Off (the text alone; saved as "text").
+    /// with a pace dot), Gauge (saved as "icon"), Sparkle (saved as "splash"; a gauge or a sparkle in
+    /// the pace colour) or Off (the text alone; saved as "text").
     enum Style: String, CaseIterable {
         case bars, compact, dots, icon, splash, text
         static let key = "menuBarStyle"
@@ -97,7 +97,7 @@ enum MenuBarImage {
             case .compact: return "Circle"
             case .dots: return single ? "Dot" : "Dots"
             case .icon: return "Gauge"
-            case .splash: return "Network"
+            case .splash: return "Sparkle"
             case .text: return "Off"
             }
         }
@@ -444,7 +444,7 @@ enum MenuBarImage {
     /// stays in the text colour. Mono has no dots; Alerts shows one only once ahead or nearly full,
     /// and takes no room without one. One row is a single 11 pt line, like the system's own
     /// labels; more rows (or one with the projection under it) stack at 9 pt. `dots: false` is the
-    /// Off indicator: the same text, no dots. `glyph` (`.icon` or `.splash`): a gauge or a network
+    /// Off indicator: the same text, no dots. `glyph` (`.icon` or `.splash`): a gauge or a sparkle
     /// before the text instead.
     static func makeDots(rows: [Row], options o: Options = Options(), dots: Bool = true, glyph: Style? = nil) -> NSImage {
         var textRows = lines(rows.map { cells($0, o, label: o.labels) }, o)
@@ -456,7 +456,7 @@ enum MenuBarImage {
             var shown = o; shown.percent = true
             textRows = lines(rows.map { cells($0, shown, label: o.labels) }, shown)
         }
-        // A gauge or network with no number beside it stands alone: labels ("5h", "7d") with no value
+        // A gauge or sparkle with no number beside it stands alone: labels ("5h", "7d") with no value
         // say nothing next to a single glyph.
         if glyph != nil, noValues { textRows = textRows.map { _ in ["", "", "", ""] } }
         let small = textRows.count > 1
@@ -465,8 +465,7 @@ enum MenuBarImage {
         let dot: CGFloat = small ? 4 : 5
         // Alone (no text beside it) the glyph fills the menu bar's height, like the system's own icons.
         let glyphSize: CGFloat = columns.width == 0 ? 17 : small ? 15 : 14
-        let gauge = glyph == .icon ? gaugeImage(rows, o, pointSize: glyphSize)
-            : glyph == .splash ? splashImage(rows, o, size: glyphSize) : nil
+        let gauge = glyph.flatMap { glyphImage($0, rows, o, pointSize: glyphSize) }
         let dotSpace = gauge.map { $0.size.width + (columns.width > 0 ? 3 : 0) } ?? (hasDot ? dot + 2 : 0)
         let size = NSSize(width: max(dotSpace + columns.width, dot), height: height)
         let rowHeight = small ? Self.rowHeight : height
@@ -493,52 +492,17 @@ enum MenuBarImage {
         }
     }
 
-    /// The Network indicator (saved as "splash"): a small network in the colour of the limit furthest
-    /// ahead of pace (the text colour in Mono, and in Alerts until one is ahead). Drawn at draw time,
-    /// so the text colour follows the menu bar's appearance.
-    private static func splashImage(_ rows: [Row], _ o: Options, size side: CGFloat) -> NSImage {
-        let worst = rows.max { paceState($0) < paceState($1) }
-        let tint: NSColor = worst.map { row in
-            switch o.palette {
-            case .colour: return color(paceState(row))
-            case .mono: return .labelColor
-            case .alerts: return paceState(row) >= .ahead ? color(paceState(row)) : .labelColor
-            }
-        } ?? .labelColor
-        return NSImage(size: NSSize(width: side, height: side), flipped: false) { rect in
-            let network = networkPieces(in: rect)
-            tint.setStroke(); network.lines.stroke()
-            tint.setFill(); network.nodes.forEach { $0.fill() }
-            return true
-        }
-    }
-
-    /// The network: a hub joined to six nodes at uneven distances. A generic network sign of our own,
-    /// deliberately not a starburst like the Claude logo.
-    static func networkPieces(in rect: NSRect) -> (lines: NSBezierPath, nodes: [NSBezierPath]) {
-        let w = rect.width
-        let c = NSPoint(x: rect.midX, y: rect.midY)
-        // (angle in degrees, distance from the hub), as shares of the width.
-        let spots: [(CGFloat, CGFloat)] = [(15, 0.38), (75, 0.34), (135, 0.39), (195, 0.33), (250, 0.38), (310, 0.35)]
-        let nodes = spots.map { deg, dist in
-            NSPoint(x: c.x + cos(deg * .pi / 180) * dist * w, y: c.y + sin(deg * .pi / 180) * dist * w)
-        }
-        let lines = NSBezierPath()
-        lines.lineWidth = max(1, w * 0.075); lines.lineCapStyle = .round
-        for n in nodes { lines.move(to: c); lines.line(to: n) }
-        func dot(_ p: NSPoint, _ r: CGFloat) -> NSBezierPath { NSBezierPath(ovalIn: NSRect(x: p.x - r, y: p.y - r, width: 2 * r, height: 2 * r)) }
-        return (lines, [dot(c, w * 0.15)] + nodes.map { dot($0, w * 0.085) })
-    }
-
-    /// The Gauge indicator (saved as "icon"): the gauge symbol with its needle at the highest use shown, in the colour of
-    /// the limit furthest ahead of pace (the text colour in Mono, and in Alerts until one is ahead).
-    /// Tinted at draw time, so the text colour follows the menu bar's appearance.
-    private static func gaugeImage(_ rows: [Row], _ o: Options, pointSize: CGFloat) -> NSImage? {
+    /// The Gauge (saved as "icon") and Sparkle (saved as "splash") indicators: Apple's gauge symbol, its
+    /// needle at the highest use shown, or its sparkle, in the colour of the limit furthest ahead of
+    /// pace (the text colour in Mono, and in Alerts until one is ahead). Tinted at draw time, so the
+    /// text colour follows the menu bar's appearance.
+    private static func glyphImage(_ glyph: Style, _ rows: [Row], _ o: Options, pointSize: CGFloat) -> NSImage? {
         let top = rows.map(\.percent).max() ?? 0
         let needle = [0, 33, 50, 67, 100].min { abs(Double($0) - top) < abs(Double($1) - top) } ?? 0
+        let name = glyph == .icon ? "gauge.with.dots.needle.\(needle)percent" : "sparkle"
         let config = NSImage.SymbolConfiguration(pointSize: pointSize, weight: .medium)
-        guard let symbol = NSImage(systemSymbolName: "gauge.with.dots.needle.\(needle)percent", accessibilityDescription: nil)?
-            .withSymbolConfiguration(config) else { return nil }
+        guard let symbol = NSImage(systemSymbolName: name, accessibilityDescription: nil)?.withSymbolConfiguration(config)
+        else { return nil }
         let worst = rows.max { paceState($0) < paceState($1) }
         let tint: NSColor = worst.map { row in
             switch o.palette {
@@ -554,7 +518,6 @@ enum MenuBarImage {
             return true
         }
     }
-
 
     /// The Dots style's dot: the pace colour, none in Mono, and in Alerts only once it's ahead of
     /// pace or nearly full.
