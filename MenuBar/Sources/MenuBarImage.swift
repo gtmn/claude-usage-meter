@@ -463,8 +463,8 @@ enum MenuBarImage {
         let fonts = Columns.fonts(size: small ? 9 : 11, weight: compactWeight(stacked: small))
         let columns = Columns(textRows, leftAligned: [true, false, false, false], fonts: fonts)
         let dot: CGFloat = small ? 4 : 5
-        // Alone (no text beside it) the glyph fills the menu bar's height, like the system's own icons.
-        let glyphSize: CGFloat = columns.width == 0 ? 17 : small ? 15 : 14
+        // Alone (no text beside it) at the single-line size: the full menu bar height looked too big.
+        let glyphSize: CGFloat = columns.width == 0 ? 14 : small ? 15 : 14
         let gauge = glyph.flatMap { glyphImage($0, rows, o, pointSize: glyphSize) }
         let dotSpace = gauge.map { $0.size.width + (columns.width > 0 ? 3 : 0) } ?? (hasDot ? dot + 2 : 0)
         let size = NSSize(width: max(dotSpace + columns.width, dot), height: height)
@@ -544,7 +544,7 @@ enum MenuBarImage {
         let fonts = Columns.fonts(size: small ? 9 : 11, weight: compactWeight(stacked: small))
         let numberFont = fonts[1]
         let columns = Columns(textRows, leftAligned: [true, false, false, false], fonts: fonts)
-        let diameter: CGFloat = stacked ? 16 : 13, line: CGFloat = stacked ? 2.2 : 2.5
+        let diameter: CGFloat = stacked ? 17 : 15, line: CGFloat = stacked ? 2.3 : 2.7
         let ringGap: CGFloat = 1
         let textGap: CGFloat = columns.width > 0 ? 3 : 0
         let size = NSSize(width: diameter + textGap + columns.width, height: height)

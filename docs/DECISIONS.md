@@ -51,11 +51,13 @@ options that were ruled out, so they aren't tried again.
   one line, 2 pt gap). Gauge (saved as `icon`) is Apple's gauge symbol (also shown when there's no data),
   tinted like the worst limit, its needle at the highest use. Sparkle (saved as `splash`, after a short-lived paint splash and network
   drawing) is Apple's `sparkle` symbol, in the same colour. Without numbers beside it, a gauge or sparkle
-  stands alone at the menu bar's full height (labels with no value are left out). Neither is the Claude logo:
+  stands alone at the single-line size (labels with no value are left out); the full menu bar height looked
+  too big. Neither is the Claude logo:
   it's Anthropic's mark, and a lookalike would suggest an official app; a burst of rays (`laser.burst`) came
   too close to it. With Dots or Off nothing else is sure to show, so the popup greys out combinations that would
   leave the item empty (nothing to click); settings saved before that show the plain number. The palette has
-  its own row (Colours), hidden with Off.
+  its own row (Colours), hidden with Off. Circle's rings are 15 pt (one) and 17 pt (two nested), up from 13
+  and 16, to sit level with the 14 pt gauge and sparkle.
 - **A model's own weekly limit (Fable) is a third line in the week graph**, not a chart of its own: same 0-100%
   scale over the same week. Ochre, because violet merges with the blue week line for colour-blind readers.
 
