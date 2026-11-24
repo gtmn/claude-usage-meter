@@ -134,7 +134,7 @@ Hover over a control to see what it does.
   An account without a 5-hour limit shows only `7d` anyway.
 - **Number**: `%` or off; on a $ budget also the amount spent.
 - **Projection**: off, or where each limit is heading at its reset (`→35%`, `→140%` when it runs out
-  first), instead of the number or beside it. A single Compact ring puts it on a second line.
+  first), instead of the number or beside it. Beside a single bar or ring it goes on a second line.
 - **Extra usage** (Pro/Max with extra usage turned on): a `$` item beside the limits, as `%` or amount.
 - **When ahead**: off, or how far ahead once a limit is 15+ points ahead of pace.
 - **Labels** and **Pace tick**. On a $ budget there's no Labels setting and no `$` label: one bar

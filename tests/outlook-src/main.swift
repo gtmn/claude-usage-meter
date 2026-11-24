@@ -114,4 +114,10 @@ check("saved numbers project from their fetch time", UsageWindow(key: "seven_day
 // Rounding never shows less than is already used: 41% with 2 h left ends near 41.5, which rounds to 40.
 check("never below the % used", UsageWindow(key: "seven_day", percent: 41, resetsAt: wk).menuBarProjection(now: at("2026-11-12 03:00")), "→41%")
 check("never below the amount used", bWin.menuBarProjection(now: at("2026-11-30 23:00"), amount: true), "→$412")
+// The menu bar leaves out the thousands separator (narrow, and budgets stay in four digits); the
+// outlook keeps it ("about $1,580").
+let bigSpend = Spend(used: Money(minor: 123400, exponent: 2, currency: "USD"), limit: Money(minor: 200000, exponent: 2, currency: "USD"))
+let bigWin = UsageWindow(key: "extra_usage", percent: bigSpend.percent, resetsAt: at("2026-12-01 00:00"), spend: bigSpend)
+check("no thousands separator in the menu bar", bigWin.menuBarProjection(now: at("2026-11-24 09:51"), amount: true), "→$1580")
+check("…but the outlook keeps it", bigWin.outlook(now: at("2026-11-24 09:51"), calendar: cal), "Lasts until the reset — on track for about $1,580")
 if failures > 0 { exit(1) }

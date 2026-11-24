@@ -31,13 +31,15 @@ public struct Money: Equatable {
         return f.string(from: NSNumber(value: amount)) ?? String(format: "%.\(exponent)f \(currency)", amount)
     }
 
-    /// Whole units, for tight spaces like the menu bar: "$306", "€1,000", "CHF 50".
+    /// Whole units, for tight spaces like the menu bar: "$306", "€1000", "CHF 50". No thousands
+    /// separator: it only takes room, and a budget stays in four digits.
     public var wholeUnits: String {
         let f = NumberFormatter()
         f.locale = Locale(identifier: "en_US")
         f.numberStyle = .currency
         f.currencyCode = currency
         f.maximumFractionDigits = 0
+        f.usesGroupingSeparator = false
         return f.string(from: NSNumber(value: amount.rounded(.down))) ?? "\(Int(amount)) \(currency)"
     }
 }
@@ -66,12 +68,14 @@ public struct Spend: Equatable {
     }()
 
     /// A share of the limit as an estimate, rounded to a whole 10 above 100 units: "about $490".
-    func approx(percent p: Double) -> String {
+    /// `grouping: false` for the menu bar: "$1990", not "$1,990".
+    func approx(percent p: Double, grouping: Bool = true) -> String {
         let units = limit.amount * p / 100
         let rounded = units >= 100 ? (units / 10).rounded() * 10 : units.rounded()
         let f = NumberFormatter()
         f.locale = Locale(identifier: "en_US"); f.numberStyle = .currency; f.currencyCode = limit.currency
         f.maximumFractionDigits = 0
+        f.usesGroupingSeparator = grouping
         return f.string(from: NSNumber(value: rounded)) ?? "\(Int(rounded)) \(limit.currency)"
     }
     public var remaining: Money {
@@ -195,7 +199,7 @@ public struct UsageWindow: Equatable {
         if amount, let spend {
             let units = spend.limit.amount * end / 100
             let rounded = units >= 100 ? (units / 10).rounded() * 10 : units.rounded()
-            return "→" + (rounded < spend.used.amount.rounded(.down) ? spend.used.wholeUnits : spend.approx(percent: end))
+            return "→" + (rounded < spend.used.amount.rounded(.down) ? spend.used.wholeUnits : spend.approx(percent: end, grouping: false))
         }
         return String(format: "→%.0f%%", max((end / 5).rounded() * 5, percent.rounded()))
     }

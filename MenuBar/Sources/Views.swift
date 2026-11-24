@@ -85,7 +85,7 @@ struct MenuBarSettings: View {
                                + [("off", "Off")])
             }
             row("Projection", help: "Where each limit is heading at its reset, at the pace so far: →35%, or →140% when it "
-                + "runs out first. Instead: in place of the number. Beside: after it, on a second line for a single Compact ring. "
+                + "runs out first. Instead: in place of the number. Beside: after it, on a second line beside a single bar or ring. "
                 + "Until there's a projection (early in a window, or at 100%), the number alone.") {
                 ModeSwitch(mode: Binding(get: { MenuBarImage.Projection(saved: projection).rawValue }, set: { projection = $0 }),
                            options: MenuBarImage.Projection.allCases.map { ($0.rawValue, $0.name) })

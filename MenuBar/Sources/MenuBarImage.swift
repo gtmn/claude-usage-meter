@@ -16,7 +16,7 @@ import AppKit
 /// would be if spread evenly over the window), and, once well ahead, the points ahead ("+24"),
 /// the time left until it runs out at that pace ("1.5d left"), or how long before the reset
 /// that is ("3d early"). The projection at the reset ("→35%", "→140%") can replace the number or
-/// follow it. Text sits in aligned columns (see Columns).
+/// follow it (under it, beside a single bar or ring). Text sits in aligned columns (see Columns).
 ///
 /// It can't be a template image, because those are single-colour. Instead it uses a
 /// drawing handler with dynamic colours, which AppKit re-runs for the menu bar's
@@ -261,6 +261,14 @@ enum MenuBarImage {
         return [labelCell, o.percent ? number : "", o.projection == .beside ? projected : "", ahead]
     }
 
+    /// One bar or ring with its number and the projection beside it: the projection on a second line
+    /// under the number, stacked like two rows, since one row has no room for both (a ring's single
+    /// line is larger). Anything else keeps one line per bar or ring.
+    private static func lines(_ cells: [[String]], _ o: Options) -> [[String]] {
+        guard cells.count == 1, o.projection == .beside, let c = cells.first, !c[1].isEmpty, !c[2].isEmpty else { return cells }
+        return [[c[0], c[1], "", c[3]], ["", c[2], "", ""]]
+    }
+
     /// Rounded, since it's an estimate: half days from a day on ("1d", "1.5d", "3d"), whole hours
     /// under a day ("5h"), and, only for the 5 h session (`minutes`), 5 minutes under an hour ("45m").
     /// "40m", "1h 10m", "3h": to 5 minutes, for a known time.
@@ -340,17 +348,18 @@ enum MenuBarImage {
         let labelled = rows.filter { showsLabel($0, o) }
         let labelWidth = ceil(labelled.map { ($0.label as NSString).size(withAttributes: measure).width }.max() ?? 0)
         let barX = labelled.isEmpty ? 0 : labelWidth + 3
-        let columns = Columns(rows.map { cells($0, o, label: false) }, leftAligned: [true, false, false, false],
-                              fonts: Columns.fonts(size: font.pointSize))
+        let textRows = lines(rows.map { cells($0, o, label: false) }, o)
+        let columns = Columns(textRows, leftAligned: [true, false, false, false], fonts: Columns.fonts(size: font.pointSize))
         let textX = barX + barWidth + 3
         let size = NSSize(width: columns.width > 0 ? textX + columns.width : barX + barWidth, height: height)
         let firstRowBottom = (height + rowHeight * CGFloat(rows.count)) / 2 - rowHeight
+        let firstTextBottom = (height + rowHeight * CGFloat(textRows.count)) / 2 - rowHeight
 
         return NSImage(size: size, flipped: false) { _ in
             let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.labelColor]
+            let textHeight = ("0" as NSString).size(withAttributes: attrs).height
             for (i, row) in rows.enumerated() {
                 let y = firstRowBottom - CGFloat(i) * rowHeight
-                let textHeight = ("0" as NSString).size(withAttributes: attrs).height
                 let textY = y + (rowHeight - textHeight) / 2
                 if showsLabel(row, o) { (row.label as NSString).draw(at: NSPoint(x: 0, y: textY), withAttributes: attrs) }
 
@@ -371,8 +380,11 @@ enum MenuBarImage {
                     NSColor.labelColor.setFill()
                     NSRect(x: tickX, y: y + 1, width: 1, height: rowHeight - 2).fill()
                 }
-
-                columns.draw(row: i, x: textX, y: textY, color: .labelColor)
+            }
+            // Usually one line per bar; a single bar with the projection beside it has two.
+            for i in textRows.indices {
+                let y = firstTextBottom - CGFloat(i) * rowHeight + (rowHeight - textHeight) / 2
+                columns.draw(row: i, x: textX, y: y, color: .labelColor)
             }
             return true
         }
@@ -411,12 +423,7 @@ enum MenuBarImage {
     static func makeCompact(rings: [Row], options o: Options = Options()) -> NSImage {
         let rings = Array(rings.prefix(2))
         let stacked = rings.count > 1
-        var textRows = (stacked ? Array(rings.reversed()) : rings).map { cells($0, o, label: o.labels) }
-        // One ring with its number and the projection beside it: the projection on a second line,
-        // stacked like two rings' numbers, since one row has no room for both at full size.
-        if !stacked, o.projection == .beside, let c = textRows.first, !c[1].isEmpty, !c[2].isEmpty {
-            textRows = [[c[0], c[1], "", c[3]], ["", c[2], "", ""]]
-        }
+        let textRows = lines((stacked ? Array(rings.reversed()) : rings).map { cells($0, o, label: o.labels) }, o)
         let small = textRows.count > 1
         let fonts = Columns.fonts(size: small ? 9 : 11, weight: compactWeight(stacked: small))
         let numberFont = fonts[1]
