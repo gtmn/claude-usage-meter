@@ -299,10 +299,12 @@ on any machine) and the short message for each kind of error.
 ## Screenshots
 
 The images in [`docs/screenshots/`](docs/screenshots) are rendered from sample numbers
-(no Keychain access, no real usage), so they can be regenerated at any time:
+(no Keychain access, no real usage), so they can be regenerated at any time. `TZ=UTC` keeps the
+times in UTC, so the images don't show the time zone of the Mac that rendered them:
 
 ```bash
 cd MenuBar && ./build.sh && cd ..
+export TZ=UTC
 APP=MenuBar/build/UsageMeter.app/Contents/MacOS/UsageMeter
 $APP --render-preview docs/screenshots/popup-pro-max.png
 $APP --render-preview docs/screenshots/popup-enterprise.png enterprise
