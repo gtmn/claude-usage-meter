@@ -421,15 +421,15 @@ enum MenuBarImage {
 
     /// Dots: the text alone, with a small dot before each row in its pace colour, since the text
     /// stays in the text colour. Mono has no dots; Alerts shows one only once ahead or nearly full,
-    /// but keeps its room, so the text doesn't shift. One row is a single 11 pt line, like the
-    /// system's own labels; more rows (or one with the projection under it) stack at 9 pt.
+    /// and takes no room without one. One row is a single 11 pt line, like the system's own
+    /// labels; more rows (or one with the projection under it) stack at 9 pt.
     static func makeDots(rows: [Row], options o: Options = Options()) -> NSImage {
         let textRows = lines(rows.map { cells($0, o, label: o.labels) }, o)
         let small = textRows.count > 1
         let fonts = Columns.fonts(size: small ? 9 : 11, weight: compactWeight(stacked: small))
         let columns = Columns(textRows, leftAligned: [true, false, false, false], fonts: fonts)
-        let dot: CGFloat = small ? 5 : 6
-        let dotSpace = o.palette == .mono ? 0 : dot + 3
+        let dot: CGFloat = small ? 4 : 5
+        let dotSpace = rows.contains { dotColor($0, o) != nil } ? dot + 2 : 0
         let size = NSSize(width: max(dotSpace + columns.width, dot), height: height)
         let rowHeight = small ? Self.rowHeight : height
         return NSImage(size: size, flipped: false) { _ in

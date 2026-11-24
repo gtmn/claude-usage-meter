@@ -45,8 +45,9 @@ options that were ruled out, so they aren't tried again.
   (`$1990`): it only takes room, and a budget stays in four digits; the popup keeps it (`$1,990`).
 - **Styles: Bars, Circle and Dots** (2026-11-24). Circle is the earlier Compact, renamed; it's still saved
   as `compact`. Dots is the text without bars, with a dot before each row for the pace colour, since the
-  text stays in the text colour; Mono has no dots, Alerts shows one only once ahead but keeps its room so the
-  text doesn't shift. The palette got its own row (Colours): three styles and three palettes don't fit in one.
+  text stays in the text colour; Mono has no dots, Alerts shows one only once ahead. Without a dot the text
+  starts at the edge: kept room read as a gap in the menu bar, and the width changes with the numbers anyway.
+  The dot is small (4 pt stacked, 5 pt on one line, 2 pt gap) so Colour costs about 6 pt. The palette got its own row (Colours): three styles and three palettes don't fit in one.
 - **A model's own weekly limit (Fable) is a third line in the week graph**, not a chart of its own: same 0-100%
   scale over the same week. Ochre, because violet merges with the blue week line for colour-blind readers.
 
