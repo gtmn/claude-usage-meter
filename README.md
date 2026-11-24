@@ -6,13 +6,31 @@ in plain words whether you'll run out before the reset. It handles both kinds of
 - **Pro / Max:** the 5-hour session window and the weekly limit, in percent.
 - **Enterprise / Team seats:** the monthly $ budget, in percent and in dollars.
 
+<img src="docs/screenshots/hero.png" width="412" alt="The popup opened under the menu bar item: the item shows 5h 20% →35% and 7d 60% →105%; the popup has Session 5 h at 20%, on track for about 35%, Week all models at 60% in yellow, runs out Friday morning, a line graph of the week with a dashed projection to 100%, and the Menu bar item settings below, with Projection set to Beside">
+
+*Sample numbers and a made-up history, rendered by the app itself.*
+
 | Pro / Max | Enterprise / Team |
 |---|---|
-| <img src="docs/screenshots/menubar-pro-max.png" width="140" alt="Menu bar item with 5h and 7d bars at 20% (green, under pace) and 60% (yellow, ahead of pace), each with a pace tick, on a dark and a light menu bar"> | <img src="docs/screenshots/menubar-enterprise.png" width="130" alt="Menu bar item with a single green $ bar at 21% and a pace tick, on a dark and a light menu bar"> |
 | <img src="docs/screenshots/popup-pro-max.png" width="356" alt="Popup: Session 5 h at 20%; Week all models at 60% in yellow, runs out 8 h before the weekly reset; below, a line graph of both this week with a dashed projection of the week to 100%"> | <img src="docs/screenshots/popup-enterprise.png" width="356" alt="Popup: Monthly budget at 21%, $412.80 used of $2,000.00, $1,587.20 left, on track for about $800 by the 1 Dec reset; below, a line graph of money spent this month with a dashed projection, the unrecorded part drawn lighter as estimated"> |
-| | <img src="docs/screenshots/popup-enterprise-daily.png" width="356" alt="The same popup with the graph switched to Per day: a bar per UTC day, the unrecorded days' bars lighter as estimated"> |
+| <img src="docs/screenshots/popup-pro-max-extra.png" width="356" alt="Popup: Session and Week rows, then Extra usage at 25%, $12.40 used of $50.00, on track for about $16; the 5h/7d graph, and below it a graph of extra usage this month with a dashed projection to about $16"> | <img src="docs/screenshots/popup-enterprise-daily.png" width="356" alt="The same popup with the graph switched to Per day: a bar per UTC day, the unrecorded days' bars lighter as estimated"> |
+| <img src="docs/screenshots/popup-pro-max-fable.png" width="356" alt="Popup: Session, Week all models and Week Fable at 35%; the week graph with a third, ochre line for Fable ending at Fable 35%"> | |
 
-*Sample numbers and a made-up history. The menu bar item is shown enlarged, on a dark and a light menu bar.*
+### Menu bar styles
+
+Each one is a setting in the popup (see [Settings](#settings)), shown enlarged on a dark and a light menu bar.
+
+| Bars | Compact | Mono | Alerts |
+|---|---|---|---|
+| <img src="docs/screenshots/menubar-pro-max.png" width="140" alt="Menu bar item with 5h and 7d bars at 20% (green, under pace) and 60% (yellow, ahead of pace), each with a pace tick, on a dark and a light menu bar"> | <img src="docs/screenshots/menubar-compact.png" width="110" alt="Compact style: two rings, the week outside in yellow and the session inside in green, with 5h 20% and 7d 60% beside them"> | <img src="docs/screenshots/menubar-mono.png" width="140" alt="Mono palette: the 5h and 7d bars filled in the text colour instead of green and yellow"> | <img src="docs/screenshots/menubar-alerts.png" width="140" alt="Alerts palette: the 5h bar in the text colour while on pace, the 7d bar yellow because it is ahead of pace"> |
+
+| Projection beside | Projection instead | Only the 5 h limit |
+|---|---|---|
+| <img src="docs/screenshots/menubar-projection-beside.png" width="218" alt="The 5h and 7d bars with 20% →35% and 60% →105%: the number, then where it is heading at the reset"> | <img src="docs/screenshots/menubar-projection-instead.png" width="168" alt="The 5h and 7d bars with →35% and →105% in place of the numbers"> | <img src="docs/screenshots/menubar-only5h.png" width="140" alt="A single 5h bar at 20%"> |
+
+| Budget | Budget amount | Budget, Compact, projection beside | Extra usage beside the limits |
+|---|---|---|---|
+| <img src="docs/screenshots/menubar-enterprise.png" width="130" alt="Menu bar item with a single green $ bar at 21% and a pace tick, on a dark and a light menu bar"> | <img src="docs/screenshots/menubar-enterprise-amount.png" width="120" alt="A budget bar with $412 beside it instead of 21%"> | <img src="docs/screenshots/menubar-projection.png" width="97" alt="Compact style on a budget: one ring, with $412 on top and →$530 below it, where the budget is heading at the reset"> | <img src="docs/screenshots/menubar-pro-max-extra.png" width="190" alt="The 5h and 7d bars, and beside them a $ bar with $12"> |
 
 No browser cookie to paste. It reuses the login that [Claude Code](https://claude.com/claude-code)
 already keeps on your Mac.
@@ -143,20 +161,6 @@ Hover over a control to see what it does.
 | Pro / Max | Enterprise / Team |
 |---|---|
 | <img src="docs/screenshots/settings-pro-max.png" width="356" alt="Menu bar item settings, one per row: Style Bars or Compact and Colour, Alerts or Mono; Limits Both, 5h or 7d; Number % or Off; Projection Off, Instead or Beside; Extra usage Off, % or Amount; When ahead Off, +N, time left or early; checkboxes Labels and Pace tick"> | <img src="docs/screenshots/settings-enterprise.png" width="356" alt="The same settings on a budget account: Number %, Amount or Off, Projection Off, Instead or Beside, no Limits or Extra usage rows, and only the Pace tick checkbox"> |
-
-Some of the combinations, shown enlarged on a dark and a light menu bar:
-
-| Compact | Mono | Amount (budget) | Projection beside (budget, Compact) |
-|---|---|---|---|
-| <img src="docs/screenshots/menubar-compact.png" width="110" alt="Compact style: two rings, the week outside in yellow and the session inside in green, with 5h 20% and 7d 60% beside them"> | <img src="docs/screenshots/menubar-mono.png" width="140" alt="Mono palette: the 5h and 7d bars filled in the text colour instead of green and yellow"> | <img src="docs/screenshots/menubar-enterprise-amount.png" width="120" alt="A budget bar with $412 beside it instead of 21%"> | <img src="docs/screenshots/menubar-projection.png" width="97" alt="Compact style on a budget: one ring, with $412 on top and →$530 below it, where the budget is heading at the reset"> |
-
-| Pro/Max with extra usage beside it | The popup with extra usage |
-|---|---|
-| <img src="docs/screenshots/menubar-pro-max-extra.png" width="190" alt="The 5h and 7d bars, and beside them a $ bar with $12"> | <img src="docs/screenshots/popup-pro-max-extra.png" width="356" alt="Popup: Session and Week rows, then Extra usage at 25%, $12.40 used of $50.00, on track for about $24; the 5h/7d graph, and below it a graph of extra usage this month with the $50 limit and a dashed projection"> |
-
-| With a Fable weekly limit |
-|---|
-| <img src="docs/screenshots/popup-pro-max-fable.png" width="356" alt="Popup: Session, Week all models and Week Fable at 35%; the week graph with a third, ochre line for Fable ending at Fable 35%"> |
 
 **Updates.** With **Check for updates** on, a newer version shows under the popup's title, with
 what's new and an **Update** button that installs it the way your copy came. A Homebrew copy
@@ -318,15 +322,22 @@ $APP --render-preview docs/screenshots/popup-pro-max-extra.png extra amount
 $APP --render-preview docs/screenshots/popup-pro-max-fable.png fable
 mv docs/screenshots/popup-pro-max-extra.png.label.png docs/screenshots/menubar-pro-max-extra.png
 $APP --render-preview docs/screenshots/settings-enterprise.png settings enterprise amount
-for v in compact mono "enterprise amount" "compact enterprise amount beside"; do
+$APP --render-preview docs/screenshots/hero.png scene beside
+for v in compact mono alerts beside projected only5h "enterprise amount" "compact enterprise amount beside"; do
   $APP --render-preview /tmp/um.png $v
-  mv /tmp/um.png.label.png "docs/screenshots/menubar-$(echo $v | sed 's/compact enterprise amount beside/projection/; s/enterprise amount/enterprise-amount/').png"
+  case "$v" in
+    beside) name=projection-beside ;; projected) name=projection-instead ;;
+    "enterprise amount") name=enterprise-amount ;; "compact enterprise amount beside") name=projection ;;
+    *) name=$v ;;
+  esac
+  mv /tmp/um.png.label.png "docs/screenshots/menubar-$name.png"
 done
 rm docs/screenshots/*.label.png /tmp/um.png
 ```
 
 Renders never read or change your own settings: they use the arguments, in a throwaway store.
 
+`scene` draws the whole popup opened under the item on a plain menu bar (the README's first image).
 Add `compact` for the Compact menu bar style, `mono` or `alerts` for those palettes, `amount` for the budget's amount, `extra` for Pro/Max with extra usage (and its menu bar item), `only5h` or `only7d` for one limit in the menu bar, `fable` for a Fable weekly limit (and its line in the graph), `update` for a newer release offered, `panel` for the whole popup or `settings` for its settings alone, `nolabels`, `nopercent`, `nopace` or `noahead` to leave those out, `left` or `early` for the time left or early, `daily` for the per-day bars, `overview` for the Weeks or Months view, `full` for the session at its limit, `burst` for 58% twenty minutes into a session, `back=2` for two periods (or overview pages) back, `hover` to show the graph's tooltip (`hover=1.5` halfway along the projection), `light` for light mode, or `live` to render your
 own current numbers and recorded history instead (don't commit those).
 

@@ -10,7 +10,7 @@ struct UsageMeterApp: App {
     )
 
     init() {
-        // `UsageMeter --render-preview out.png [live] [offline] [enterprise] [hover] [light] [daily] [seen] [saved] [compact] [mono] [amount] [extra] [fable] [only5h|only7d] [projected|beside] [update] [panel|settings] [nolabels] [nopercent] [nopace] [noahead] [left|early] [overview] [back=N] [full|burst]` (`hover=0.85`: pointer at 85% of the times): render the panel rows (`panel`: the whole popup; `settings`: its menu bar settings) to a PNG and exit.
+        // `UsageMeter --render-preview out.png [live] [offline] [enterprise] [hover] [light] [daily] [seen] [saved] [compact] [mono] [amount] [extra] [fable] [only5h|only7d] [projected|beside] [update] [panel|settings|scene] [nolabels] [nopercent] [nopace] [noahead] [left|early] [overview] [back=N] [full|burst]` (`hover=0.85`: pointer at 85% of the times): render the panel rows (`panel`: the whole popup; `settings`: its menu bar settings; `scene`: the whole popup opened under the item on a plain menu bar) to a PNG and exit.
         let args = CommandLine.arguments
         if args.contains("--check-update") { Updater.checkFromCommandLine() }
         if let i = args.firstIndex(of: "--render-preview"), i + 1 < args.count {
@@ -67,7 +67,7 @@ enum PreviewRenderer {
                                saved: saved,
                                history: live ? UsageHistory.load() : nil, logWeights: logs)
         writeLabelPreview(model: model, output: output)
-        if CommandLine.arguments.contains("panel") || CommandLine.arguments.contains("settings") {
+        if ["panel", "settings", "scene"].contains(where: CommandLine.arguments.contains) {
             writePanel(model: model, light: light, output: output)
         }
         let view = UsageRows(model: model)
@@ -111,7 +111,7 @@ enum PreviewRenderer {
             Key.budgetAs: a.contains("amount") ? "amount" : "percent",
             "budgetChartMode": a.contains("daily") ? "daily" : "total",
             Key.extra: a.contains("extra"),
-            UsagePanel.settingsShownKey: a.contains("panel"),   // the whole popup shows its settings open
+            UsagePanel.settingsShownKey: a.contains("panel") || a.contains("scene"),   // the whole popup shows its settings open
             Updater.enabledKey: a.contains("update"),
             Key.limits: a.contains("only5h") ? "session" : a.contains("only7d") ? "week" : "both",
             Key.projection: a.contains("projected") ? "instead" : a.contains("beside") ? "beside" : "off",
@@ -149,15 +149,74 @@ enum PreviewRenderer {
             fputs("render failed\n", stderr); exit(1)
         }
         host.cacheDisplay(in: host.bounds, to: rep)
-        guard let png = rep.representation(using: .png, properties: [:]) else { fputs("render failed\n", stderr); exit(1) }
+        let image = a.contains("scene") ? scene(panel: rep, model: model, light: light) : rep
+        guard let png = image?.representation(using: .png, properties: [:]) else { fputs("render failed\n", stderr); exit(1) }
         try? png.write(to: URL(fileURLWithPath: output))
         previewStore.removePersistentDomain(forName: previewSuite)
         print("wrote \(output)")
         exit(0)
     }
 
-    /// The menu bar item, enlarged 6x, on a light and a dark menu bar (two stacked strips).
-    private static func writeLabelPreview(model: UsageModel, output: String) {
+    /// `scene`: the popup as it opens under the menu bar item, on a plain menu bar with only the
+    /// item and a clock (the sample's fetch time), over a plain backdrop. For the README's first
+    /// image: no other apps' icons, nothing from this Mac.
+    private static func scene(panel: NSBitmapImageRep, model: UsageModel, light: Bool) -> NSBitmapImageRep? {
+        guard let item = labelImage(model: model) else { return nil }
+        let (margin, barHeight, gap, radius): (CGFloat, CGFloat, CGFloat, CGFloat) = (28, 24, 6, 10)
+        let ink = light ? NSColor.black : NSColor.white
+        let clockFormat = DateFormatter()
+        clockFormat.locale = HumanTime.en; clockFormat.dateFormat = "EEE d MMM  HH:mm"
+        let clock = clockFormat.string(from: model.snapshot?.capturedAt ?? Date()) as NSString
+        let clockAttrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 13, weight: .medium), .foregroundColor: ink]
+        let clockSize = clock.size(withAttributes: clockAttrs)
+        // macOS centres the popup under the item.
+        let itemX = margin + panel.size.width / 2 - item.size.width / 2
+        let clockX = itemX + item.size.width + 16
+        let size = NSSize(width: max(margin * 2 + panel.size.width, clockX + clockSize.width + 14),
+                          height: barHeight + gap + panel.size.height + margin)
+        guard let out = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(size.width * 2), pixelsHigh: Int(size.height * 2),
+                                         bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                         colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { return nil }
+        out.size = size
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: out)
+        NSAppearance(named: light ? .aqua : .darkAqua)!.performAsCurrentDrawingAppearance {
+            let backdrop = light ? NSGradient(starting: NSColor(calibratedRed: 0.80, green: 0.84, blue: 0.90, alpha: 1),
+                                              ending: NSColor(calibratedRed: 0.66, green: 0.71, blue: 0.80, alpha: 1))
+                                 : NSGradient(starting: NSColor(calibratedRed: 0.20, green: 0.23, blue: 0.30, alpha: 1),
+                                              ending: NSColor(calibratedRed: 0.07, green: 0.08, blue: 0.11, alpha: 1))
+            backdrop?.draw(in: NSRect(origin: .zero, size: size), angle: -90)
+            let bar = NSRect(x: 0, y: size.height - barHeight, width: size.width, height: barHeight)
+            (light ? NSColor(white: 0.96, alpha: 0.8) : NSColor(white: 0.08, alpha: 0.8)).setFill()
+            bar.fill()
+            // The item as it looks while its popup is open: on a rounded highlight.
+            let itemRect = NSRect(x: itemX, y: bar.midY - item.size.height / 2, width: item.size.width, height: item.size.height)
+            ink.withAlphaComponent(0.18).setFill()
+            NSBezierPath(roundedRect: itemRect.insetBy(dx: -5, dy: -1), xRadius: 5, yRadius: 5).fill()
+            item.draw(in: itemRect)
+            clock.draw(at: NSPoint(x: clockX, y: bar.midY - clockSize.height / 2), withAttributes: clockAttrs)
+            // The popup: rounded, with a shadow and a hairline edge.
+            let frame = NSRect(x: margin, y: margin, width: panel.size.width, height: panel.size.height)
+            let outline = NSBezierPath(roundedRect: frame, xRadius: radius, yRadius: radius)
+            NSGraphicsContext.saveGraphicsState()
+            let shadow = NSShadow()
+            shadow.shadowColor = NSColor.black.withAlphaComponent(0.45); shadow.shadowBlurRadius = 18
+            shadow.shadowOffset = NSSize(width: 0, height: -6)
+            shadow.set()
+            NSColor.windowBackgroundColor.setFill(); outline.fill()
+            NSGraphicsContext.restoreGraphicsState()
+            NSGraphicsContext.saveGraphicsState()
+            outline.addClip()
+            panel.draw(in: frame)
+            NSGraphicsContext.restoreGraphicsState()
+            ink.withAlphaComponent(0.15).setStroke(); outline.lineWidth = 0.5; outline.stroke()
+        }
+        NSGraphicsContext.restoreGraphicsState()
+        return out
+    }
+
+    /// The menu bar item as the arguments set it up.
+    private static func labelImage(model: UsageModel) -> NSImage? {
         let args = CommandLine.arguments
         let options = MenuBarImage.Options(labels: !args.contains("nolabels") && model.snapshot?.isBudgetOnly != true, percent: !args.contains("nopercent"),
                                            pace: !args.contains("nopace"), ahead: !args.contains("noahead"),
@@ -167,9 +226,13 @@ enum PreviewRenderer {
                                            extra: args.contains("extra"),
                                            limits: args.contains("only5h") ? .session : args.contains("only7d") ? .week : .both,
                                            projection: args.contains("projected") ? .instead : args.contains("beside") ? .beside : .off)
-        guard let label = MenuBarImage.item(style: args.contains("compact") ? .compact : .bars, rows: model.menuBarRows(),
-                                            rings: model.compactRings(), extra: model.extraRow(), options: options)
-        else { return }
+        return MenuBarImage.item(style: args.contains("compact") ? .compact : .bars, rows: model.menuBarRows(),
+                                 rings: model.compactRings(), extra: model.extraRow(), options: options)
+    }
+
+    /// The menu bar item, enlarged 6x, on a light and a dark menu bar (two stacked strips).
+    private static func writeLabelPreview(model: UsageModel, output: String) {
+        guard let label = labelImage(model: model) else { return }
         let strip = NSSize(width: label.size.width * 6 + 24, height: label.size.height * 6 + 24)
         let canvas = NSImage(size: NSSize(width: strip.width, height: strip.height * 2))
         canvas.lockFocus()
