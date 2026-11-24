@@ -63,6 +63,10 @@ options that were ruled out, so they aren't tried again.
 
 ## History and estimates
 
+- **The budget graph's running total is named by its period** (2026-11-24): Month / Per day / Months (Week for
+  a weekly budget), like the limits graph's Week / Weeks. "Total" didn't say of what, and "This month" would be
+  wrong after stepping back to an earlier month with ‹.
+
 - **History is kept without a time limit** (2026-11-19), so past weeks and months can be looked back at.
   Points older than 60 days are thinned to one per window per hour, keeping each hour's highest point so a
   period's peak before its reset survives. About 2 MB a year; it was 40 days before.

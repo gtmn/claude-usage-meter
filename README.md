@@ -82,8 +82,9 @@ already keeps on your Mac.
   to add a `$` item next to the 5h/7d one in the menu bar, as `%` or the amount.
 - **History graph** in the popup, a line over time like a temperature curve:
   - on an Enterprise/Team seat, money spent across the budget period, with a dashed
-    projection to the reset (and the budget line once the curve gets near it). Switch to
-    **Per day** for a bar per day, in UTC days like Claude's own usage page.
+    projection to the reset (and the budget line once the curve gets near it): **Month** (or
+    **Week** for a weekly budget). Switch to **Per day** for a bar per day, in UTC days like
+    Claude's own usage page, or **Months** for the totals of recent months.
   - on Pro/Max, the 5h and 7d percentages this week (from the last weekly reset to the next), plus a
     line for a model's own weekly limit (Fable) when the plan has one, with a
     dashed projection of the weekly limit to 100% or to the reset, matching the outlook line

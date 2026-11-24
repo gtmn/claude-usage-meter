@@ -588,7 +588,7 @@ struct BudgetHistoryChart: View {
         let periods = mode == "overview" ? history.periods(of: window) : []
         let what = extra ? "Extra usage" : "Spent"
         let title = mode == "overview" ? (back == 0 ? "Recent \(units)" : "Earlier \(units)")
-            : back > 0 ? Self.periodName(start, end, period: period)   // the switch says Total or Per day
+            : back > 0 ? Self.periodName(start, end, period: period)   // the switch says Month (or Week) or Per day
             : mode == "daily" ? "\(what) per day" : "\(what) this \(unit)"
 
         VStack(alignment: .leading, spacing: 4) {
@@ -599,7 +599,9 @@ struct BudgetHistoryChart: View {
                               back: $stepBack)
                 if mode == "daily" { Text("UTC days").font(.system(size: 10)).foregroundStyle(.secondary) }
                 Spacer()
-                let options = [("total", "Total")] + (perDayAllowed ? [("daily", "Per day")] : [])
+                // The running total is named by its period ("Month", like the limits graph's "Week"):
+                // "Total" didn't say of what, and "This month" would be wrong after stepping back.
+                let options = [("total", unit.capitalized)] + (perDayAllowed ? [("daily", "Per day")] : [])
                     + (overviewAllowed ? [("overview", units.capitalized)] : [])
                 if options.count > 1 {
                     ModeSwitch(mode: Binding(get: { mode }, set: { savedMode = $0; stepBack = 0 }), options: options)
