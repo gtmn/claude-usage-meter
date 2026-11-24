@@ -1,12 +1,13 @@
 import AppKit
 
-/// Draws the menu bar item in one of four styles, with the same colour coding (none in Text):
+/// Draws the menu bar item with one of these indicators, with the same colour coding (none with Off):
 /// - Bars: stacked "5h ▬▬ 8%" / "7d ▬▬ 60%" rows (one "$" row on an Enterprise/Team seat).
 /// - Circle (saved as "compact"): rings with their numbers beside them. Pro/Max: the week outside (the weekly limit
 ///   furthest ahead of pace, see UsageModel.compactRings) and the session inside;
 ///   Enterprise/Team: one ring for the budget.
 /// - Dots: the text alone, with a small pace-coloured dot before each row.
-/// - Text: the text alone.
+/// - Icon: a gauge in the worst pace colour, its needle at the highest use, then the text.
+/// - Off (saved as "text"): the text alone.
 ///
 /// Colour coding, as ClaudeUsageBar's pace icon (see PaceLead): green on or under pace, yellow
 /// ahead of it, orange well ahead (15+ points) or nearly full, and plain (text colour) early in a
@@ -81,12 +82,24 @@ enum MenuBarImage {
         }
     }
 
-    /// Bars, Circle (rings; saved as "compact", its earlier name), Dots (text with a pace dot) or
-    /// Text (the text alone, no graphic and no colour).
+    /// The Indicator setting: Bars, Circle (rings; saved as "compact", its earlier name), Dots (text
+    /// with a pace dot), Icon (a gauge in the pace colour) or Off (the text alone; saved as "text").
     enum Style: String, CaseIterable {
-        case bars, compact, dots, text
+        case bars, compact, dots, icon, text
         static let key = "menuBarStyle"
-        var name: String { self == .compact ? "Circle" : rawValue.capitalized }
+        var name: String { name(single: false) }
+        /// `single`: one limit (an Enterprise/Team budget), so "Bar" and "Dot".
+        func name(single: Bool) -> String {
+            switch self {
+            case .bars: return single ? "Bar" : "Bars"
+            case .compact: return "Circle"
+            case .dots: return single ? "Dot" : "Dots"
+            case .icon: return "Icon"
+            case .text: return "Off"
+            }
+        }
+        /// Text only: the item needs a number or projection, or it would be empty.
+        var needsText: Bool { self == .dots || self == .text }
         /// A saved style that no longer exists (the short-lived "pace") reads as Bars.
         init(saved: String) { self = Style(rawValue: saved) ?? .bars }
     }
@@ -401,11 +414,13 @@ enum MenuBarImage {
         let (rows, rings) = (o.limits.pick(rows), o.limits.pick(rings))
         let main = style == .compact && !rings.isEmpty ? makeCompact(rings: rings, options: o)
             : (style == .dots || style == .text) && !rows.isEmpty ? makeDots(rows: rows, options: o, dots: style == .dots)
+            : style == .icon && !rows.isEmpty ? makeDots(rows: rows, options: o, dots: false, icon: true)
             : !rows.isEmpty ? make(rows: rows, options: o) : nil
         guard let main else { return nil }
         guard o.extra, let extra else { return main }
         let extraItem = style == .compact ? makeCompact(rings: [extra], options: o)
-            : style == .dots || style == .text ? makeDots(rows: [extra], options: o, dots: style == .dots)
+            : style == .dots || style == .text || style == .icon
+                ? makeDots(rows: [extra], options: o, dots: style == .dots, icon: style == .icon)
             : make(rows: [extra], options: o)
         return beside(main, extraItem)
     }
@@ -426,19 +441,30 @@ enum MenuBarImage {
     /// stays in the text colour. Mono has no dots; Alerts shows one only once ahead or nearly full,
     /// and takes no room without one. One row is a single 11 pt line, like the system's own
     /// labels; more rows (or one with the projection under it) stack at 9 pt. `dots: false` is the
-    /// Text style: the same text, no dots.
-    static func makeDots(rows: [Row], options o: Options = Options(), dots: Bool = true) -> NSImage {
-        let textRows = lines(rows.map { cells($0, o, label: o.labels) }, o)
+    /// Off indicator: the same text, no dots. `icon`: a gauge before the text instead (Icon).
+    static func makeDots(rows: [Row], options o: Options = Options(), dots: Bool = true, icon: Bool = false) -> NSImage {
+        var textRows = lines(rows.map { cells($0, o, label: o.labels) }, o)
+        // Never an empty item (nothing to click to open the popup): settings saved before the
+        // popup blocked such combinations show the plain number.
+        let hasDot = dots && rows.contains { dotColor($0, o) != nil }
+        if !icon, !hasDot, textRows.allSatisfy({ $0[1].isEmpty && $0[2].isEmpty }) {
+            var shown = o; shown.percent = true
+            textRows = lines(rows.map { cells($0, shown, label: o.labels) }, shown)
+        }
         let small = textRows.count > 1
         let fonts = Columns.fonts(size: small ? 9 : 11, weight: compactWeight(stacked: small))
         let columns = Columns(textRows, leftAligned: [true, false, false, false], fonts: fonts)
         let dot: CGFloat = small ? 4 : 5
-        let dotSpace = dots && rows.contains { dotColor($0, o) != nil } ? dot + 2 : 0
+        let gauge = icon ? gaugeImage(rows, o, pointSize: small ? 15 : 14) : nil
+        let dotSpace = gauge.map { $0.size.width + (columns.width > 0 ? 3 : 0) } ?? (hasDot ? dot + 2 : 0)
         let size = NSSize(width: max(dotSpace + columns.width, dot), height: height)
         let rowHeight = small ? Self.rowHeight : height
         return NSImage(size: size, flipped: false) { _ in
             let attrs: [NSAttributedString.Key: Any] = [.font: fonts[1], .foregroundColor: NSColor.labelColor]
             let textHeight = ("0" as NSString).size(withAttributes: attrs).height
+            if let gauge {
+                gauge.draw(in: NSRect(x: 0, y: (height - gauge.size.height) / 2, width: gauge.size.width, height: gauge.size.height))
+            }
             // A dot per limit, centred on its line; one limit over two lines gets it centred on both.
             let barRowsBottom = (height + rowHeight * CGFloat(rows.count)) / 2 - rowHeight
             for (i, row) in rows.enumerated() where dots {
@@ -452,6 +478,31 @@ enum MenuBarImage {
                 let y = firstBottom - CGFloat(i) * rowHeight + (rowHeight - textHeight) / 2
                 columns.draw(row: i, x: dotSpace, y: y, color: .labelColor)
             }
+            return true
+        }
+    }
+
+    /// The Icon indicator: the gauge symbol with its needle at the highest use shown, in the colour of
+    /// the limit furthest ahead of pace (the text colour in Mono, and in Alerts until one is ahead).
+    /// Tinted at draw time, so the text colour follows the menu bar's appearance.
+    private static func gaugeImage(_ rows: [Row], _ o: Options, pointSize: CGFloat) -> NSImage? {
+        let top = rows.map(\.percent).max() ?? 0
+        let needle = [0, 33, 50, 67, 100].min { abs(Double($0) - top) < abs(Double($1) - top) } ?? 0
+        let config = NSImage.SymbolConfiguration(pointSize: pointSize, weight: .medium)
+        guard let symbol = NSImage(systemSymbolName: "gauge.with.dots.needle.\(needle)percent", accessibilityDescription: nil)?
+            .withSymbolConfiguration(config) else { return nil }
+        let worst = rows.max { paceState($0) < paceState($1) }
+        let tint: NSColor = worst.map { row in
+            switch o.palette {
+            case .colour: return color(paceState(row))
+            case .mono: return .labelColor
+            case .alerts: return paceState(row) >= .ahead ? color(paceState(row)) : .labelColor
+            }
+        } ?? .labelColor
+        return NSImage(size: symbol.size, flipped: false) { rect in
+            symbol.draw(in: rect)
+            tint.set()
+            rect.fill(using: .sourceAtop)
             return true
         }
     }

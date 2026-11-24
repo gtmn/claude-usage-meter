@@ -43,13 +43,16 @@ options that were ruled out, so they aren't tried again.
   With Number off it takes the number's column, and the plain number shows until there's a projection: a
   bar with no text early in every window would look broken. (0.1.14 had Instead and Beside; both load as On.) The menu bar's amounts have no thousands separator
   (`$1990`): it only takes room, and a budget stays in four digits; the popup keeps it (`$1,990`).
-- **Styles: Bars, Circle, Dots and Text** (2026-11-24). Text is the numbers alone, for a menu bar with no
-  graphic: no Colours row and no Pace tick then, and When ahead (`+24`) is the only warning. Dots with Mono
-  looks the same, but Text says it plainly. Circle is the earlier Compact, renamed; it's still saved
-  as `compact`. Dots is the text without bars, with a dot before each row for the pace colour, since the
-  text stays in the text colour; Mono has no dots, Alerts shows one only once ahead. Without a dot the text
-  starts at the edge: kept room read as a gap in the menu bar, and the width changes with the numbers anyway.
-  The dot is small (4 pt stacked, 5 pt on one line, 2 pt gap) so Colour costs about 6 pt. The palette got its own row (Colours): three styles and three palettes don't fit in one.
+- **Indicator: Bars, Circle, Dots, Icon or Off** (2026-11-24). Was "Style"; Off is the numbers alone (saved as
+  `text`, its first name), Circle the earlier Compact (still saved as `compact`). On a $ budget the names are
+  singular (Bar, Dot). Dots puts a dot before each row for the pace colour, since the text stays in the text
+  colour; Mono has no dots, Alerts shows one only once ahead. Without a dot the text starts at the edge: kept
+  room read as a gap, and the width changes with the numbers anyway. The dot is small (4 pt stacked, 5 pt on
+  one line, 2 pt gap). Icon is Apple's gauge symbol (also shown when there's no data), tinted like the worst
+  limit, its needle at the highest use; not the Claude logo, which is Anthropic's mark and would suggest an
+  official app. With Dots or Off nothing else is sure to show, so the popup greys out combinations that would
+  leave the item empty (nothing to click); settings saved before that show the plain number. The palette has
+  its own row (Colours), hidden with Off.
 - **A model's own weekly limit (Fable) is a third line in the week graph**, not a chart of its own: same 0-100%
   scale over the same week. Ochre, because violet merges with the blue week line for colour-blind readers.
 

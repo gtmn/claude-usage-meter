@@ -517,16 +517,20 @@ private let localDayTime: DateFormatter = {
 struct ModeSwitch: View {
     @Binding var mode: String
     let options: [(String, String)]
+    /// Options that can't be picked right now, with why (shown on hover), greyed out.
+    var disabled: [String: String] = [:]
     var body: some View {
         HStack(spacing: 0) {
             ForEach(options, id: \.0) { tag, label in
+                let reason = disabled[tag]
                 Text(label)
                     .font(.system(size: 10, weight: mode == tag ? .semibold : .regular))
-                    .foregroundStyle(mode == tag ? Color.primary : Color.secondary)
+                    .foregroundStyle(mode == tag ? Color.primary : reason == nil ? Color.secondary : Color.secondary.opacity(0.4))
                     .padding(.horizontal, 7).padding(.vertical, 2)
                     .background(RoundedRectangle(cornerRadius: 4).fill(mode == tag ? Color.primary.opacity(0.12) : .clear))
                     .contentShape(Rectangle())
-                    .onTapGesture { mode = tag }
+                    .onTapGesture { if reason == nil { mode = tag } }
+                    .help(reason ?? "")
                     .accessibilityAddTraits(mode == tag ? [.isButton, .isSelected] : .isButton)
             }
         }

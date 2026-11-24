@@ -58,14 +58,20 @@ struct MenuBarSettings: View {
         let budget = snapshot?.isBudgetOnly == true
         VStack(alignment: .leading, spacing: 5) {
             Text("Menu bar item").font(.system(size: 11, weight: .semibold))
-            row("Style") {
-                ModeSwitch(mode: Binding(get: { MenuBarImage.Style(saved: menuBarStyle).rawValue }, set: { menuBarStyle = $0 }),
-                           options: MenuBarImage.Style.allCases.map { ($0.rawValue, $0.name) })
+            // Combinations that would leave the menu bar item empty (nothing to click) are greyed out.
+            let style = MenuBarImage.Style(saved: menuBarStyle)
+            let projectionOn = MenuBarImage.Projection(saved: projection) == .on
+            let empty = "Nothing would show in the menu bar: turn on Number or Projection first"
+            row("Indicator") {
+                ModeSwitch(mode: Binding(get: { style.rawValue }, set: { menuBarStyle = $0 }),
+                           options: MenuBarImage.Style.allCases.map { ($0.rawValue, $0.name(single: budget)) },
+                           disabled: !showPercent && !projectionOn ? ["dots": empty, "text": empty] : [:])
                     .help("Bars: the session and weekly bars. Circle: rings, the week outside and the session inside "
-                          + "(one budget ring on Enterprise). Dots: the numbers alone, each with a dot in its pace colour. Text: the numbers alone.")
+                          + "(one budget ring on Enterprise). Dots: the numbers, each after a dot in its pace colour. "
+                          + "Icon: a gauge in the pace colour before the numbers. Off: the numbers alone.")
             }
             // Text has nothing to colour.
-            if MenuBarImage.Style(saved: menuBarStyle) != .text {
+            if style != .text {
                 row("Colours") {
                     ModeSwitch(mode: Binding(get: { MenuBarImage.Palette(saved: palette).rawValue }, set: { palette = $0 }),
                                options: MenuBarImage.Palette.allCases.map { ($0.rawValue, $0.name) })
@@ -87,13 +93,15 @@ struct MenuBarSettings: View {
                 ModeSwitch(mode: Binding(get: { !showPercent ? "off" : budget ? MenuBarImage.BudgetAs(saved: budgetAs).rawValue : "percent" },
                                          set: { showPercent = $0 != "off"; if budget && $0 != "off" { budgetAs = $0 } }),
                            options: (budget ? MenuBarImage.BudgetAs.allCases.map { ($0.rawValue, $0.name) } : [("percent", "%")])
-                               + [("off", "Off")])
+                               + [("off", "Off")],
+                           disabled: style.needsText && !projectionOn ? ["off": "Nothing would show in the menu bar: turn on Projection first"] : [:])
             }
             row("Projection", help: "Where each limit is heading at its reset, at the pace so far: →35%, or →140% when it "
                 + "runs out first. On: after the number, on a second line for a single limit. With Number off, in the number's place, "
                 + "and the number alone until there's a projection (early in a window, or at 100%).") {
                 ModeSwitch(mode: Binding(get: { MenuBarImage.Projection(saved: projection).rawValue }, set: { projection = $0 }),
-                           options: MenuBarImage.Projection.allCases.map { ($0.rawValue, $0.name) })
+                           options: MenuBarImage.Projection.allCases.map { ($0.rawValue, $0.name) },
+                           disabled: style.needsText && !showPercent ? ["off": "Nothing would show in the menu bar: turn on Number first"] : [:])
             }
             if snapshot?.extraUsage != nil {
                 row("Extra usage", help: "Your extra usage as its own $ item next to the 5h and 7d one: as the share of its "
@@ -114,7 +122,7 @@ struct MenuBarSettings: View {
                 if !budget {
                     Toggle("Labels", isOn: $showLabels).help("“5h” and “7d” (and “$” for extra usage) beside the bars or numbers")
                 }
-                if MenuBarImage.Style(saved: menuBarStyle) == .bars || MenuBarImage.Style(saved: menuBarStyle) == .compact {
+                if style == .bars || style == .compact {
                     Toggle("Pace tick", isOn: $showPace).help("A tick where usage would be by now if spread evenly over the window")
                 }
             }
