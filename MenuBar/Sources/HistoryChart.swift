@@ -520,22 +520,39 @@ struct ModeSwitch: View {
     /// Options that can't be picked right now, with why (shown on hover), greyed out.
     var disabled: [String: String] = [:]
     var body: some View {
+        // Each option is its own small view: as one expression, the GitHub runner's compiler gave up
+        // type-checking it (0.1.15).
         HStack(spacing: 0) {
-            ForEach(options, id: \.0) { tag, label in
-                let reason = disabled[tag]
-                Text(label)
-                    .font(.system(size: 10, weight: mode == tag ? .semibold : .regular))
-                    .foregroundStyle(mode == tag ? Color.primary : reason == nil ? Color.secondary : Color.secondary.opacity(0.4))
-                    .padding(.horizontal, 7).padding(.vertical, 2)
-                    .background(RoundedRectangle(cornerRadius: 4).fill(mode == tag ? Color.primary.opacity(0.12) : .clear))
-                    .contentShape(Rectangle())
-                    .onTapGesture { if reason == nil { mode = tag } }
-                    .help(reason ?? "")
-                    .accessibilityAddTraits(mode == tag ? [.isButton, .isSelected] : .isButton)
+            ForEach(options, id: \.0) { option in
+                ModeSegment(label: option.1, selected: mode == option.0, reason: disabled[option.0]) { mode = option.0 }
             }
         }
         .padding(1)
         .background(RoundedRectangle(cornerRadius: 5).strokeBorder(Color.primary.opacity(0.15), lineWidth: 1))
+    }
+}
+
+/// One option of a ModeSwitch.
+private struct ModeSegment: View {
+    let label: String
+    let selected: Bool
+    /// Why it can't be picked right now (shown on hover); nil when it can.
+    let reason: String?
+    let pick: () -> Void
+
+    private var ink: Color { selected ? Color.primary : reason == nil ? Color.secondary : Color.secondary.opacity(0.4) }
+    private var fill: Color { selected ? Color.primary.opacity(0.12) : Color.clear }
+
+    var body: some View {
+        Text(label)
+            .font(.system(size: 10, weight: selected ? .semibold : .regular))
+            .foregroundStyle(ink)
+            .padding(.horizontal, 7).padding(.vertical, 2)
+            .background(RoundedRectangle(cornerRadius: 4).fill(fill))
+            .contentShape(Rectangle())
+            .onTapGesture { if reason == nil { pick() } }
+            .help(reason ?? "")
+            .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
     }
 }
 

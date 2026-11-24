@@ -569,7 +569,8 @@ enum MenuBarImage {
                 if o.pace, let expected = row.expected {
                     // The pace marker: a short radial tick across this ring's band only (beyond it,
                     // the ring reads as a "Q", or the tick runs into the other ring).
-                    let a = (90 - min(max(expected, 0), 100) / 100 * 360) * .pi / 180
+                    let share: Double = min(max(expected, 0), 100) / 100   // typed in steps: slow to type-check as one
+                    let a = CGFloat((90 - share * 360) * Double.pi / 180)
                     let (inner, outer) = (radius - line / 2 - 0.5, radius + line / 2)
                     let tick = NSBezierPath(); tick.lineWidth = 1.2; tick.lineCapStyle = .butt
                     tick.move(to: NSPoint(x: center.x + cos(a) * inner, y: center.y + sin(a) * inner))
