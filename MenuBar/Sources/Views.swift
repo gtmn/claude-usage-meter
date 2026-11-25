@@ -156,8 +156,9 @@ struct UsagePanel: View {
 
     @ObservedObject var model: UsageModel
     @ViewState private var openAtLogin = SMAppService.mainApp.status == .enabled
-    /// The menu bar settings, shown or hidden with the gear button (closed until opened; remembered).
-    @AppStorage(UsagePanel.settingsShownKey) private var settingsShown = false
+    /// The menu bar settings, shown or hidden with the gear button (open on first start, so they're
+    /// found; closing them is remembered).
+    @AppStorage(UsagePanel.settingsShownKey) private var settingsShown = true
     static let settingsShownKey = "settingsShown"
     @AppStorage(Updater.enabledKey) private var checkForUpdates = false
     @ObservedObject private var updater = Updater.shared

@@ -113,8 +113,8 @@ into a session: *Runs out around 10:52*.
 
 ## Settings
 
-The gear button at the top of the popup shows or hides the settings (closed until you open them;
-the app remembers). They sit under the graph: **Menu bar item**, one setting per row, then
+The gear button at the top of the popup shows or hides the settings (open on first start;
+the app remembers when you close them). They sit under the graph: **Menu bar item**, one setting per row, then
 **Open at login**, **Check for updates** and **Quit** (⌘Q also quits while the popup is open).
 Hover over a control to see what it does.
 
