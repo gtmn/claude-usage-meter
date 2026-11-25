@@ -147,7 +147,8 @@ downloaded copy asks for the latest GitHub release.
 - Download: fetches the release zip, checks it against the release's `SHA256SUMS.txt`, replaces the
   app and reopens it. A file the app downloads itself isn't quarantined, so there's no warning.
 
-**Check now** asks once, right away, also with the daily check off, and says "Up to date" or which
+The app asks at most once a day, also across restarts and sleep. **Check now** asks once, right away, also
+with the setting off, and says "Up to date" or which
 version is out. A dev build hears about releases but doesn't install them. `UsageMeter --check-update`
 asks once from the command line.
 

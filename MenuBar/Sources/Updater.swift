@@ -1,8 +1,9 @@
 import AppKit
 import Foundation
 
-/// "Check for updates" (off by default): once at launch and then daily, asks GitHub for the latest
-/// release. When it's newer, the popup offers it; Update installs it the way this copy came:
+/// "Check for updates" (off by default): at most once a day, asks GitHub for the latest release.
+/// The time of the last answer and the version it named are saved, so restarts don't ask again
+/// and still show an offer found earlier; an hourly timer and waking from sleep ask once a day is up. When it's newer, the popup offers it; Update installs it the way this copy came:
 /// - Homebrew: `brew update` + `brew upgrade` (builds from source, about a minute), then
 ///   `brew services restart` (or opens the new copy).
 /// - Downloaded: fetches the release zip, checks it against the release's SHA256SUMS.txt, swaps the
@@ -12,6 +13,8 @@ import Foundation
 final class Updater: ObservableObject {
     static let shared = Updater()
     static let enabledKey = "checkForUpdates"
+    static let lastCheckKey = "updateLastCheck"
+    static let latestVersionKey = "updateLatestVersion"
 
     @Published private(set) var available: UpdateCheck.Release?
     /// What Update is doing, or why it failed.
@@ -24,6 +27,7 @@ final class Updater: ObservableObject {
     var canInstall: Bool { UpdateCheck.numbers(current) != nil }
 
     private var timer: Timer?
+    private var wakeObserver: NSObjectProtocol?
     private var enabled: Bool { UserDefaults.standard.bool(forKey: Self.enabledKey) }
 
     /// For previews: pretend this version is out.
@@ -33,31 +37,57 @@ final class Updater: ObservableObject {
 
     func start() {
         guard timer == nil else { return }
-        timer = Timer.scheduledTimer(withTimeInterval: 24 * 3600, repeats: true) { _ in
-            Task { @MainActor in await Updater.shared.check() }
+        if enabled, let saved = UserDefaults.standard.string(forKey: Self.latestVersionKey),
+           UpdateCheck.isNewer(saved, than: current) {
+            available = UpdateCheck.Release(version: saved)
         }
-        timer?.tolerance = 3600
-        Task { await check() }
+        // A timer doesn't count the time the Mac sleeps, so it only looks every hour whether a day
+        // is up; waking looks too.
+        timer = Timer.scheduledTimer(withTimeInterval: 3600, repeats: true) { _ in
+            Task { @MainActor in await Updater.shared.checkIfDue() }
+        }
+        timer?.tolerance = 300
+        wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { _ in
+            Task { @MainActor in await Updater.shared.checkIfDue() }
+        }
+        Task { await checkIfDue() }
+    }
+
+    /// The automatic check: asks GitHub only when the last answer is a day old (or there's none).
+    func checkIfDue() async {
+        guard enabled else { available = nil; checkResult = nil; return }
+        let last = UserDefaults.standard.object(forKey: Self.lastCheckKey) as? Date
+        guard UpdateCheck.isDue(last: last, now: Date()) else { return }
+        await check()
     }
 
     /// Asks GitHub once (when the setting is on); clears the offer when it's off.
     func check() async {
         guard enabled else { available = nil; checkResult = nil; return }
-        guard let release = await Self.fetchLatest() else { return }   // offline etc.: try tomorrow
+        guard let release = await Self.fetchLatest() else { return }   // offline etc.: the next hour tries again
+        remember(release)
         available = UpdateCheck.isNewer(release.version, than: current) ? release : nil
+    }
+
+    /// Saves when GitHub last answered and which version it named.
+    private func remember(_ release: UpdateCheck.Release) {
+        UserDefaults.standard.set(Date(), forKey: Self.lastCheckKey)
+        UserDefaults.standard.set(release.version, forKey: Self.latestVersionKey)
     }
 
     /// The answer to Check now: "Up to date (0.1.12)", "0.1.13 is out" (its row shows above), or why not.
     @Published private(set) var checkResult: String?
     @Published private(set) var checking = false
 
-    /// Check now: one request, whether the setting is on or not (the user asked for it). Leaves
-    /// the daily check as it is.
+    /// Check now: one request, whether the setting is on or not (the user asked for it). Counts as
+    /// the day's check.
     func checkNow() async {
         guard !checking else { return }
         checking = true; checkResult = nil
         defer { checking = false }
         guard let release = await Self.fetchLatest() else { checkResult = "Couldn't reach GitHub"; return }
+        remember(release)
         let newer = UpdateCheck.isNewer(release.version, than: current)
         available = newer ? release : nil
         checkResult = !canInstall ? "Latest: \(release.version) (dev build)"

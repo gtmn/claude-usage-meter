@@ -36,6 +36,17 @@ public enum UpdateCheck {
         return parts.map { $0! }
     }
 
+    /// How often the automatic check asks GitHub: at most once a day.
+    public static let interval: TimeInterval = 24 * 3600
+
+    /// True when the automatic check should ask again: never asked, a day or more since the last
+    /// answer, or a last answer "in the future" (the clock was moved back).
+    public static func isDue(last: Date?, now: Date) -> Bool {
+        guard let last else { return true }
+        let since = now.timeIntervalSince(last)
+        return since < 0 || !(since < interval)
+    }
+
     /// True when `latest` is a higher plain version than `current` ("0.1.10" after "0.1.9").
     public static func isNewer(_ latest: String, than current: String) -> Bool {
         guard let l = numbers(latest), let c = numbers(current) else { return false }

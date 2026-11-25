@@ -107,8 +107,12 @@ options that were ruled out, so they aren't tried again.
 - **GitHub releases carry pre-built universal zips**, ad-hoc signed only. Notarizing would need an Apple
   Developer ID.
 - **Updates are opt-in** ("Check for updates", off by default), because the app promised to talk only to
-  `api.anthropic.com`. One unauthenticated request a day to GitHub's latest-release API; **Check now**
-  sends one right away even with the setting off, because the user asked for it. A Homebrew copy reads the
+  `api.anthropic.com`. At most one unauthenticated request a day to GitHub's latest-release API: the time
+  of the last answer and the version it named are saved, so restarts (login, `brew services restart`, dev
+  builds) don't ask again but still show an offer found earlier. An hourly timer and waking from sleep look
+  whether the day is up, because a 24-hour `Timer` doesn't count sleep and can stretch to days on a Mac that
+  sleeps at night. A failed request isn't saved, so the next hour tries again. **Check now**
+  sends one right away even with the setting off, because the user asked for it, and counts as the day's check. A Homebrew copy reads the
   version from the tap's formula (through the same API), not the releases: a release goes out minutes before
   the tap is bumped, and offering it then would end in "Homebrew doesn't have it yet". Update installs
   the way the copy came: Homebrew runs `brew update` + `brew upgrade`, then `brew services restart`
