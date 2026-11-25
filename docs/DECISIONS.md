@@ -82,6 +82,12 @@ options that were ruled out, so they aren't tried again.
 - **History is kept without a time limit** (2026-11-19), so past weeks and months can be looked back at.
   Points older than 60 days are thinned to one per window per hour, keeping each hour's highest point so a
   period's peak before its reset survives. About 2 MB a year; it was 40 days before.
+- **A Day view for Pro/Max** (2026-11-25): one calendar day (local, 00:00 to 24:00), where a week's scale
+  squeezes a session into a sliver. The session is the point there: its resets are dashed lines (a recorded
+  drop, or the current session's start from its reset time), and the dashed projection is the session's,
+  not the week's. Only shown within the day: a session that runs out or resets after midnight shows its
+  projection from that day on. Not for the budget: Per day already gives a bar per day, and spending
+  within a day only goes up.
 - **Looking back: ‹ › through periods, and a long view as one line** (2026-11-19). The long view is the weekly
   % (or the budget's money) as one line over 8 weeks (6 months), a dashed rule at each reset and the value
   each period reached labelled before it, orange where it ran out. Tried first as one bar per period at its

@@ -85,6 +85,9 @@ check("each session that reached 100% counts once", hits.map(\.at) == [at("2026-
 check("blocked until the reset", hits[0].resetAt == at("2026-11-17 16:00") && hits[0].blocked == 100 * 60 && !hits[0].atLeast)
 check("reset unknown after a gap: at least until the last 100%", hits[1].resetAt == nil && hits[1].atLeast && hits[1].blocked == 3600)
 check("still blocked", hits[2].resetSeen == nil)
+check("session resets: the first point after each drop",
+      sessions.resets() == [at("2026-11-17 16:00"), at("2026-11-18 19:00")]
+      && sessions.resets(from: at("2026-11-18 00:00")) == [at("2026-11-18 19:00")])
 check("hits within a time span", sessions.limitHits(from: at("2026-11-18 00:00"), to: at("2026-11-19 00:00")).count == 1)
 
 let dir = FileManager.default.temporaryDirectory.appendingPathComponent("usagemeter-test-\(getpid())")

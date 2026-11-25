@@ -447,3 +447,17 @@ extension UsageHistory {
         return hits.filter { $0.at.isAtOrAfter(from) && $0.at < to }
     }
 }
+
+extension UsageHistory {
+    /// When a limit reset (by default the 5 h session), as close as the history says: the first
+    /// recorded point after its value dropped. Those between `from` and `to`, oldest first.
+    public func resets(_ key: String = "five_hour", from: Date = .distantPast, to: Date = .distantFuture) -> [Date] {
+        var out: [Date] = []
+        var last: Double?
+        for p in points where p.key == key && p.estimated != true {
+            if let l = last, p.percent < l - 0.5, p.t.isAtOrAfter(from), p.t < to { out.append(p.t) }
+            last = p.percent
+        }
+        return out
+    }
+}

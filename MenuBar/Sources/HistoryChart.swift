@@ -25,7 +25,7 @@ struct HistoryChart: View {
                 BudgetHistoryChart(window: w, history: model.history, logWeights: model.logWeights, now: asOf)
             } else if s.window("seven_day") != nil || s.window("five_hour") != nil {
                 VStack(alignment: .leading, spacing: 12) {
-                    LimitsHistoryChart(history: model.history, week: s.window("seven_day"), now: asOf,
+                    LimitsHistoryChart(history: model.history, week: s.window("seven_day"), session: s.window("five_hour"), now: asOf,
                                        models: s.windows.map(\.key).filter { $0.hasPrefix("seven_day_") }.sorted())
                     // Pro/Max extra usage: its own $ chart. No log estimates: most Claude Code activity
                     // is covered by the plan, and the logs can't tell which part was paid extra.
@@ -908,6 +908,8 @@ struct LimitsHistoryChart: View {
     let history: UsageHistory
     /// The weekly limit (with last week's pace when known): sets the chart's span and the projection.
     var week: UsageWindow? = nil
+    /// The 5 h session: its projection in the Day view.
+    var session: UsageWindow? = nil
     let now: Date
     /// A model's own weekly limits ("seven_day_fable"): a line each, as far as there are colours (one today).
     var models: [String] = []
@@ -917,7 +919,7 @@ struct LimitsHistoryChart: View {
     @Environment(\.previewBack) private var previewBack
     @AppStorage("limitsChartScale") private var savedScale = "week"
     @ViewState private var hovered: Date?
-    /// How many weeks back (Week), or pages of weeks back (Weeks).
+    /// How many days back (Day), weeks back (Week), or pages of weeks back (Weeks).
     @ViewState private var stepBack = 0
 
     private struct Line { let key, name, short: String; let color: Color }
@@ -926,17 +928,22 @@ struct LimitsHistoryChart: View {
         // This week, from the last reset to the next one; without a reset time, the last 7 days.
         let weekReset = week?.resetsAt.flatMap { $0.isAtOrAfter(now) ? $0 : nil }
         let back = previewBack ?? stepBack
-        let overview = weekReset != nil && (previewScale ?? savedScale) == "overview"
-        let currentEnd = weekReset ?? now
-        let start = currentEnd.addingTimeInterval(-7 * 86400 * Double(back + 1))
-        let end = back == 0 ? currentEnd : start.addingTimeInterval(7 * 86400)
+        let scale = previewScale ?? savedScale
+        let overview = weekReset != nil && scale == "overview"
+        // Day: one calendar day, 00:00 to 24:00, with the session in front.
+        let day = scale == "day"
+        let (start, end) = day ? Self.dayRange(now: now, back: back) : Self.weekRange(weekReset ?? now, back: back)
         let seriesEnd = back == 0 ? now : end
         let oldest = history.series("seven_day", from: .distantPast).first?.t
-        let projection = back > 0 ? nil : weekReset.flatMap { r in week.flatMap { Self.projection($0, reset: r, now: now) } }
-        let weekColor = ChartInk.series1(scheme)
+        let projection = back > 0 ? nil
+            : day ? session.flatMap { Self.sessionProjection($0, now: now, dayEnd: end) }
+            : weekReset.flatMap { r in week.flatMap { Self.projection($0, reset: r, now: now) } }
+        // Day: where each session reset (a dashed line), and the current session's start.
+        let resets = day ? Self.sessionStarts(history, session: session, from: start, to: seriesEnd) : []
+        let weekColor = ChartInk.series1(scheme), sessionColor = ChartInk.series2(scheme)
         let lines = [
             Line(key: "seven_day", name: "Week (7 d)", short: "7d", color: weekColor),
-            Line(key: "five_hour", name: "Session (5 h)", short: "5h", color: ChartInk.series2(scheme)),
+            Line(key: "five_hour", name: "Session (5 h)", short: "5h", color: sessionColor),
         ] + zip(models, [ChartInk.series3(scheme)]).map { key, color in
             let model = key.dropFirst("seven_day_".count).replacingOccurrences(of: "_", with: " ").capitalized
             return Line(key: key, name: "\(model) (7 d)", short: model, color: color)
@@ -955,16 +962,17 @@ struct LimitsHistoryChart: View {
                 if overview {
                     PeriodStepper(title: back == 0 ? "Recent weeks" : "Earlier weeks",
                                   canGoBack: weeks.count > (back + 1) * weeksPage, back: $stepBack)
+                } else if day {
+                    PeriodStepper(title: Self.dayTitle(start, back: back),
+                                  canGoBack: oldest.map { $0 < start } ?? false, back: $stepBack)
                 } else {
                     PeriodStepper(title: back > 0 ? periodRange(start, end) : weekReset == nil ? "Last 7 days" : "This week",
                                   canGoBack: oldest.map { $0 < start } ?? false, back: $stepBack)
                 }
                 Spacer()
-                if weekReset != nil {
-                    ModeSwitch(mode: Binding(get: { overview ? "overview" : "week" },
-                                             set: { savedScale = $0; stepBack = 0 }),
-                               options: [("week", "Week"), ("overview", "Weeks")])
-                }
+                ModeSwitch(mode: Binding(get: { overview ? "overview" : day ? "day" : "week" },
+                                         set: { savedScale = $0; stepBack = 0 }),
+                           options: [("day", "Day"), ("week", "Week")] + (weekReset != nil ? [("overview", "Weeks")] : []))
             }
             if !overview {
                 // Legend: a short line key beside each name (identity is never colour alone;
@@ -994,6 +1002,10 @@ struct LimitsHistoryChart: View {
                 EmptyHistory()
             } else {
                 Chart {
+                    ForEach(resets, id: \.self) { r in
+                        RuleMark(x: .value("Reset", r)).foregroundStyle(ChartInk.muted)
+                            .lineStyle(StrokeStyle(lineWidth: 1, dash: [2, 3]))
+                    }
                     ForEach(series, id: \.0.key) { l, pts in
                         ForEach(ChartGap.gaps(pts.map { ($0.t, $0.value) })) { g in
                             LineMark(x: .value("Time", g.from.t), y: .value("Used", g.from.value),
@@ -1022,11 +1034,11 @@ struct LimitsHistoryChart: View {
                             .foregroundStyle(Color(nsColor: MenuBarImage.color(.far))).symbolSize(30)
                     }
                     if let projection {
-                        projection.marks(color: weekColor, domain: (start, end))
+                        projection.marks(color: day ? sessionColor : weekColor, domain: (start, end))
                     }
                     if let h = active, now < h, let projection {
-                        // Along the dashed line: the projected weekly number (no session projection).
-                        projection.hoverMarks(at: h, color: weekColor, domain: (start, end))
+                        // Along the dashed line: the projected number (the week's; in the Day view the session's).
+                        projection.hoverMarks(at: h, color: day ? sessionColor : weekColor, domain: (start, end))
                     } else if let h = active {
                         // Beside the rule, on the side with more room, so it never covers the hovered points
                         // (above them there's no room: the lines reach the top of the chart).
@@ -1047,7 +1059,7 @@ struct LimitsHistoryChart: View {
                 }
                 .chartXScale(domain: start...end)
                 .chartYScale(domain: 0...100)
-                .chartXAxis { dayAxis(period: "weekly", start: start, end: end) }
+                .chartXAxis { dayAxis(period: day ? "hours" : "weekly", start: start, end: end) }
                 .chartYAxis {
                     AxisMarks(position: .leading, values: [0, 50, 100]) { v in
                         AxisGridLine(stroke: StrokeStyle(lineWidth: 1)).foregroundStyle(ChartInk.grid)
@@ -1059,7 +1071,8 @@ struct LimitsHistoryChart: View {
                 .modifier(HoverLayer(times: times, future: projection?.span, hovered: $hovered))
                 .padding(.top, projection == nil ? 6 : 14)   // room for the projection label above 100%
                 .frame(height: projection == nil ? 110 : 118)
-                .accessibilityLabel(back > 0 ? "Session and weekly usage, \(periodRange(start, end))"
+                .accessibilityLabel(day ? "Session and weekly usage, \(Self.dayTitle(start, back: back).lowercased())"
+                                    : back > 0 ? "Session and weekly usage, \(periodRange(start, end))"
                                     : weekReset == nil ? "Session and weekly usage over the last 7 days"
                                     : "Session and weekly usage this week" + (projection.map { ", projected \($0.endLabel)" } ?? ""))
             }
@@ -1082,6 +1095,54 @@ struct LimitsHistoryChart: View {
         guard let p = w.projectedPercentAtReset(now: now) else { return nil }
         return ChartProjection(now: now, from: w.percent, end: reset, to: min(p, 100),
                                endLabel: String(format: "≈ %.0f%%", (p / 5).rounded() * 5), hoverText: hover)   // as the outlook rounds
+    }
+
+    /// A week from the last reset to the next, `back` weeks before the current one.
+    static func weekRange(_ currentEnd: Date, back: Int) -> (Date, Date) {
+        let start = currentEnd.addingTimeInterval(-7 * 86400 * Double(back + 1))
+        return (start, back == 0 ? currentEnd : start.addingTimeInterval(7 * 86400))
+    }
+
+    /// A calendar day (local), `back` days before today.
+    static func dayRange(now: Date, back: Int) -> (Date, Date) {
+        let cal = Calendar.current
+        let start = cal.date(byAdding: .day, value: -back, to: cal.startOfDay(for: now)) ?? now
+        return (start, cal.date(byAdding: .day, value: 1, to: start) ?? start.addingTimeInterval(86400))
+    }
+
+    /// "Today", "Yesterday", "Mon 23 Nov".
+    static func dayTitle(_ start: Date, back: Int) -> String {
+        if back == 0 { return "Today" }
+        if back == 1 { return "Yesterday" }
+        let f = DateFormatter(); f.locale = HumanTime.en; f.dateFormat = "EEE d MMM"; return f.string(from: start)
+    }
+
+    /// Where sessions reset within a day: the recorded drops, plus the current session's start (its
+    /// reset minus 5 h) when it falls in, unless a drop already marks it (within 20 minutes).
+    static func sessionStarts(_ history: UsageHistory, session: UsageWindow?, from: Date, to: Date) -> [Date] {
+        var out = history.resets(from: from, to: to)
+        if let reset = session?.resetsAt, let d = session?.duration {
+            let begin = reset.addingTimeInterval(-d)
+            if begin.isAtOrAfter(from), begin < to, !out.contains(where: { abs($0.timeIntervalSince(begin)) < 1200 }) {
+                out.append(begin)
+            }
+        }
+        return out.sorted()
+    }
+
+    /// Where the session is headed, as the outlook says: 100% when it runs out, or the share at its
+    /// reset. Only within the day shown (a session ending after midnight shows from tomorrow on).
+    static func sessionProjection(_ w: UsageWindow, now: Date, dayEnd: Date) -> ChartProjection? {
+        guard let reset = w.resetsAt, !w.isTooEarlyToProject(now: now), w.percent > 0, w.percent < 100 else { return nil }
+        let hover: (Double) -> String = { "5h ≈ \(Int($0.rounded()))% projected" }
+        if let hit = w.projectedLimitAt(now: now) {
+            guard hit < dayEnd else { return nil }
+            return ChartProjection(now: now, from: w.percent, end: hit, to: 100,
+                                   endLabel: "100% \(HumanTime.clock(hit))", hoverText: hover)
+        }
+        guard reset < dayEnd, let p = w.projectedPercentAtReset(now: now) else { return nil }
+        return ChartProjection(now: now, from: w.percent, end: reset, to: min(p, 100),
+                               endLabel: String(format: "≈ %.0f%%", (p / 5).rounded() * 5), hoverText: hover)
     }
 
     /// The hit a hover time falls in: from reaching 100% until the reset (or the last 100% seen).
@@ -1107,6 +1168,12 @@ private func dayAxis(period: String?, start: Date, end: Date) -> some AxisConten
         AxisMarks(values: .stride(by: .hour, count: 6)) { _ in
             AxisGridLine(stroke: StrokeStyle(lineWidth: 1)).foregroundStyle(ChartInk.grid)
             AxisValueLabel(format: .dateTime.hour()).font(.system(size: 9)).foregroundStyle(ChartInk.label)
+        }
+    case "hours":
+        // A day: every 3 hours.
+        AxisMarks(values: .stride(by: .hour, count: 3)) { _ in
+            AxisGridLine(stroke: StrokeStyle(lineWidth: 1)).foregroundStyle(ChartInk.grid)
+            AxisValueLabel(format: .dateTime.hour(.twoDigits(amPM: .omitted))).font(.system(size: 9)).foregroundStyle(ChartInk.label)
         }
     case "weekly":
         AxisMarks(values: .stride(by: .day, count: 1)) { _ in

@@ -55,6 +55,10 @@ the settings, how the app gets its data, installing, and the command-line reader
   - hover over it for the time and value at any point
   - **‹ ›** step back through earlier weeks (or budget months) as far as the history goes; click
     the title to return to now. Past periods show how they went, without a projection.
+  - **Day** (Pro/Max) shows one calendar day, 00:00 to 24:00: the session line in front of the
+    week's, a dashed line where each 5h session reset, its limit hits, and the current session's
+    dashed projection to 100% or to its reset, like its outlook line. ‹ › step through earlier
+    days ("Yesterday", "Mon 23 Nov").
   - **Weeks** (or **Months**) switches to the long view: the weekly % (or the money spent) as one
     line over several periods, a dashed line at each reset with its date, and what each period
     reached labelled just before its reset (an orange point where it ran out or reached the
