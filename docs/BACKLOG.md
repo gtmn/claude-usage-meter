@@ -3,7 +3,7 @@
 ## Next
 
 1. **"Sign in again" button** (runs `claude auth login`): decide before 2026-12-07, when Claude Code's
-   refresh token here expires.
+   refresh token here expires. Options and a recommendation: [SIGN-IN-AGAIN.md](SIGN-IN-AGAIN.md).
 2. **Test the Update button's restart with 0.1.14 → 0.1.15.** 0.1.12 → 0.1.13 installed fine (2026-11-21,
    "brew upgrade to 0.1.13 exited with 0") but the new copy didn't start: `launchctl kickstart` kept the old
    code signature (see DECISIONS, Distribution). Fixed with a detached `brew services restart`, which ships in
