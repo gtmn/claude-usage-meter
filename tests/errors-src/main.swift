@@ -51,6 +51,37 @@ let trimmed = (try? String(contentsOf: logURL, encoding: .utf8)) ?? ""
 expect("a big log drops its oldest half (\(size) bytes)", size <= AppLog.maxBytes + 200 && !trimmed.contains(" first\n") && trimmed.hasSuffix(" line 3999 " + String(repeating: "x", count: 60) + "\n"))
 try? FileManager.default.removeItem(at: logURL.deletingLastPathComponent())
 
+print("--- sign in again: when the popup offers Sign in… (docs/SIGN-IN-AGAIN.md)")
+let expired = UsageError.tokenExpired(Date()) as Error
+for (name, error, nudge, renewed, cli, want): (String, Error, LoginNudge.Outcome?, Bool, Bool, Bool) in [
+  ("nudge ran, login not renewed", expired, .exited(0), false, true, true),
+  ("nudge failed, login not renewed", expired, .exited(1), false, true, true),
+  ("nudge timed out, not renewed", expired, .timedOut, false, true, true),
+  ("renewed, but still refused (revoked)", UsageError.http(401), .exited(0), true, true, true),
+  ("no Keychain item, claude installed", UsageError.noCredentials, nil, false, true, true),
+  ("expired, nudge not tried yet", expired, nil, false, true, false),
+  ("claude couldn't be started", expired, .couldNotRun, false, true, false),
+  ("no claude command", expired, .noCLI, false, false, false),
+  ("no Keychain item, no claude command", UsageError.noCredentials, nil, false, false, false),
+  ("renewed, then offline", URLError(.notConnectedToInternet), .exited(0), true, true, false),
+  ("rate-limited", UsageError.http(429), nil, false, true, false),
+] {
+  expect("\(name) → \(want ? "Sign in…" : "no button")",
+         LoginNudge.signInNeeded(after: error, nudge: nudge, renewed: renewed, hasCLI: cli) == want)
+}
+let script = LoginNudge.signInScript(claudePath: "/opt/homebrew/bin/claude")
+expect("the sign-in script is zsh and runs only claude auth login",
+       script.hasPrefix("#!/bin/zsh\n") && script.hasSuffix("\nexec '/opt/homebrew/bin/claude' auth login\n")
+       && script.split(separator: "\n").filter { !$0.hasPrefix("#") }.count == 1)
+// A path with a space and a quote reaches zsh unchanged.
+let oddPath = "/Users/a b/it's/claude"
+let zsh = Process(); zsh.executableURL = URL(fileURLWithPath: "/bin/zsh")
+zsh.arguments = ["-f", "-c", "print -r -- " + LoginNudge.shellQuoted(oddPath)]
+let zshOut = Pipe(); zsh.standardOutput = zshOut
+try? zsh.run(); zsh.waitUntilExit()
+expect("…with the claude path quoted for the shell",
+       String(decoding: zshOut.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self) == oddPath + "\n")
+
 print("--- update check")
 expect("0.1.10 is newer than 0.1.9", UpdateCheck.isNewer("0.1.10", than: "0.1.9"))
 expect("the same version isn't newer", !UpdateCheck.isNewer("0.1.11", than: "0.1.11") && !UpdateCheck.isNewer("0.1.11", than: "0.1.11.0"))

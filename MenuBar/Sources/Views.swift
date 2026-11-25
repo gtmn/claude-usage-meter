@@ -28,7 +28,8 @@ struct MenuBarLabel: View {
         Group {
             if let image = MenuBarImage.item(style: MenuBarImage.Style(saved: style), rows: model.menuBarRows(),
                                              rings: model.compactRings(), extra: model.extraRow(), options: options) {
-                Image(nsImage: image)
+                // Signed out of Claude Code: faded, since the numbers it shows are getting old.
+                Image(nsImage: model.signedOut ? MenuBarImage.faded(image) : image)
             } else {
                 Image(systemName: model.error == nil ? "gauge.with.dots.needle.0percent" : "exclamationmark.circle")
             }
@@ -182,6 +183,10 @@ struct UsagePanel: View {
 
             if let release = updater.available {
                 UpdateRow(updater: updater, release: release)
+            }
+
+            if model.signedOut {
+                SignInRow(model: model)
             }
 
             UsageRows(model: model)
@@ -450,6 +455,47 @@ struct UpdateRow: View {
                     .fixedSize(horizontal: false, vertical: true)
             } else if !updater.canInstall {
                 Text("A dev build (\(updater.current)) doesn't update itself.").foregroundStyle(.secondary)
+            }
+        }
+        .font(.system(size: 11))
+        .controlSize(.small)
+    }
+}
+
+/// Signed out of Claude Code (see docs/SIGN-IN-AGAIN.md): Sign in… opens Claude Code's own sign-in
+/// in Terminal. Under the popup's title, like the Update row; not in UsageRows, since a button there
+/// wouldn't render to an image.
+struct SignInRow: View {
+    @ObservedObject var model: UsageModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 6) {
+                Image(systemName: "person.crop.circle.badge.exclamationmark").foregroundStyle(.orange)
+                Text("Sign in to Claude Code to get new numbers")
+                Spacer(minLength: 0)
+                if model.signInProgress == .waiting { ProgressView().controlSize(.mini) }
+                Button("Sign in…") { model.startSignIn() }
+                    .help("Opens Terminal with claude auth login, Claude Code's own sign-in (in your browser). "
+                          + "The app doesn't see the sign-in; it fetches again as soon as the new login is there.")
+            }
+            switch model.signInProgress {
+            case .waiting:
+                Text("Finish signing in in Terminal and your browser. The numbers update as soon as it's done.")
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            case .couldNotOpen:
+                HStack(spacing: 6) {
+                    Text("Couldn't open Terminal. Run claude auth login there.").foregroundStyle(.orange)
+                    Spacer(minLength: 0)
+                    Button("Copy") {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString("claude auth login", forType: .string)
+                    }
+                    .help("Copy “claude auth login”")
+                }
+            case nil:
+                EmptyView()
             }
         }
         .font(.system(size: 11))

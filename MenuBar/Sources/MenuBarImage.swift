@@ -428,6 +428,15 @@ enum MenuBarImage {
         return beside(main, extraItem)
     }
 
+    /// The item while signed out of Claude Code: the same drawing, fainter, since its numbers are
+    /// getting old. Keeps the item's drawing handler, so its colours still follow the menu bar's appearance.
+    static func faded(_ image: NSImage, alpha: CGFloat = 0.45) -> NSImage {
+        NSImage(size: image.size, flipped: false) { rect in
+            image.draw(in: rect, from: .zero, operation: .sourceOver, fraction: alpha)
+            return true
+        }
+    }
+
     /// Two items side by side. Both keep their drawing handlers, so their colours still follow
     /// the menu bar's appearance.
     static func beside(_ a: NSImage, _ b: NSImage, gap: CGFloat = 6) -> NSImage {

@@ -2,8 +2,12 @@
 
 ## Next
 
-1. **"Sign in again" button** (runs `claude auth login`): decide before 2026-12-07, when Claude Code's
-   refresh token here expires. Options and a recommendation: [SIGN-IN-AGAIN.md](SIGN-IN-AGAIN.md).
+1. **Try "Sign in…" for real** before or on 2026-12-07, when Claude Code's refresh token here expires.
+   Built (option A, see [SIGN-IN-AGAIN.md](SIGN-IN-AGAIN.md)), checked only with renders. Either wait for
+   the expiry or run `claude auth logout` on a day when signing in again is convenient. Then check: the
+   popup shows **Sign in…** after the first failed nudge, the menu bar item fades, Terminal opens without
+   a Gatekeeper prompt, and after signing in the numbers come back within about 10 s; the log has the
+   "sign-in: …" lines.
 2. **Test the Update button's restart with 0.1.14 → 0.1.15.** 0.1.12 → 0.1.13 installed fine (2026-11-21,
    "brew upgrade to 0.1.13 exited with 0") but the new copy didn't start: `launchctl kickstart` kept the old
    code signature (see DECISIONS, Distribution). Fixed with a detached `brew services restart`, which ships in
@@ -32,8 +36,11 @@
 - **Dark-mode contrast of the estimated line** (2026-11-25): a washed-out slate instead of blue at 45%,
   3.1:1 against the background (was 1.9:1). Light mode unchanged (1.8:1), as is the fainter gap line
   (0.25, 1.4:1 in both modes).
+- **"Sign in…" when Claude Code's login can't be renewed** (2026-11-25): opens `claude auth login` in
+  Terminal and fetches as soon as the new login is there; the menu bar item fades while signed out.
 - **The settings are open on first start** (closed with the gear, and remembered). A copy that never
-  touched the gear also opens them once after the update, since "not set" now means open.
+  touched the gear also opens them once after the update, since "not set" now means open. Left that way
+  on purpose (2026-11-25): no migration, it happens once and shows settings that may never have been found.
 - **Last period's pace no longer names the reset date** ("At last month's pace: about $1,990 by the reset"),
   like the other outlooks: the reset time has its own line.
 - **The app renews Claude Code's login** (confirmed 2026-11-17). With Claude Code and the Claude app quit

@@ -12,6 +12,13 @@ options that were ruled out, so they aren't tried again.
 - **When the token has expired, run `claude mcp list`** (no model call, costs nothing), at most every 30
   minutes, from an empty folder. Ruled out: `claude auth status` (only reports the expiry, doesn't renew) and
   `claude -p` (renews, but costs usage).
+- **Signing in again happens in Terminal, started by a click** (2026-11-25, [SIGN-IN-AGAIN.md](SIGN-IN-AGAIN.md)).
+  Once the nudge runs and the login doesn't come back, the popup offers **Sign in…**, which opens a
+  `.command` file running `claude auth login`; the app then watches the Keychain item's expiry. Ruled out:
+  running `claude auth login` in the background (it can fall back to asking for a pasted code, which a
+  background process can't get, and the app would be driving a sign-in it can't see) and signing in
+  without a click (it would open browser tabs unasked). Copy-the-command only is the fallback when
+  Terminal can't be opened. The menu bar item fades while signed out, since its numbers are getting old.
 - **Status line as the fallback source.** Claude Code passes `rate_limits` to status-line commands, so the
   script works without the token. It only runs where Claude Code runs status lines: in our checks the
   terminal, not the desktop app's Code tab.

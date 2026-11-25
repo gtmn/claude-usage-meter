@@ -1,7 +1,8 @@
 # "Sign in again" button: options
 
-Status: options note, not decided, nothing implemented. Decide before 2026-12-07, when Claude Code's refresh
-token on the main Mac runs out (backlog, Next 1).
+Status: **decided 2026-11-25: option A, with C as the fallback, and the menu bar item fades while signed
+out.** Built on `claude/overnight-polish` (see "What was built" at the end). Not yet tried for real: that
+needs an expired refresh token (due 2026-12-07 on the main Mac) or a deliberate `claude auth logout`.
 
 ## The problem
 
@@ -104,7 +105,28 @@ is small. Ship it before 7 Dec so the first real expiry is the test; until then,
 render and the flow once with `claude auth logout` followed by the button, on a day when signing in again
 is convenient.
 
-Decisions needed:
-1. A (Terminal) vs C (copy only) vs D.
-2. Whether the menu bar item should show the signed-out state too.
-3. Whether to test with a deliberate `claude auth logout` before 7 Dec, or wait for the real expiry.
+Decided (2026-11-25): A, with C's text and Copy button as the fallback; the menu bar item fades while signed
+out. Still open: test with a deliberate `claude auth logout` before 7 Dec, or wait for the real expiry.
+
+## What was built
+
+- **When** (`LoginNudge.signInNeeded`, checked in `tests/errors-src`): the nudge ran (finished or timed out)
+  and the login wasn't renewed; or it was renewed and the server still refused it; or there's no Keychain
+  item. Never without a `claude` command. The state stays until a fetch through the login works again,
+  since a fetch between two nudges can't tell.
+- **Popup**: a row under the title, *Sign in to Claude Code to get new numbers* with **Sign in…**. The
+  saved-numbers line says *Signed out of Claude Code* instead of *Login expired: open Claude Code*.
+- **Sign in…** writes `~/Library/Application Support/UsageMeter/sign-in.command` (`exec '<claude>' auth
+  login`, nothing else) and opens it, which opens Terminal (or whatever is set to open `.command` files).
+  It then reads the Keychain item's expiry every 10 s for up to 10 minutes and fetches as soon as it's in
+  the future. While waiting: *Finish signing in in Terminal and your browser.* If the file can't be opened:
+  *Couldn't open Terminal. Run claude auth login there.* with **Copy**.
+- **Log** (`~/Library/Logs/UsageMeter.log`): "sign-in: opened claude auth login in Terminal", "sign-in:
+  login valid until …", "sign-in: no new login after 10 min", "sign-in: couldn't open Terminal". Nothing
+  from the command itself.
+- **Menu bar**: the item is drawn at 45% opacity while signed out (`MenuBarImage.faded`).
+- **Previews**: `--render-preview out.png signedout panel` shows the row with sample data; the `.label.png`
+  next to it shows the faded item.
+
+Not verified: that a `.command` file the app writes opens without a Gatekeeper prompt, and how
+`claude auth login` behaves when its refresh token has run out. Both need the real flow.

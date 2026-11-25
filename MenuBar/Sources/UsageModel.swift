@@ -207,6 +207,14 @@ final class UsageModel: ObservableObject {
     @Published private(set) var error: String?
     @Published private(set) var isLoading = false
     @Published private(set) var lastAttempt: Date?
+    /// Claude Code's login can't come back without signing in again (see `LoginNudge.signInNeeded`):
+    /// the popup offers Sign in… and the menu bar item fades. Cleared by the next successful fetch.
+    @Published private(set) var signedOut = false
+    static let signedOutMessage = "Signed out of Claude Code"
+    /// After Sign in…: waiting for the new login, or Terminal couldn't be opened.
+    enum SignInProgress: Equatable { case waiting, couldNotOpen }
+    @Published private(set) var signInProgress: SignInProgress?
+    private var signInPoll: Timer?
     /// Usage over time, recorded from each fetch (the endpoint has no history of its own).
     @Published private(set) var history = UsageHistory()
     private var persistsHistory = false
@@ -225,10 +233,10 @@ final class UsageModel: ObservableObject {
     private let pathMonitor = NWPathMonitor()
     private var networkWasDown = false
 
-    init(preview: UsageSnapshot? = nil, problem: String? = nil, saved: Bool = false,
+    init(preview: UsageSnapshot? = nil, problem: String? = nil, saved: Bool = false, signedOut previewSignedOut: Bool = false,
          history previewHistory: UsageHistory? = nil, logWeights previewLogs: [UsageWeight]? = nil) {
         if let preview {
-            snapshot = preview; oauthProblem = problem; showingSaved = saved
+            snapshot = preview; oauthProblem = problem; showingSaved = saved; signedOut = previewSignedOut
             if let previewHistory {
                 history = previewHistory; logWeights = previewLogs ?? []
             } else if preview.isBudgetOnly {
@@ -282,23 +290,28 @@ final class UsageModel: ObservableObject {
         let mayNudge = persistsHistory && lastNudge.map { Date().timeIntervalSince($0) > Self.nudgeSpacing } ?? true
         Task {
             // Keychain access can block on a permission prompt, so keep it off the main actor.
-            let (snap, oauthWhy, nudged) = await Task.detached { () -> (UsageSnapshot?, String?, Bool) in
+            let (snap, oauthWhy, nudged, needsSignIn) = await Task.detached { () -> (UsageSnapshot?, String?, Bool, Bool) in
                 do {
-                    return (try await reader.fetchOAuth(saveResponseTo: LastUsage.defaultURL), nil, false)
+                    return (try await reader.fetchOAuth(saveResponseTo: LastUsage.defaultURL), nil, false, false)
                 } catch {
-                    var nudged = false
+                    var nudge: LoginNudge.Outcome?, renewed = false, last: Error = error
                     if mayNudge && LoginNudge.isExpiredLogin(error) {
-                        nudged = true
-                        if let s = await Self.nudgeAndRetry(reader) { return (s, nil, true) }
+                        let r = await Self.nudgeAndRetry(reader)
+                        if let s = r.snapshot { return (s, nil, true, false) }
+                        (nudge, renewed, last) = (r.outcome, r.renewed, r.retryError ?? error)
                     }
+                    let signIn = LoginNudge.signInNeeded(after: last, nudge: nudge, renewed: renewed,
+                                                         hasCLI: LoginNudge.claudePath() != nil)
                     let why = UsageError.shortMessage(for: error)
-                    return ((try? reader.readSnapshot(maxAge: reader.maxSnapshotAge)), why, nudged)
+                    return ((try? reader.readSnapshot(maxAge: reader.maxSnapshotAge)), why, nudge != nil, signIn)
                 }
             }.value
 
             if nudged { lastNudge = Date() }
             lastAttempt = Date()
-            oauthProblem = oauthWhy
+            // Signed out stays until the login works again: between nudges a fetch can't tell.
+            if oauthWhy == nil { signedOut = false; endSignIn(); signInProgress = nil } else if needsSignIn { signedOut = true }
+            oauthProblem = oauthWhy.map { signedOut ? Self.signedOutMessage : $0 }
             if let snap {
                 recordHistory(snap)
                 updateSeenReset()
@@ -307,20 +320,92 @@ final class UsageModel: ObservableObject {
                 error = nil
             } else {
                 showingSaved = snapshot != nil
-                error = oauthWhy ?? "No usage data"
+                error = oauthProblem ?? "No usage data"
             }
             isLoading = false
         }
+    }
+
+    /// Sign in…: opens Claude Code's own sign-in (`claude auth login`) in Terminal, then watches the
+    /// Keychain item's expiry and fetches as soon as there's a new login. The app starts the sign-in
+    /// and nothing more: it never sees the command's input or output, and logs only times and outcomes.
+    func startSignIn() {
+        guard persistsHistory else { return }   // previews never start anything
+        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("UsageMeter")
+        let url = dir.appendingPathComponent("sign-in.command")
+        // A file the app writes itself isn't quarantined, so it opens without a Gatekeeper prompt;
+        // `open` needs no Automation permission (Terminal's `do script` would).
+        guard let path = LoginNudge.claudePath(),
+              (try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)) != nil,
+              (try? Data(LoginNudge.signInScript(claudePath: path).utf8).write(to: url, options: .atomic)) != nil,
+              (try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)) != nil,
+              NSWorkspace.shared.open(url)
+        else {
+            AppLog.write("sign-in: couldn't open Terminal")
+            signInProgress = .couldNotOpen
+            return
+        }
+        AppLog.write("sign-in: opened claude auth login in Terminal")
+        signInProgress = .waiting
+        let deadline = Date().addingTimeInterval(Self.signInWait)
+        signInPoll?.invalidate()
+        signInPoll = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.checkSignIn(deadline: deadline) }
+        }
+    }
+
+    /// How long Sign in… keeps watching for the new login.
+    static let signInWait: TimeInterval = 10 * 60
+    private var checkingSignIn = false
+
+    /// One look at the Keychain item's expiry (the same `security` read as a fetch; the token stays in memory).
+    private func checkSignIn(deadline: Date) {
+        guard !checkingSignIn else { return }
+        checkingSignIn = true
+        let reader = self.reader
+        Task {
+            let validUntil = await Task.detached { () -> Date?? in
+                guard let c = try? reader.readCredentials() else { return nil }
+                return .some(c.expiresAt)
+            }.value
+            checkingSignIn = false
+            guard signInProgress == .waiting else { return }
+            // A login with no expiry counts as valid; the fetch will tell.
+            if let validUntil, validUntil.map({ $0 > Date() }) ?? true {
+                let f = ISO8601DateFormatter(); f.timeZone = .current
+                AppLog.write("sign-in: login valid until \(validUntil.map { f.string(from: $0) } ?? "unknown")")
+                endSignIn()
+                refresh()
+            } else if Date() > deadline {
+                AppLog.write("sign-in: no new login after \(Int(Self.signInWait / 60)) min")
+                endSignIn()
+            }
+        }
+    }
+
+    private func endSignIn() {
+        signInPoll?.invalidate(); signInPoll = nil
+        if signInProgress == .waiting { signInProgress = nil }
     }
 
     /// When the app last asked Claude Code to check its expired login, and how often it may.
     private var lastNudge: Date?
     static let nudgeSpacing: TimeInterval = 30 * 60
 
+    /// What a nudge did: the numbers if it worked; otherwise what the Sign in… check needs.
+    struct NudgeResult {
+        var snapshot: UsageSnapshot?
+        var outcome: LoginNudge.Outcome
+        var renewed: Bool
+        /// The fetch after a renewal failed (a 401 there means the login was revoked).
+        var retryError: Error?
+    }
+
     /// Claude Code's login has expired: runs `claude mcp list` (see LoginNudge.swift) and, if that
     /// renewed the login, fetches again. Logs what happened to ~/Library/Logs/UsageMeter.log
     /// (times only, no account data).
-    nonisolated static func nudgeAndRetry(_ reader: UsageReader) async -> UsageSnapshot? {
+    nonisolated static func nudgeAndRetry(_ reader: UsageReader) async -> NudgeResult {
         let before = (try? reader.readCredentials())?.expiresAt
         let started = Date()
         let outcome = LoginNudge.run()
@@ -333,8 +418,12 @@ final class UsageModel: ObservableObject {
                           renewed ? "yes, now valid until \(f.string(from: after!))" : "no")
         AppLog.write(line)
         NSLog("UsageMeter: %@", line)
-        guard renewed else { return nil }
-        return try? await reader.fetchOAuth()
+        guard renewed else { return NudgeResult(outcome: outcome, renewed: false) }
+        do {
+            return NudgeResult(snapshot: try await reader.fetchOAuth(), outcome: outcome, renewed: true)
+        } catch {
+            return NudgeResult(outcome: outcome, renewed: true, retryError: error)
+        }
     }
 
     private func recordHistory(_ snap: UsageSnapshot) {

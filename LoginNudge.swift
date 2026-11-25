@@ -74,6 +74,38 @@ public enum LoginNudge {
         default: return false
         }
     }
+
+    // MARK: Sign in again (docs/SIGN-IN-AGAIN.md)
+
+    /// Whether the popup offers Sign in…: the login can't come back without signing in again.
+    /// - the nudge ran (`nudge`: it finished or timed out) and the login wasn't renewed: the refresh
+    ///   token has run out or was revoked. One failed nudge may be a network blip, but the button
+    ///   only opens a sign-in when clicked, and nudges go on every 30 minutes;
+    /// - the login was renewed and the server still refused it (`renewed`): revoked;
+    /// - there is no Keychain item: never signed in, or signed out.
+    /// Never without a `claude` command (`hasCLI`): there would be nothing to run.
+    public static func signInNeeded(after error: Error, nudge: Outcome?, renewed: Bool, hasCLI: Bool) -> Bool {
+        guard hasCLI else { return false }
+        if case .noCredentials? = error as? UsageError { return true }
+        if renewed { return isExpiredLogin(error) }
+        switch nudge {
+        case .exited?, .timedOut?: return isExpiredLogin(error)
+        default: return false
+        }
+    }
+
+    /// The script the Sign in… button opens in Terminal: Claude Code's own sign-in and nothing else,
+    /// so the app never sees the sign-in or its output.
+    public static func signInScript(claudePath: String) -> String {
+        "#!/bin/zsh\n"
+            + "# Written by Usage Meter for its Sign in… button: Claude Code's own sign-in. Safe to delete.\n"
+            + "exec \(shellQuoted(claudePath)) auth login\n"
+    }
+
+    /// `s` in single quotes for zsh (a quote inside becomes '\'').
+    public static func shellQuoted(_ s: String) -> String {
+        "'" + s.replacingOccurrences(of: "'", with: #"'\''"#) + "'"
+    }
 }
 
 /// A small log of the app's own, in ~/Library/Logs/UsageMeter.log (Console.app shows it too):

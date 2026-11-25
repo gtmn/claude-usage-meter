@@ -10,7 +10,7 @@ struct UsageMeterApp: App {
     )
 
     init() {
-        // `UsageMeter --render-preview out.png [live] [offline] [enterprise] [hover] [light] [daily] [seen] [saved] [compact|dots|icon|splash|text] [mono] [amount] [extra] [fable] [only5h|only7d] [beside|projected] [update] [panel|settings|scene] [nolabels] [nopercent] [nopace] [noahead] [left|early] [overview] [back=N] [full|burst]` (`hover=0.85`: pointer at 85% of the times): render the panel rows (`panel`: the whole popup; `settings`: its menu bar settings; `scene`: the whole popup opened under the item on a plain menu bar) to a PNG and exit.
+        // `UsageMeter --render-preview out.png [live] [offline] [enterprise] [hover] [light] [daily] [seen] [saved] [compact|dots|icon|splash|text] [mono] [amount] [extra] [fable] [only5h|only7d] [beside|projected] [update] [signedout] [panel|settings|scene] [nolabels] [nopercent] [nopace] [noahead] [left|early] [overview] [back=N] [full|burst]` (`hover=0.85`: pointer at 85% of the times): render the panel rows (`panel`: the whole popup; `settings`: its menu bar settings; `scene`: the whole popup opened under the item on a plain menu bar) to a PNG and exit.
         let args = CommandLine.arguments
         if args.contains("--check-update") { Updater.checkFromCommandLine() }
         if let i = args.firstIndex(of: "--render-preview"), i + 1 < args.count {
@@ -61,10 +61,14 @@ enum PreviewRenderer {
         let light = CommandLine.arguments.contains("light")
         var logs: [UsageWeight]?
         if live, let period = UsageModel.budgetPeriod(snap) { logs = ClaudeCodeLogs.weights(from: period.start, to: Date()) }
-        // `saved`: as if rate-limited, showing numbers saved earlier.
-        let saved = CommandLine.arguments.contains("saved")
-        let model = UsageModel(preview: snap, problem: saved ? "Too many requests, will retry" : offline ? "Offline" : nil,
-                               saved: saved,
+        // `saved`: as if rate-limited, showing numbers saved earlier. `signedout`: saved numbers while
+        // signed out of Claude Code (the Sign in… row needs `panel`; the menu bar item fades).
+        let signedOut = CommandLine.arguments.contains("signedout")
+        let saved = signedOut || CommandLine.arguments.contains("saved")
+        let model = UsageModel(preview: snap,
+                               problem: signedOut ? UsageModel.signedOutMessage : saved ? "Too many requests, will retry"
+                                   : offline ? "Offline" : nil,
+                               saved: saved, signedOut: signedOut,
                                history: live ? UsageHistory.load() : nil, logWeights: logs)
         writeLabelPreview(model: model, output: output)
         if ["panel", "settings", "scene"].contains(where: CommandLine.arguments.contains) {
@@ -228,8 +232,10 @@ enum PreviewRenderer {
                                            extra: args.contains("extra"),
                                            limits: args.contains("only5h") ? .session : args.contains("only7d") ? .week : .both,
                                            projection: args.contains("projected") || args.contains("beside") ? .on : .off)
-        return MenuBarImage.item(style: args.contains("compact") ? .compact : args.contains("dots") ? .dots : args.contains("text") ? .text : args.contains("icon") ? .icon : args.contains("splash") ? .splash : .bars, rows: model.menuBarRows(),
-                                 rings: model.compactRings(), extra: model.extraRow(), options: options)
+        guard let item = MenuBarImage.item(style: args.contains("compact") ? .compact : args.contains("dots") ? .dots : args.contains("text") ? .text : args.contains("icon") ? .icon : args.contains("splash") ? .splash : .bars, rows: model.menuBarRows(),
+                                           rings: model.compactRings(), extra: model.extraRow(), options: options)
+        else { return nil }
+        return model.signedOut ? MenuBarImage.faded(item) : item   // `signedout`: faded, as in the menu bar
     }
 
     /// The menu bar item, enlarged 6x, on a light and a dark menu bar (two stacked strips).

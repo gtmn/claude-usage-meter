@@ -165,6 +165,10 @@ asks once from the command line.
      Checking the MCP connections makes Claude Code renew its own login; it sends no request to a
      model and costs nothing. (`claude auth status` only reports the expiry.) The command's output
      is discarded; the app logs only whether the login was renewed, in `~/Library/Logs/UsageMeter.log`.
+   - If that doesn't bring the login back (Claude Code's longer-lived refresh token has run out too),
+     the popup says *Signed out of Claude Code* with a **Sign in…** button and the menu bar item fades.
+     The button opens Terminal running `claude auth login`, Claude Code's own sign-in; the app doesn't
+     see it, and fetches again as soon as the new login is in the Keychain.
    - It reads the item the same way Claude Code does, through Apple's `security` tool, which the
      item already trusts. So there's no Keychain password dialog, not after a rebuild and not after
      Claude Code refreshes its token. (Asking the Keychain directly would prompt each time, because
