@@ -7,7 +7,6 @@ import AppKit
 ///   Enterprise/Team: one ring for the budget.
 /// - Dots: the text alone, with a small pace-coloured dot before each row.
 /// - Gauge (saved as "icon"): a gauge in the worst pace colour, its needle at the highest use, then the text.
-/// - Sparkle (saved as "splash"): Apple's sparkle symbol in the worst pace colour, then the text.
 /// - Off (saved as "text"): the text alone.
 ///
 /// Colour coding, as ClaudeUsageBar's pace icon (see PaceLead): green on or under pace, yellow
@@ -84,10 +83,10 @@ enum MenuBarImage {
     }
 
     /// The Indicator setting: Bars, Circle (rings; saved as "compact", its earlier name), Dots (text
-    /// with a pace dot), Gauge (saved as "icon"), Sparkle (saved as "splash"; a gauge or a sparkle in
-    /// the pace colour) or Off (the text alone; saved as "text").
+    /// with a pace dot), Gauge (saved as "icon"; a gauge in the pace colour) or Off (the text alone;
+    /// saved as "text").
     enum Style: String, CaseIterable {
-        case bars, compact, dots, icon, splash, text
+        case bars, compact, dots, icon, text
         static let key = "menuBarStyle"
         var name: String { name(single: false) }
         /// `single`: one limit (an Enterprise/Team budget), so "Bar" and "Dot".
@@ -97,14 +96,14 @@ enum MenuBarImage {
             case .compact: return "Circle"
             case .dots: return single ? "Dot" : "Dots"
             case .icon: return "Gauge"
-            case .splash: return "Sparkle"
             case .text: return "Off"
             }
         }
         /// Text only: the item needs a number or projection, or it would be empty.
         var needsText: Bool { self == .dots || self == .text }
-        /// A saved style that no longer exists (the short-lived "pace") reads as Bars.
-        init(saved: String) { self = Style(rawValue: saved) ?? .bars }
+        /// A saved style that no longer exists reads as the closest one: the removed Sparkle ("splash",
+        /// a glyph in the pace colour) as Gauge, the short-lived "pace" as Bars.
+        init(saved: String) { self = saved == "splash" ? .icon : Style(rawValue: saved) ?? .bars }
     }
 
     /// Colour: the bars and rings show the pace (green, yellow, orange). Mono: they're drawn in
@@ -417,13 +416,13 @@ enum MenuBarImage {
         let (rows, rings) = (o.limits.pick(rows), o.limits.pick(rings))
         let main = style == .compact && !rings.isEmpty ? makeCompact(rings: rings, options: o)
             : (style == .dots || style == .text) && !rows.isEmpty ? makeDots(rows: rows, options: o, dots: style == .dots)
-            : (style == .icon || style == .splash) && !rows.isEmpty ? makeDots(rows: rows, options: o, dots: false, glyph: style)
+            : style == .icon && !rows.isEmpty ? makeDots(rows: rows, options: o, dots: false, gauge: true)
             : !rows.isEmpty ? make(rows: rows, options: o) : nil
         guard let main else { return nil }
         guard o.extra, let extra else { return main }
         let extraItem = style == .compact ? makeCompact(rings: [extra], options: o)
-            : style == .dots || style == .text || style == .icon || style == .splash
-                ? makeDots(rows: [extra], options: o, dots: style == .dots, glyph: style == .icon || style == .splash ? style : nil)
+            : style == .dots || style == .text || style == .icon
+                ? makeDots(rows: [extra], options: o, dots: style == .dots, gauge: style == .icon)
             : make(rows: [extra], options: o)
         return beside(main, extraItem)
     }
@@ -453,28 +452,27 @@ enum MenuBarImage {
     /// stays in the text colour. Mono has no dots; Alerts shows one only once ahead or nearly full,
     /// and takes no room without one. One row is a single 11 pt line, like the system's own
     /// labels; more rows (or one with the projection under it) stack at 9 pt. `dots: false` is the
-    /// Off indicator: the same text, no dots. `glyph` (`.icon` or `.splash`): a gauge or a sparkle
-    /// before the text instead.
-    static func makeDots(rows: [Row], options o: Options = Options(), dots: Bool = true, glyph: Style? = nil) -> NSImage {
+    /// Off indicator: the same text, no dots. `gauge`: a gauge before the text instead.
+    static func makeDots(rows: [Row], options o: Options = Options(), dots: Bool = true, gauge showsGauge: Bool = false) -> NSImage {
         var textRows = lines(rows.map { cells($0, o, label: o.labels) }, o)
         // Never an empty item (nothing to click to open the popup): settings saved before the
         // popup blocked such combinations show the plain number.
         let hasDot = dots && rows.contains { dotColor($0, o) != nil }
         let noValues = textRows.allSatisfy { $0[1].isEmpty && $0[2].isEmpty }
-        if glyph == nil, !hasDot, noValues {
+        if !showsGauge, !hasDot, noValues {
             var shown = o; shown.percent = true
             textRows = lines(rows.map { cells($0, shown, label: o.labels) }, shown)
         }
-        // A gauge or sparkle with no number beside it stands alone: labels ("5h", "7d") with no value
-        // say nothing next to a single glyph.
-        if glyph != nil, noValues { textRows = textRows.map { _ in ["", "", "", ""] } }
+        // A gauge with no number beside it stands alone: labels ("5h", "7d") with no value say nothing
+        // next to a single glyph.
+        if showsGauge, noValues { textRows = textRows.map { _ in ["", "", "", ""] } }
         let small = textRows.count > 1
         let fonts = Columns.fonts(size: small ? 9 : 11, weight: compactWeight(stacked: small))
         let columns = Columns(textRows, leftAligned: [true, false, false, false], fonts: fonts)
         let dot: CGFloat = small ? 4 : 5
         // Alone (no text beside it) at the single-line size: the full menu bar height looked too big.
         let glyphSize: CGFloat = columns.width == 0 ? 14 : small ? 15 : 14
-        let gauge = glyph.flatMap { glyphImage($0, rows, o, pointSize: glyphSize) }
+        let gauge = showsGauge ? gaugeImage(rows, o, pointSize: glyphSize) : nil
         // Apple's symbols carry their own side margin, so 1 pt is enough between glyph and text.
         let dotSpace = gauge.map { $0.size.width + (columns.width > 0 ? 1 : 0) } ?? (hasDot ? dot + 2 : 0)
         let size = NSSize(width: max(dotSpace + columns.width, dot), height: height)
@@ -502,14 +500,14 @@ enum MenuBarImage {
         }
     }
 
-    /// The Gauge (saved as "icon") and Sparkle (saved as "splash") indicators: Apple's gauge symbol, its
-    /// needle at the highest use shown, or its sparkle, in the colour of the limit furthest ahead of
-    /// pace (the text colour in Mono, and in Alerts until one is ahead). Tinted at draw time, so the
-    /// text colour follows the menu bar's appearance.
-    private static func glyphImage(_ glyph: Style, _ rows: [Row], _ o: Options, pointSize: CGFloat) -> NSImage? {
+    /// The Gauge indicator (saved as "icon"): Apple's gauge symbol, its needle at the highest use
+    /// shown, in the colour of the limit furthest ahead of pace (the text colour in Mono, and in
+    /// Alerts until one is ahead). Tinted at draw time, so the text colour follows the menu bar's
+    /// appearance.
+    private static func gaugeImage(_ rows: [Row], _ o: Options, pointSize: CGFloat) -> NSImage? {
         let top = rows.map(\.percent).max() ?? 0
         let needle = [0, 33, 50, 67, 100].min { abs(Double($0) - top) < abs(Double($1) - top) } ?? 0
-        let name = glyph == .icon ? "gauge.with.dots.needle.\(needle)percent" : "sparkle"
+        let name = "gauge.with.dots.needle.\(needle)percent"
         let config = NSImage.SymbolConfiguration(pointSize: pointSize, weight: .medium)
         guard let symbol = NSImage(systemSymbolName: name, accessibilityDescription: nil)?.withSymbolConfiguration(config)
         else { return nil }

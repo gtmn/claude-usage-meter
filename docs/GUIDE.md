@@ -14,7 +14,6 @@ the settings, how the app gets its data, installing, and the command-line reader
   - **Dots**: no bars, just the numbers, each after a small dot in its pace colour.
   - **Gauge**: a gauge before the numbers, in the colour of the limit furthest ahead of pace, its
     needle at the highest use.
-  - **Sparkle**: a sparkle before the numbers, in that same colour.
   - **Off**: just the numbers, no graphic and no colour.
 
   All but Off use the same colours, as ClaudeUsageBar's pace icon: green on or under pace, yellow
@@ -118,7 +117,7 @@ the app remembers when you close them). They sit under the graph: **Menu bar ite
 **Open at login**, **Check for updates** and **Quit** (⌘Q also quits while the popup is open).
 Hover over a control to see what it does.
 
-- **Indicator**: Bars, Circle, Dots, Gauge, Sparkle or Off (on a $ budget: Bar and Dot). With Dots or Off the
+- **Indicator**: Bars, Circle, Dots, Gauge or Off (on a $ budget: Bar and Dot). With Dots or Off the
   item needs a number or the projection, so the choices that would leave it empty are greyed out.
 - **Colours** (not with Off): Colour, Alerts or Mono. In Dots, Mono has no dots and Alerts shows one only once ahead.
 - **Limits** (Pro/Max): both, or only `5h` or `7d`. The popup and the graph keep showing both.
@@ -134,7 +133,7 @@ Hover over a control to see what it does.
 
 | Pro / Max | Enterprise / Team |
 |---|---|
-| <img src="screenshots/settings-pro-max.png" width="356" alt="Menu bar item settings, one per row: Indicator Bars, Circle, Dots, Gauge, Sparkle or Off; Colours Colour, Alerts or Mono; Limits Both, 5h or 7d; Number % or Off; Projection Off or On; Extra usage Off, % or Amount; When ahead Off, +N, time left or early; checkboxes Labels and Pace tick"> | <img src="screenshots/settings-enterprise.png" width="356" alt="The same settings on a budget account: Number %, Amount or Off, Projection Off or On, no Limits or Extra usage rows, and only the Pace tick checkbox"> |
+| <img src="screenshots/settings-pro-max.png" width="356" alt="Menu bar item settings, one per row: Indicator Bars, Circle, Dots, Gauge or Off; Colours Colour, Alerts or Mono; Limits Both, 5h or 7d; Number % or Off; Projection Off or On; Extra usage Off, % or Amount; When ahead Off, +N, time left or early; checkboxes Labels and Pace tick"> | <img src="screenshots/settings-enterprise.png" width="356" alt="The same settings on a budget account: Number %, Amount or Off, Projection Off or On, no Limits or Extra usage rows, and only the Pace tick checkbox"> |
 
 **Updates.** With **Check for updates** on, a newer version shows under the popup's title, with
 what's new and an **Update** button that installs it the way your copy came. A Homebrew copy

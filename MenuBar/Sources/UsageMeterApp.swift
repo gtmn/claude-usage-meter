@@ -10,7 +10,7 @@ struct UsageMeterApp: App {
     )
 
     init() {
-        // `UsageMeter --render-preview out.png [live] [offline] [enterprise] [hover] [light] [daily] [seen] [saved] [compact|dots|icon|splash|text] [mono] [amount] [extra] [fable] [only5h|only7d] [beside|projected] [update] [signedout] [panel|settings|scene] [nolabels] [nopercent] [nopace] [noahead] [left|early] [overview] [back=N] [full|burst]` (`hover=0.85`: pointer at 85% of the times): render the panel rows (`panel`: the whole popup; `settings`: its menu bar settings; `scene`: the whole popup opened under the item on a plain menu bar) to a PNG and exit.
+        // `UsageMeter --render-preview out.png [live] [offline] [enterprise] [hover] [light] [daily] [seen] [saved] [compact|dots|icon|text] [mono] [amount] [extra] [fable] [only5h|only7d] [beside|projected] [update] [signedout] [panel|settings|scene] [nolabels] [nopercent] [nopace] [noahead] [left|early] [overview] [back=N] [full|burst]` (`hover=0.85`: pointer at 85% of the times): render the panel rows (`panel`: the whole popup; `settings`: its menu bar settings; `scene`: the whole popup opened under the item on a plain menu bar) to a PNG and exit.
         let args = CommandLine.arguments
         if args.contains("--check-update") { Updater.checkFromCommandLine() }
         if let i = args.firstIndex(of: "--render-preview"), i + 1 < args.count {
@@ -107,7 +107,7 @@ enum PreviewRenderer {
         store.removePersistentDomain(forName: previewSuite)
         typealias Key = MenuBarImage.Options.Key
         let settings: [String: Any] = [
-            MenuBarImage.Style.key: a.contains("compact") ? "compact" : a.contains("dots") ? "dots" : a.contains("text") ? "text" : a.contains("icon") ? "icon" : a.contains("splash") ? "splash" : "bars",
+            MenuBarImage.Style.key: a.contains("compact") ? "compact" : a.contains("dots") ? "dots" : a.contains("text") ? "text" : a.contains("icon") ? "icon" : "bars",
             Key.labels: !a.contains("nolabels"), Key.percent: !a.contains("nopercent") && !a.contains("projected"),
             Key.pace: !a.contains("nopace"), Key.ahead: !a.contains("noahead"),
             Key.aheadAs: a.contains("left") ? "left" : a.contains("early") ? "early" : "points",
@@ -150,10 +150,16 @@ enum PreviewRenderer {
         window.contentView = host
         host.layoutSubtreeIfNeeded()
         RunLoop.current.run(until: Date().addingTimeInterval(0.5))   // let SwiftUI and Charts settle
-        guard let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) else {
+        // Always at 2x, like a Retina screen: the view's own caching rep would take the main
+        // screen's scale, and an external non-Retina screen gave half-resolution screenshots.
+        let bounds = host.bounds
+        guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(bounds.width * 2), pixelsHigh: Int(bounds.height * 2),
+                                         bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                         colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else {
             fputs("render failed\n", stderr); exit(1)
         }
-        host.cacheDisplay(in: host.bounds, to: rep)
+        rep.size = bounds.size
+        host.cacheDisplay(in: bounds, to: rep)
         let image = a.contains("scene") ? scene(panel: rep, model: model, light: light) : rep
         guard let png = image?.representation(using: .png, properties: [:]) else { fputs("render failed\n", stderr); exit(1) }
         try? png.write(to: URL(fileURLWithPath: output))
@@ -232,7 +238,7 @@ enum PreviewRenderer {
                                            extra: args.contains("extra"),
                                            limits: args.contains("only5h") ? .session : args.contains("only7d") ? .week : .both,
                                            projection: args.contains("projected") || args.contains("beside") ? .on : .off)
-        guard let item = MenuBarImage.item(style: args.contains("compact") ? .compact : args.contains("dots") ? .dots : args.contains("text") ? .text : args.contains("icon") ? .icon : args.contains("splash") ? .splash : .bars, rows: model.menuBarRows(),
+        guard let item = MenuBarImage.item(style: args.contains("compact") ? .compact : args.contains("dots") ? .dots : args.contains("text") ? .text : args.contains("icon") ? .icon : .bars, rows: model.menuBarRows(),
                                            rings: model.compactRings(), extra: model.extraRow(), options: options)
         else { return nil }
         return model.signedOut ? MenuBarImage.faded(item) : item   // `signedout`: faded, as in the menu bar
