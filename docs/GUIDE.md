@@ -72,12 +72,12 @@ the settings, how the app gets its data, installing, and the command-line reader
   credentials. It's kept without a time limit; after 60 days it's thinned to one point per
   limit per hour (the highest, so each period's peak before its reset stays), about 2 MB a year.
 - **Before the app ran, or while the Mac was off,** the budget curve is estimated from Claude
-  Code's session logs on this Mac (`~/.claude/projects`), drawn lighter:
+  Code's session logs on this Mac (`~/.claude/projects`), drawn in grey:
   - The app reads only each request's time, model and token counts, never message content,
     and keeps nothing on disk.
   - Each request is priced at list price, and the curve is scaled so it ends exactly at the
     known total. The amounts are real and only the shape in between is estimated.
-  - Everything the app didn't record is drawn lighter, quiet time included: the logs can't
+  - Everything the app didn't record is drawn in grey, quiet time included: the logs can't
     see spending elsewhere. The hover says "(estimated)" where spending was placed and
     "about $… · no activity" where the logs show none (a weekend, a night). An unrecorded
     stretch with the same amount on both sides stays solid, since nothing was spent in it.

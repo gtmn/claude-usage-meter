@@ -33,9 +33,9 @@
 
 ## Done
 
-- **Dark-mode contrast of the estimated line** (2026-11-25): a washed-out slate instead of blue at 45%,
-  3.1:1 against the background (was 1.9:1). Light mode unchanged (1.8:1), as is the fainter gap line
-  (0.25, 1.4:1 in both modes).
+- **Contrast of the estimated line** (2026-11-25): a washed-out slate instead of blue at 45%, 3.1:1
+  against the background in both modes (was 1.9:1 dark, 1.8:1 light). The fainter gap line (0.25, 1.4:1)
+  stays as it is on purpose.
 - **"Sign in…" when Claude Code's login can't be renewed** (2026-11-25): opens `claude auth login` in
   Terminal and fetches as soon as the new login is there; the menu bar item fades while signed out.
 - **The settings are open on first start** (closed with the gear, and remembered). A copy that never

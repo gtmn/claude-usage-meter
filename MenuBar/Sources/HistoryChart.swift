@@ -4,7 +4,7 @@ import SwiftUI
 // Usage history as a line over time, like a temperature curve.
 // - Budget-only accounts (Enterprise/Team): money spent across the budget period,
 //   with a dashed projection to the reset, or per UTC day as bars. Stretches the app didn't
-//   record are estimated from Claude Code's logs and drawn lighter (an unrecorded stretch
+//   record are estimated from Claude Code's logs and drawn in grey (an unrecorded stretch
 //   with the same amount on both sides stays solid: nothing was spent in it).
 // - Pro/Max: the 5 h and 7 d percentages over this week (last reset to next), with a dashed
 //   projection of the weekly limit to the reset or to 100%, whichever comes first.
@@ -60,15 +60,15 @@ enum ChartInk {
         scheme == .dark ? Color(red: 0xc9 / 255, green: 0xa2 / 255, blue: 0x27 / 255)
                         : Color(red: 0xb0 / 255, green: 0x8a / 255, blue: 0x10 / 255)
     }
-    /// The lighter, estimated part of the budget curve (and of the per-day bars). Opaque, not the
+    /// The grey, estimated part of the budget curve (and of the per-day bars). Opaque, not the
     /// series colour at 45%: on the dark background that came out darker, not lighter (#2a4d78,
-    /// 1.93:1 against #1e1e1e). Dark: a washed-out slate, 3.1:1 against the background (WCAG's 3:1
-    /// for graphics) and still OKLab ΔE 16 from the solid blue, so recorded and estimated stay
-    /// apart. Light: the same colour as before (series 1 at 45% on white, 1.84:1), where paler
-    /// already reads as lighter.
+    /// 1.93:1 against #1e1e1e), and on white too faint (#9fc2ed, 1.84:1). A washed-out slate in both
+    /// modes, the same hue and chroma (OKLCH 0.037 at 254°), at 3.1:1 against the background (WCAG's
+    /// 3:1 for graphics) and still OKLab ΔE 15-16 from the solid blue, so recorded and estimated
+    /// stay apart: dark #5c6c80 on #1e1e1e, light #8394a9 on white (paler than the solid #2a78d6).
     static func estimated(_ scheme: ColorScheme) -> Color {
         scheme == .dark ? Color(red: 0x5c / 255, green: 0x6c / 255, blue: 0x80 / 255)
-                        : Color(red: 0x9f / 255, green: 0xc2 / 255, blue: 0xed / 255)
+                        : Color(red: 0x83 / 255, green: 0x94 / 255, blue: 0xa9 / 255)
     }
     /// Reference marks (budget line, hover rule): neutral, not a series.
     static let muted = Color.primary.opacity(0.42)
@@ -680,7 +680,7 @@ struct BudgetHistoryChart: View {
     static func footnote(_ pts: [HistoryPoint], start: Date, usesLogs: Bool = true) -> String? {
         var notes: [String] = []
         if pts.contains(where: { $0.estimated == true }) {
-            notes.append("Lighter: not recorded; estimated from Claude Code's logs on this Mac, scaled to the real totals.")
+            notes.append("Grey: not recorded; estimated from Claude Code's logs on this Mac, scaled to the real totals.")
         } else if let first = pts.first, first.t.timeIntervalSince(start) > UsageHistory.fillableGap {
             notes.append("Recorded since \(localDayTime.string(from: first.t))"
                          + (usesLogs ? "; no Claude Code logs cover the time before." : "."))
@@ -799,7 +799,7 @@ private struct BudgetLine: View {
     }
 }
 
-/// Money spent per UTC day as bars; the estimated part of a day is the lighter segment at the bottom.
+/// Money spent per UTC day as bars; the estimated part of a day is the grey segment at the bottom.
 private struct DailySpendBars: View {
     let window: UsageWindow
     let days: [DaySpend]
