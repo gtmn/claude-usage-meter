@@ -60,6 +60,16 @@ enum ChartInk {
         scheme == .dark ? Color(red: 0xc9 / 255, green: 0xa2 / 255, blue: 0x27 / 255)
                         : Color(red: 0xb0 / 255, green: 0x8a / 255, blue: 0x10 / 255)
     }
+    /// The lighter, estimated part of the budget curve (and of the per-day bars). Opaque, not the
+    /// series colour at 45%: on the dark background that came out darker, not lighter (#2a4d78,
+    /// 1.93:1 against #1e1e1e). Dark: a washed-out slate, 3.1:1 against the background (WCAG's 3:1
+    /// for graphics) and still OKLab ΔE 16 from the solid blue, so recorded and estimated stay
+    /// apart. Light: the same colour as before (series 1 at 45% on white, 1.84:1), where paler
+    /// already reads as lighter.
+    static func estimated(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color(red: 0x5c / 255, green: 0x6c / 255, blue: 0x80 / 255)
+                        : Color(red: 0x9f / 255, green: 0xc2 / 255, blue: 0xed / 255)
+    }
     /// Reference marks (budget line, hover rule): neutral, not a series.
     static let muted = Color.primary.opacity(0.42)
     static let grid = Color.primary.opacity(0.12)
@@ -746,7 +756,7 @@ private struct BudgetLine: View {
             }
             ForEach(line) { p in
                 LineMark(x: .value("Time", p.t), y: .value("Spent", p.value), series: .value("Run", "spent-\(p.run)"))
-                    .foregroundStyle(p.estimated ? tint.opacity(0.45) : tint)
+                    .foregroundStyle(p.estimated ? ChartInk.estimated(scheme) : tint)
                     .lineStyle(ChartInk.line)
             }
             if let projection {
@@ -811,7 +821,7 @@ private struct DailySpendBars: View {
 
         Chart {
             ForEach(shown, id: \.day) { d in
-                bars(d, scale: scale, tint: tint, dim: active != nil && active != d.day.addingTimeInterval(43200))
+                bars(d, scale: scale, tint: tint, estimated: ChartInk.estimated(scheme), dim: active != nil && active != d.day.addingTimeInterval(43200))
             }
             // Selective label: today's amount at the top of its bar.
             if active == nil, let d = today, d.usedMinor > 0 {
@@ -855,13 +865,13 @@ private struct DailySpendBars: View {
     }
 
     @ChartContentBuilder
-    private func bars(_ d: DaySpend, scale: Double, tint: Color, dim: Bool) -> some ChartContent {
+    private func bars(_ d: DaySpend, scale: Double, tint: Color, estimated: Color, dim: Bool) -> some ChartContent {
         let x0 = d.day.addingTimeInterval(86400 * 0.14), x1 = d.day.addingTimeInterval(86400 * 0.86)
         let est = Double(d.estimatedMinor) / scale, total = Double(d.usedMinor) / scale
         if est > 0 {
             RectangleMark(xStart: .value("Day", x0), xEnd: .value("Day", x1),
                     yStart: .value("Spent", 0), yEnd: .value("Spent", est))
-                .foregroundStyle(tint.opacity(dim ? 0.2 : 0.45))
+                .foregroundStyle(estimated.opacity(dim ? 0.45 : 1))
         }
         if total > est {
             RectangleMark(xStart: .value("Day", x0), xEnd: .value("Day", x1),

@@ -93,7 +93,11 @@ options that were ruled out, so they aren't tried again.
 - **Unrecorded stretches are estimated from Claude Code's logs** (`~/.claude/projects/**/*.jsonl`, deduplicated
   by message id + requestId, priced at list prices), scaled to the real totals at both ends of a gap.
 - **Drawing rule:** everything the app didn't record itself is drawn lighter. The hover says "no activity"
-  only where the logs show none, and "(estimated)" where spending was placed. A gap with the same amount on
+  only where the logs show none, and "(estimated)" where spending was placed. In dark mode "lighter"
+  is a washed-out slate (#5c6c80, 3.1:1 against the background), not the blue at 45% opacity, which
+  came out darker on a dark background (1.9:1). Not the blue at 75% either: that reaches 3:1 but is
+  hard to tell from the solid line (1.45:1 between them); the slate differs in colour, not just
+  brightness (OKLab ΔE 16). A gap with the same amount on
   both sides stays solid: nothing happened, and that is known.
 - **Pro/Max extra usage is recorded only, never estimated from logs.** On Pro/Max most activity is covered by
   the plan, so the logs can't tell which part was paid extra.

@@ -21,7 +21,6 @@
   runs; merged, they'd give the whole curve. One history file per Mac in iCloud Drive (`history-<Mac>.json`:
   each Mac writes only its own, so no sync conflicts); the app reads all of them and merges by time (one point
   per window per 10 minutes, as now). Only worth it once the curve is watched on more than one Mac.
-- Dark-mode contrast of the lighter (estimated) line.
 - From ClaudeUsageBar, another menu bar app: notifications, reset countdowns, service status, a global
   shortcut, and hiding the numbers while on pace (its PR #124).
 - Developer ID signing and notarization for the download (needs a paid Apple developer account).
@@ -30,6 +29,9 @@
 
 ## Done
 
+- **Dark-mode contrast of the estimated line** (2026-11-25): a washed-out slate instead of blue at 45%,
+  3.1:1 against the background (was 1.9:1). Light mode unchanged (1.8:1), as is the fainter gap line
+  (0.25, 1.4:1 in both modes).
 - **The settings are open on first start** (closed with the gear, and remembered). A copy that never
   touched the gear also opens them once after the update, since "not set" now means open.
 - **Last period's pace no longer names the reset date** ("At last month's pace: about $1,990 by the reset"),
