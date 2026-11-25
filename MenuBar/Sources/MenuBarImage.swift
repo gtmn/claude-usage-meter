@@ -159,6 +159,9 @@ enum MenuBarImage {
         var extra = false
         var limits = Limits.both
         var projection = Projection.off
+        /// The numbers are old (signed out of Claude Code, or no fetch has worked for a while): no pace
+        /// colours, the item faded, and in Dots and Off a red dot in front (see `item`).
+        var stale = false
         enum Key {
             static let labels = "menuBarShowLabels", percent = "menuBarShowPercent"
             static let pace = "menuBarShowPace", ahead = "menuBarShowAhead", aheadAs = "menuBarAheadAs"
@@ -205,6 +208,7 @@ enum MenuBarImage {
     /// The bar's or ring's fill: its pace colour, the text colour in Mono, and in Alerts the pace
     /// colour only once it's ahead of pace or nearly full (yellow or orange).
     static func fillColor(_ row: Row, _ o: Options) -> NSColor {
+        if o.stale { return .secondaryLabelColor }   // old numbers have no pace worth colouring
         switch o.palette {
         case .colour: return color(paceState(row))
         case .mono: return .labelColor
@@ -414,20 +418,41 @@ enum MenuBarImage {
     /// it: there's no room for a third row in the menu bar's height.
     static func item(style: Style, rows: [Row], rings: [Row], extra: Row?, options o: Options) -> NSImage? {
         let (rows, rings) = (o.limits.pick(rows), o.limits.pick(rings))
+        let paceDots = style == .dots && !o.stale   // stale: one red dot instead (below)
         let main = style == .compact && !rings.isEmpty ? makeCompact(rings: rings, options: o)
-            : (style == .dots || style == .text) && !rows.isEmpty ? makeDots(rows: rows, options: o, dots: style == .dots)
+            : (style == .dots || style == .text) && !rows.isEmpty ? makeDots(rows: rows, options: o, dots: paceDots)
             : style == .icon && !rows.isEmpty ? makeDots(rows: rows, options: o, dots: false, gauge: true)
             : !rows.isEmpty ? make(rows: rows, options: o) : nil
         guard let main else { return nil }
-        guard o.extra, let extra else { return main }
-        let extraItem = style == .compact ? makeCompact(rings: [extra], options: o)
-            : style == .dots || style == .text || style == .icon
-                ? makeDots(rows: [extra], options: o, dots: style == .dots, gauge: style == .icon)
-            : make(rows: [extra], options: o)
-        return beside(main, extraItem)
+        let whole: NSImage
+        if o.extra, let extra {
+            let extraItem = style == .compact ? makeCompact(rings: [extra], options: o)
+                : style == .dots || style == .text || style == .icon
+                    ? makeDots(rows: [extra], options: o, dots: paceDots, gauge: style == .icon)
+                : make(rows: [extra], options: o)
+            whole = beside(main, extraItem)
+        } else {
+            whole = main
+        }
+        // Old numbers: faded (with grey fills, see `fillColor`); Dots and Off, which have no fill to
+        // grey, get a red dot in front, the one thing in the item at full strength.
+        guard o.stale else { return whole }
+        return style == .dots || style == .text ? warningDot(before: faded(whole)) : faded(whole)
     }
 
-    /// The item while signed out of Claude Code: the same drawing, fainter, since its numbers are
+    /// A small red dot before `image`, centred on its height: the stale warning in Dots and Off.
+    static func warningDot(before image: NSImage, dot: CGFloat = 5, gap: CGFloat = 3) -> NSImage {
+        let size = NSSize(width: dot + gap + image.size.width, height: max(image.size.height, dot))
+        return NSImage(size: size, flipped: false) { _ in
+            NSColor.systemRed.setFill()
+            NSBezierPath(ovalIn: NSRect(x: 0, y: (size.height - dot) / 2, width: dot, height: dot)).fill()
+            image.draw(in: NSRect(x: dot + gap, y: (size.height - image.size.height) / 2,
+                                  width: image.size.width, height: image.size.height))
+            return true
+        }
+    }
+
+    /// The item with old numbers (signed out of Claude Code, or no fetch working): the same drawing, fainter, since its numbers are
     /// getting old. Keeps the item's drawing handler, so its colours still follow the menu bar's appearance.
     static func faded(_ image: NSImage, alpha: CGFloat = 0.45) -> NSImage {
         NSImage(size: image.size, flipped: false) { rect in
@@ -512,7 +537,7 @@ enum MenuBarImage {
         guard let symbol = NSImage(systemSymbolName: name, accessibilityDescription: nil)?.withSymbolConfiguration(config)
         else { return nil }
         let worst = rows.max { paceState($0) < paceState($1) }
-        let tint: NSColor = worst.map { row in
+        let tint: NSColor = o.stale ? .secondaryLabelColor : worst.map { row in
             switch o.palette {
             case .colour: return color(paceState(row))
             case .mono: return .labelColor

@@ -10,7 +10,7 @@ struct UsageMeterApp: App {
     )
 
     init() {
-        // `UsageMeter --render-preview out.png [live] [offline] [enterprise] [hover] [light] [daily] [seen] [saved] [compact|dots|icon|text] [mono] [amount] [extra] [fable] [only5h|only7d] [beside|projected] [update] [signedout] [panel|settings|scene] [nolabels] [nopercent] [nopace] [noahead] [left|early] [overview|day] [back=N] [full|burst]` (`hover=0.85`: pointer at 85% of the times): render the panel rows (`panel`: the whole popup; `settings`: its menu bar settings; `scene`: the whole popup opened under the item on a plain menu bar) to a PNG and exit.
+        // `UsageMeter --render-preview out.png [live] [offline] [enterprise] [hover] [light] [daily] [seen] [saved] [compact|dots|icon|text] [mono] [amount] [extra] [fable] [only5h|only7d] [beside|projected] [update] [signedout] [panel|settings|scene] [nolabels] [nopercent] [nopace] [noahead] [left|early] [overview|day] [back=N] [full|burst] [stale]` (`hover=0.85`: pointer at 85% of the times): render the panel rows (`panel`: the whole popup; `settings`: its menu bar settings; `scene`: the whole popup opened under the item on a plain menu bar) to a PNG and exit.
         let args = CommandLine.arguments
         if args.contains("--check-update") { Updater.checkFromCommandLine() }
         if let i = args.firstIndex(of: "--render-preview"), i + 1 < args.count {
@@ -237,11 +237,12 @@ enum PreviewRenderer {
                                            budgetAs: args.contains("amount") ? .amount : .percent,
                                            extra: args.contains("extra"),
                                            limits: args.contains("only5h") ? .session : args.contains("only7d") ? .week : .both,
-                                           projection: args.contains("projected") || args.contains("beside") ? .on : .off)
+                                           projection: args.contains("projected") || args.contains("beside") ? .on : .off,
+                                           stale: args.contains("stale") || model.signedOut)
         guard let item = MenuBarImage.item(style: args.contains("compact") ? .compact : args.contains("dots") ? .dots : args.contains("text") ? .text : args.contains("icon") ? .icon : .bars, rows: model.menuBarRows(),
                                            rings: model.compactRings(), extra: model.extraRow(), options: options)
         else { return nil }
-        return model.signedOut ? MenuBarImage.faded(item) : item   // `signedout`: faded, as in the menu bar
+        return item   // `stale` (and `signedout`): old numbers, as in the menu bar
     }
 
     /// The menu bar item, enlarged 6x, on a light and a dark menu bar (two stacked strips).

@@ -211,6 +211,17 @@ final class UsageModel: ObservableObject {
     /// the popup offers Sign in… and the menu bar item fades. Cleared by the next successful fetch.
     @Published private(set) var signedOut = false
     static let signedOutMessage = "Signed out of Claude Code"
+
+    /// The numbers on show are old: signed out of Claude Code, or more than `staleAfter` old and the
+    /// latest fetch since then failed (offline, rate-limited, …). Right after waking from sleep the
+    /// numbers are old too, but no fetch has failed yet: the wake fetch replaces them first.
+    func isStale(now: Date = Date()) -> Bool {
+        if signedOut { return true }
+        guard let s = snapshot, now.timeIntervalSince(s.capturedAt) > Self.staleAfter else { return false }
+        return !isLoading && (lastAttempt.map { s.capturedAt < $0.addingTimeInterval(-60) } ?? false)
+    }
+    /// Three missed 5-minute fetches.
+    static let staleAfter: TimeInterval = 15 * 60
     /// After Sign in…: waiting for the new login, or Terminal couldn't be opened.
     enum SignInProgress: Equatable { case waiting, couldNotOpen }
     @Published private(set) var signInProgress: SignInProgress?

@@ -24,12 +24,13 @@ struct MenuBarLabel: View {
                                            palette: MenuBarImage.Palette(saved: palette),
                                            budgetAs: MenuBarImage.BudgetAs(saved: budgetAs), extra: showExtra,
                                            limits: MenuBarImage.Limits(saved: limits),
-                                           projection: MenuBarImage.Projection(saved: projection))
+                                           projection: MenuBarImage.Projection(saved: projection),
+                                           stale: model.isStale())
         Group {
             if let image = MenuBarImage.item(style: MenuBarImage.Style(saved: style), rows: model.menuBarRows(),
                                              rings: model.compactRings(), extra: model.extraRow(), options: options) {
-                // Signed out of Claude Code: faded, since the numbers it shows are getting old.
-                Image(nsImage: model.signedOut ? MenuBarImage.faded(image) : image)
+                // Old numbers (signed out, or no fetch working) are faded inside `item`.
+                Image(nsImage: image)
             } else {
                 Image(systemName: model.error == nil ? "gauge.with.dots.needle.0percent" : "exclamationmark.circle")
             }

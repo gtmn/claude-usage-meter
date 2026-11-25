@@ -169,9 +169,14 @@ asks once from the command line.
      model and costs nothing. (`claude auth status` only reports the expiry.) The command's output
      is discarded; the app logs only whether the login was renewed, in `~/Library/Logs/UsageMeter.log`.
    - If that doesn't bring the login back (Claude Code's longer-lived refresh token has run out too),
-     the popup says *Signed out of Claude Code* with a **Sign in…** button and the menu bar item fades.
+     the popup says *Signed out of Claude Code* with a **Sign in…** button and the menu bar item shows
+     its numbers are old (below).
      The button opens Terminal running `claude auth login`, Claude Code's own sign-in; the app doesn't
      see it, and fetches again as soon as the new login is in the Keychain.
+   - **Old numbers in the menu bar**: while signed out, or once no fetch has worked for over 15 minutes
+     (offline, rate-limited, …), the item fades and drops its pace colours: bars, rings and the gauge
+     turn grey, and Dots and Off get a small red dot in front instead. Right after the Mac wakes it
+     fetches first, so the warning doesn't flash.
    - It reads the item the same way Claude Code does, through Apple's `security` tool, which the
      item already trusts. So there's no Keychain password dialog, not after a rebuild and not after
      Claude Code refreshes its token. (Asking the Keychain directly would prompt each time, because
