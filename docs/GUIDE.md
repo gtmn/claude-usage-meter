@@ -101,7 +101,7 @@ window. In the first 15% of a window (45 minutes of the 5-hour window, about a d
 of the week, about 4½ days of the month) that rate alone is too jumpy: $20 in the
 first two hours of a month would project to $7,200. So the week and the budget start
 from the previous period's average pace instead, from the app's own history, e.g.
-*At last month's pace: about $600 by the 1 Jan reset*. A period counts once the app
+*At last month's pace: about $600 by the reset*. A period counts once the app
 recorded at least a quarter of it; if the last one has less (the Mac was off), the most
 recent earlier one the history covers stands in (*At an earlier week's pace: …*). As the
 first 15% goes by, this period's own spending counts more and more, and after it only this

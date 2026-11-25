@@ -184,7 +184,7 @@ check("3 h into the month: projects instead of 'too early'",
       !early.isTooEarlyToProject(now: day1) && early.projectsFromPriorPace(now: day1) && dec.isTooEarlyToProject(now: day1))
 let endPct = early.projectedPercentAtReset(now: day1) ?? 0
 check("…to about last month's total plus a little for the busy start (\(Int(endPct * 20))$)", (31...40).contains(endPct))
-check("…and says so", early.outlook(now: day1, calendar: cal) == "At last month's pace: about $720 by the 1 Jan reset")
+check("…and says so", early.outlook(now: day1, calendar: cal) == "At last month's pace: about $720 by the reset")
 let rampEnd = at("2026-12-01 00:00").addingTimeInterval(31 * 86400 * 0.15)
 var atRamp = early; atRamp = UsageWindow(key: "extra_usage", percent: 10, resetsAt: early.resetsAt, spend: early.spend, priorPace: novPace)
 check("at 15% of the month the pace is this month's own (no jump)",

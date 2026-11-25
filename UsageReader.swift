@@ -253,13 +253,10 @@ public struct UsageWindow: Equatable {
             return "Runs out \(HumanTime.moment(hit, now: now, calendar: calendar)), \(early) before \(HumanTime.dayName(reset, now: now, calendar: calendar, possessive: true)) reset"
         }
         if percent > 0, isTooEarlyToProject(now: at) { return "Too early to project" }
-        let resetText = reset.timeIntervalSince(now) < 12 * 3600
-            ? "the reset at \(HumanTime.clock(reset, calendar.timeZone))"
-            : "\(HumanTime.dayName(reset, now: now, calendar: calendar, possessive: true)) reset"
         if let end = projectedPercentAtReset(now: at), percent > 0 || fromPrior {
             if fromPrior {
                 let amount = spend.map { $0.approx(percent: end) } ?? String(format: "%.0f%%", (end / 5).rounded() * 5)
-                return "At \(priorPeriodName) pace: about \(amount) by \(resetText)"
+                return "At \(priorPeriodName) pace: about \(amount) by the reset"
             }
             if let spend { return "Lasts until the reset — on track for about \(spend.approx(percent: end))" }
             return String(format: "Lasts until the reset — on track for about %.0f%%", (end / 5).rounded() * 5)
