@@ -175,7 +175,7 @@ asks once from the command line.
      see it, and fetches again as soon as the new login is in the Keychain.
    - **Old numbers in the menu bar**: while signed out, or once no fetch has worked for over 15 minutes
      (offline, rate-limited, …), the item fades and drops its pace colours: bars, rings and the gauge
-     turn grey, and Dots and Off get a small red dot in front instead. Right after the Mac wakes it
+     turn grey, Dots gets a small red dot in place of its pace dots, and Off is just greyed out. Right after the Mac wakes it
      fetches first, so the warning doesn't flash.
    - It reads the item the same way Claude Code does, through Apple's `security` tool, which the
      item already trusts. So there's no Keychain password dialog, not after a rebuild and not after

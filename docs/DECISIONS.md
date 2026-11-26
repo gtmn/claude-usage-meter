@@ -19,10 +19,13 @@ options that were ruled out, so they aren't tried again.
   background process can't get, and the app would be driving a sign-in it can't see) and signing in
   without a click (it would open browser tabs unasked). Copy-the-command only is the fallback when
   Terminal can't be opened. The menu bar item fades while signed out, since its numbers are getting old.
+  Tried for real on 2026-11-25 (worked; the refresh token lasts about four weeks). A long-lived
+  `claude setup-token` token was ruled out on 2026-11-26: the usage endpoint answers 403 to it.
 - **Old numbers show in the menu bar** (2026-11-25): signed out, or more than 15 minutes old with the
   latest fetch since then failed (three missed 5-minute fetches; after waking, the wake fetch comes
-  first). The item fades and its fills turn grey: old numbers have no pace worth colouring. Dots and Off
-  have no fill to grey, so they get a red dot in front, the only thing at full strength. The fade alone
+  first). The item fades and its fills turn grey: old numbers have no pace worth colouring. Dots has no fill
+  to grey, so a red dot takes the place of its pace dots, the only thing at full strength. Off, with no
+  graphic, is only greyed out (a dot there would add a graphic Off is meant to be without). The fade alone
   was easy to miss: on 2026-11-25 the bar sat at 13:17 numbers for ten hours after Claude Code's refresh
   token ran out (`loginEnded: time_limit`, well before the 7 Dec it was expected).
 - **Status line as the fallback source.** Claude Code passes `rate_limits` to status-line commands, so the

@@ -2,19 +2,13 @@
 
 ## Next
 
-1. **Try "Sign in…" for real** before or on 2026-12-07, when Claude Code's refresh token here expires.
-   Built (option A, see [SIGN-IN-AGAIN.md](SIGN-IN-AGAIN.md)), checked only with renders. Either wait for
-   the expiry or run `claude auth logout` on a day when signing in again is convenient. Then check: the
-   popup shows **Sign in…** after the first failed nudge, the menu bar item fades, Terminal opens without
-   a Gatekeeper prompt, and after signing in the numbers come back within about 10 s; the log has the
-   "sign-in: …" lines.
-2. **Test the Update button's restart with 0.1.14 → 0.1.15.** 0.1.12 → 0.1.13 installed fine (2026-11-21,
+1. **Test the Update button's restart with 0.1.14 → 0.1.15.** 0.1.12 → 0.1.13 installed fine (2026-11-21,
    "brew upgrade to 0.1.13 exited with 0") but the new copy didn't start: `launchctl kickstart` kept the old
    code signature (see DECISIONS, Distribution). Fixed with a detached `brew services restart`, which ships in
    0.1.14; the update *to* 0.1.14 still runs 0.1.13's restart, so run `brew services restart
    claude-usage-meter` after it. On the next one, check the log for "brew services restart exited with 0"
    and that the app comes back by itself.
-3. **Test the downloaded copy's Update** (still untested): unpack an older release zip into a scratch folder,
+2. **Test the downloaded copy's Update** (still untested): unpack an older release zip into a scratch folder,
    open that copy, click Update, and check that it replaces itself and reopens as the new version. Also check
    whether its Open at login item still works after the swap (macOS may have recorded the old signature
    there too).
@@ -33,6 +27,11 @@
 
 ## Done
 
+- **"Sign in…" tried for real** (2026-11-25): Claude Code's refresh token ran out (`loginEnded:
+  time_limit`), the dev build showed it signed out, Sign in… opened `claude auth login` in Terminal and new
+  numbers came two minutes later. Open: no "sign-in: login valid until" log line. A long-lived
+  `claude setup-token` token was ruled out (403 from the usage endpoint). See
+  [SIGN-IN-AGAIN.md](SIGN-IN-AGAIN.md).
 - **Contrast of the estimated line** (2026-11-25): a washed-out slate instead of blue at 45%, 3.1:1
   against the background in both modes (was 1.9:1 dark, 1.8:1 light). The fainter gap line (0.25, 1.4:1)
   stays as it is on purpose.

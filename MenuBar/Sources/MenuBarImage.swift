@@ -160,7 +160,7 @@ enum MenuBarImage {
         var limits = Limits.both
         var projection = Projection.off
         /// The numbers are old (signed out of Claude Code, or no fetch has worked for a while): no pace
-        /// colours, the item faded, and in Dots and Off a red dot in front (see `item`).
+        /// colours, the item faded, and in Dots a red dot in place of the pace dots (see `item`).
         var stale = false
         enum Key {
             static let labels = "menuBarShowLabels", percent = "menuBarShowPercent"
@@ -434,13 +434,14 @@ enum MenuBarImage {
         } else {
             whole = main
         }
-        // Old numbers: faded (with grey fills, see `fillColor`); Dots and Off, which have no fill to
-        // grey, get a red dot in front, the one thing in the item at full strength.
+        // Old numbers: faded (with grey fills, see `fillColor`). Dots, whose dots would otherwise just
+        // vanish, gets a red dot in their place, the one thing in the item at full strength. Off has
+        // no graphic at all, so it's only greyed out.
         guard o.stale else { return whole }
-        return style == .dots || style == .text ? warningDot(before: faded(whole)) : faded(whole)
+        return style == .dots ? warningDot(before: faded(whole)) : faded(whole)
     }
 
-    /// A small red dot before `image`, centred on its height: the stale warning in Dots and Off.
+    /// A small red dot before `image`, centred on its height: the stale warning in Dots.
     static func warningDot(before image: NSImage, dot: CGFloat = 5, gap: CGFloat = 3) -> NSImage {
         let size = NSSize(width: dot + gap + image.size.width, height: max(image.size.height, dot))
         return NSImage(size: size, flipped: false) { _ in

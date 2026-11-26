@@ -1,8 +1,8 @@
 # "Sign in again" button: options
 
 Status: **decided 2026-11-25: option A, with C as the fallback, and the menu bar item fades while signed
-out.** Built on `claude/overnight-polish` (see "What was built" at the end). Not yet tried for real: that
-needs an expired refresh token (due 2026-12-07 on the main Mac) or a deliberate `claude auth logout`.
+out.** Built on `claude/overnight-polish` (see "What was built" at the end). **Tried for real on
+2026-11-25** (see "Tried for real" at the end).
 
 ## The problem
 
@@ -106,7 +106,7 @@ render and the flow once with `claude auth logout` followed by the button, on a 
 is convenient.
 
 Decided (2026-11-25): A, with C's text and Copy button as the fallback; the menu bar item fades while signed
-out. Still open: test with a deliberate `claude auth logout` before 7 Dec, or wait for the real expiry.
+out.
 
 ## What was built
 
@@ -130,3 +130,24 @@ out. Still open: test with a deliberate `claude auth logout` before 7 Dec, or wa
 
 Not verified: that a `.command` file the app writes opens without a Gatekeeper prompt, and how
 `claude auth login` behaves when its refresh token has run out. Both need the real flow.
+
+## Tried for real (2026-11-25)
+
+- Claude Code's refresh token ran out on 25 Nov at 06:10, earlier than the 7 Dec expected: the Keychain item
+  then had no tokens and `loginEnded: time_limit`. The 13:22 nudge logged "login renewed: no"; the menu bar
+  kept the 13:17 numbers (0.1.15 had no signed-out state yet), which led to the stale warning.
+- A dev build showed it as signed out right away (no Keychain token at all counts as signed out, without a
+  nudge). **Sign in…** opened Terminal running `claude auth login` (log: "sign-in: opened claude auth login
+  in Terminal", 23:57:53); after signing in, fresh numbers came at 23:59:47. The new refresh token runs to
+  24 Dec: about four weeks, so expect to sign in about once a month.
+- Open: the log has no "sign-in: login valid until …" line, though the login came back. Probably the regular
+  fetch picked the new login up before the 10-second watch did and ended the wait without logging it.
+  Whether a Gatekeeper prompt appeared before Terminal opened wasn't noted.
+
+## Ruled out: a long-lived `claude setup-token` token (2026-11-26)
+
+Tested as a way to skip the monthly sign-in: `claude setup-token` makes a long-lived token, but
+`/api/oauth/usage` answers **HTTP 403** to it, on both kinds of plan (Pro/Max and an Enterprise/Team seat). It's made for model
+requests (Claude Code's own login also carries `user:profile`, which the usage endpoint likely needs).
+Reading usage from the rate-limit headers of a model request made with it would cost usage on every check,
+against the rule that the meter sends no model requests. Not an option.
