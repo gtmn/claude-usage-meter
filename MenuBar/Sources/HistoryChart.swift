@@ -938,14 +938,16 @@ private struct BudgetDayLine: View {
         .accessibilityLabel("Money used over the day, \(title.lowercased())")
     }
 
-    /// A scale around the day's amounts on round steps: two or three steps from just below the
-    /// lowest to just above the highest.
+    /// A scale around the day's amounts on round steps, with room below the lowest (for the 00:00
+    /// label under the line) and above the highest (for the end label): about a third of the day's
+    /// range each way, then out to the next round step.
     static func scale(_ values: [Double]) -> (low: Double, high: Double, step: Double) {
         let lo = values.min() ?? 0, hi = values.max() ?? 0
-        let step = niceCeil(max((hi - lo) * 1.15, hi * 0.02, 1) / 2)
-        let low = max(0, (lo / step).rounded(.down) * step)
-        var high = (hi / step).rounded(.up) * step
-        if high - hi < step * 0.15 { high += step }   // room for the end label
+        let span = max(hi - lo, hi * 0.02, 1)
+        let padLow = lo - span * 0.35, padHigh = hi + span * 0.3
+        let step = niceCeil((padHigh - padLow) / 3)
+        let low = max(0, (padLow / step).rounded(.down) * step)
+        let high = (padHigh / step).rounded(.up) * step
         return (low, max(high, low + step), step)
     }
 }
