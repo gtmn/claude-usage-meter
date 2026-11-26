@@ -113,7 +113,7 @@ enum PreviewRenderer {
             Key.aheadAs: a.contains("left") ? "left" : a.contains("early") ? "early" : "points",
             Key.palette: a.contains("mono") ? "mono" : a.contains("alerts") ? "alerts" : "colour",
             Key.budgetAs: a.contains("amount") ? "amount" : "percent",
-            "budgetChartMode": a.contains("daily") ? "daily" : "total",
+            "budgetChartMode": a.contains("daily") ? "daily" : a.contains("day") ? "day" : "total",
             Key.extra: a.contains("extra"),
             UsagePanel.settingsShownKey: a.contains("panel") || a.contains("scene"),   // the whole popup shows its settings open
             Updater.enabledKey: a.contains("update"),

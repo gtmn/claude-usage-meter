@@ -195,6 +195,27 @@ extension UsageHistory {
         return out.sorted { $0.t < $1.t }
     }
 
+    /// One day of the budget (the Day view): the points from `from` to `to`, led by the amount
+    /// already used at `from` (the last point before it, moved there), so the line starts where the
+    /// day did. A drop within the day (the period's reset) stays in. `pts`: oldest first.
+    public static func budgetDay(_ pts: [HistoryPoint], from: Date, to: Date) -> [HistoryPoint] {
+        let used = pts.filter { $0.usedMinor != nil }
+        var day = used.filter { $0.t.isAtOrAfter(from) && $0.t < to }
+        if let before = used.last(where: { $0.t < from }), day.first?.t != from {
+            day.insert(HistoryPoint(t: from, key: before.key, percent: before.percent, usedMinor: before.usedMinor,
+                                    estimated: before.estimated, idle: before.idle), at: 0)
+        }
+        return day
+    }
+
+    /// Money spent over `pts`: each increase, and after a reset (a drop) the new amount.
+    public static func spent(_ pts: [HistoryPoint]) -> Int64 {
+        let used = pts.compactMap(\.usedMinor)
+        return zip(used, used.dropFirst()).reduce(0) { sum, pair in
+            sum + (pair.1 < pair.0 ? pair.1 : pair.1 - pair.0)
+        }
+    }
+
     /// Money spent per UTC day. Each increase counts on the day it was seen; a reset (a drop)
     /// counts the new amount as spent since the reset.
     public static func dailySpend(_ pts: [HistoryPoint]) -> [DaySpend] {

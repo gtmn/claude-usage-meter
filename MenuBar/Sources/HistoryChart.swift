@@ -577,7 +577,7 @@ struct BudgetHistoryChart: View {
     @Environment(\.previewBudgetMode) private var previewMode
     @Environment(\.previewChartScale) private var previewScale
     @Environment(\.previewBack) private var previewBack
-    /// How many periods back (Total, Per day), or pages of periods back (the overview).
+    /// How many periods back (Total, Per day), days back (Day), or pages of periods back (the overview).
     @ViewState private var stepBack = 0
 
     var body: some View {
@@ -585,19 +585,24 @@ struct BudgetHistoryChart: View {
         let reset = window.resetsAt ?? now
         let back = previewBack ?? stepBack
         let currentStart = reset.addingTimeInterval(-(window.duration ?? 30 * 86400))
-        let start = back == 0 ? currentStart : UsageHistory.periodStart(of: window, back: back) ?? currentStart
-        let end = back == 0 ? reset : UsageHistory.periodStart(of: window, back: back - 1) ?? reset
         let period = spend.period
-        let filled = points(back: back, start: start, end: end, spend: spend)
+        // Day and Per day only for a budget longer than a day (a daily one's period is the day).
         let perDayAllowed = period != "daily"
         let overviewAllowed = window.resetsAt != nil
         let mode = chosenMode(perDayAllowed: perDayAllowed, overviewAllowed: overviewAllowed)
+        let day = mode == "day"
+        let (start, end) = day ? LimitsHistoryChart.dayRange(now: now, back: back)
+            : (back == 0 ? currentStart : UsageHistory.periodStart(of: window, back: back) ?? currentStart,
+               back == 0 ? reset : UsageHistory.periodStart(of: window, back: back - 1) ?? reset)
+        let filled = day ? dayPoints(start: start, end: end, currentStart: currentStart, spend: spend)
+            : points(back: back, start: start, end: end, spend: spend)
         let unit = period == "weekly" ? "week" : period == "daily" ? "day" : "month"
         let units = period == "weekly" ? "weeks" : period == "daily" ? "days" : "months"
         let oldest = history.series(window.key, from: .distantPast).first { $0.estimated != true }?.t
         let periods = mode == "overview" ? history.periods(of: window) : []
         let what = extra ? "Extra usage" : "Spent"
         let title = mode == "overview" ? (back == 0 ? "Recent \(units)" : "Earlier \(units)")
+            : day ? LimitsHistoryChart.dayTitle(start, back: back)
             : back > 0 ? Self.periodName(start, end, period: period)   // the switch says Month (or Week) or Per day
             : mode == "daily" ? "\(what) per day" : "\(what) this \(unit)"
 
@@ -608,10 +613,17 @@ struct BudgetHistoryChart: View {
                                                             : oldest.map { $0 < start } ?? false,
                               back: $stepBack)
                 if mode == "daily" { Text("UTC days").font(.system(size: 10)).foregroundStyle(.secondary) }
+                if day, filled.count >= 2 {
+                    let scale = pow(10, Double(spend.limit.exponent))
+                    Text("+" + currency(Double(UsageHistory.spent(filled)) / scale, spend.limit.currency,
+                                        decimals: spend.limit.exponent))
+                        .font(.system(size: 10)).foregroundStyle(.secondary).monospacedDigit()
+                }
                 Spacer()
                 // The running total is named by its period ("Month", like the limits graph's "Week"):
                 // "Total" didn't say of what, and "This month" would be wrong after stepping back.
-                let options = [("total", unit.capitalized)] + (perDayAllowed ? [("daily", "Per day")] : [])
+                let options = (perDayAllowed ? [("day", "Day")] : []) + [("total", unit.capitalized)]
+                    + (perDayAllowed ? [("daily", "Per day")] : [])
                     + (overviewAllowed ? [("overview", units.capitalized)] : [])
                 if options.count > 1 {
                     ModeSwitch(mode: Binding(get: { mode }, set: { savedMode = $0; stepBack = 0 }), options: options)
@@ -636,6 +648,10 @@ struct BudgetHistoryChart: View {
                 }
             } else if filled.count < 2 {
                 EmptyHistory()
+            } else if day {
+                BudgetDayLine(window: window, points: filled, start: start, end: end, now: back == 0 ? now : end,
+                              resets: dayResets(start: start, end: end, currentStart: currentStart),
+                              limitName: extra ? "Limit" : "Budget", title: title)
             } else if mode == "daily" {
                 DailySpendBars(window: window, days: UsageHistory.dailySpend(filled), start: start, end: end,
                                now: back == 0 ? now : end)
@@ -643,7 +659,8 @@ struct BudgetHistoryChart: View {
                 BudgetLine(window: window, points: filled, start: start, reset: end, now: back == 0 ? now : end,
                            limitName: extra ? "Limit" : "Budget", past: back > 0)
             }
-            if mode != "overview", let note = Self.footnote(filled, start: start, usesLogs: !extra && back == 0) {
+            if mode != "overview", let note = Self.footnote(filled, start: start,
+                                                            usesLogs: !extra && (day ? end > currentStart : back == 0)) {
                 Text(note).font(.system(size: 10)).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -659,9 +676,26 @@ struct BudgetHistoryChart: View {
         return UsageHistory.filledBudget(recorded, periodStart: start, weights: logWeights, limitMinor: spend.limit.minor)
     }
 
+    /// One local day: what was used at its start, then the day's points. The current period's part
+    /// comes with its estimates (as in the Month view), the part before it as recorded.
+    private func dayPoints(start: Date, end: Date, currentStart: Date, spend: Spend) -> [HistoryPoint] {
+        let earlier = history.series(window.key, from: .distantPast, to: min(end, currentStart))
+            .filter { $0.usedMinor != nil && $0.t < currentStart }
+        let current = end > currentStart ? points(back: 0, start: currentStart, end: window.resetsAt ?? now, spend: spend) : []
+        return UsageHistory.budgetDay(earlier + current, from: start, to: end)
+    }
+
+    /// Where the budget reset within the day: a recorded drop, or the current period's start.
+    private func dayResets(start: Date, end: Date, currentStart: Date) -> [Date] {
+        var out = history.resets(window.key, from: start, to: end)
+        if currentStart.isAtOrAfter(start), currentStart < end,
+           !out.contains(where: { abs($0.timeIntervalSince(currentStart)) < 1200 }) { out.append(currentStart) }
+        return out.sorted()
+    }
+
     private func chosenMode(perDayAllowed: Bool, overviewAllowed: Bool) -> String {
-        let mode = previewScale == "overview" ? "overview" : previewMode ?? savedMode
-        if mode == "daily" && !perDayAllowed || mode == "overview" && !overviewAllowed { return "total" }
+        let mode = previewScale == "overview" ? "overview" : previewScale == "day" ? "day" : previewMode ?? savedMode
+        if (mode == "daily" || mode == "day") && !perDayAllowed || mode == "overview" && !overviewAllowed { return "total" }
         return mode
     }
 
@@ -796,6 +830,123 @@ private struct BudgetLine: View {
         .padding(.top, 6)
         .frame(height: 110)
         .accessibilityLabel("Money spent over time this budget period")
+    }
+}
+
+/// One day of the budget: the amount used, from what it was at 00:00 to 24:00, on a scale that
+/// fits the day (so the day's spending isn't a sliver at the top of the month's). A dashed line
+/// where the budget reset. No projection: the budget's runs to its reset, not to midnight.
+private struct BudgetDayLine: View {
+    let window: UsageWindow
+    let points: [HistoryPoint]
+    let start: Date, end: Date, now: Date
+    let resets: [Date]
+    var limitName = "Budget"
+    let title: String
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.previewHover) private var previewHover
+    @ViewState private var hovered: Date?
+
+    var body: some View {
+        let spend = window.spend!
+        let code = spend.limit.currency
+        let scale = pow(10, Double(spend.limit.exponent))
+        let values = points.map { Double($0.usedMinor ?? 0) / scale }
+        let line = ChartPoint.runs(points.map { ($0.t, Double($0.usedMinor ?? 0) / scale, $0.estimated == true) })
+        let startsLate = points.first.map { $0.t.timeIntervalSince(start) > UsageHistory.fillableGap } ?? false
+        let gaps = ChartGap.gaps(points.map { ($0.t, Double($0.usedMinor ?? 0) / scale) })
+        let (low, high, step) = Self.scale(values)
+        let showLimit = spend.limit.amount <= high && spend.limit.amount >= low
+        // Cents where whole amounts would read the same ($11.91 → $12.40, not $12 → $12).
+        let axisDecimals = step < 1 ? spend.limit.exponent : 0
+        let labelDecimals = high - low < 10 ? spend.limit.exponent : 0
+        let tint = ChartInk.series1(scheme)
+        let times = line.map(\.t)
+        let active = activeHover(hovered, preview: previewHover, times: times)
+
+        Chart {
+            ForEach(resets, id: \.self) { r in
+                RuleMark(x: .value("Reset", r)).foregroundStyle(ChartInk.muted)
+                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [2, 3]))
+            }
+            if showLimit {
+                RuleMark(y: .value("Budget", spend.limit.amount))
+                    .foregroundStyle(ChartInk.muted)
+                    .lineStyle(StrokeStyle(lineWidth: 1))
+                    .annotation(position: .top, alignment: .leading, spacing: 2) {
+                        Text("\(limitName) \(currency(spend.limit.amount, code))")
+                            .font(.system(size: 9)).foregroundStyle(ChartInk.label)
+                    }
+            }
+            ForEach(gaps) { g in
+                LineMark(x: .value("Time", g.from.t), y: .value("Spent", g.from.value), series: .value("Run", "gap-\(g.id)"))
+                    .foregroundStyle(tint.opacity(gapOpacity)).lineStyle(ChartInk.line)
+                LineMark(x: .value("Time", g.to.t), y: .value("Spent", g.to.value), series: .value("Run", "gap-\(g.id)"))
+                    .foregroundStyle(tint.opacity(gapOpacity)).lineStyle(ChartInk.line)
+            }
+            ForEach(line) { p in
+                LineMark(x: .value("Time", p.t), y: .value("Spent", p.value), series: .value("Run", "spent-\(p.run)"))
+                    .foregroundStyle(p.estimated ? ChartInk.estimated(scheme) : tint)
+                    .lineStyle(ChartInk.line)
+            }
+            // The amount at the day's start (when known) and at the line's end.
+            if active == nil, !startsLate, let first = line.first, line.count > 1 {
+                PointMark(x: .value("Time", first.t), y: .value("Spent", first.value))
+                    .foregroundStyle(tint).symbolSize(16)
+                    .annotation(position: .bottom, alignment: .leading, spacing: 3) {
+                        Text(currency(first.value, code, decimals: labelDecimals))
+                            .font(.system(size: 9)).foregroundStyle(ChartInk.label).monospacedDigit()
+                            .padding(.leading, 4)
+                    }
+            }
+            if let last = line.last {
+                PointMark(x: .value("Time", last.t), y: .value("Spent", last.value))
+                    .foregroundStyle(tint).symbolSize(28)
+                    .annotation(position: .top, spacing: 3, overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
+                        if active == nil {
+                            Text(currency(last.value, code, decimals: labelDecimals)).font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(.primary).monospacedDigit()
+                        }
+                    }
+            }
+            if let h = active, let p = line.last(where: { $0.t == h }) {
+                RuleMark(x: .value("Time", p.t)).foregroundStyle(ChartInk.muted).lineStyle(StrokeStyle(lineWidth: 1))
+                PointMark(x: .value("Time", p.t), y: .value("Spent", p.value))
+                    .foregroundStyle(tint).symbolSize(40)
+                    .annotation(position: .top, spacing: 4, overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
+                        let amount = currency(p.value, code, decimals: spend.limit.exponent)
+                        let src = points.last { $0.t == p.t }
+                        Tooltip(lines: [tooltipTime.string(from: p.t),
+                                        src?.estimated != true ? amount
+                                            : src?.idle == true ? "about \(amount) · no activity" : amount + " (estimated)"])
+                    }
+            }
+        }
+        .chartXScale(domain: start...end)
+        .chartYScale(domain: low...high)
+        .chartXAxis { dayAxis(period: "hours", start: start, end: end) }
+        .chartYAxis {
+            AxisMarks(position: .leading, values: Array(stride(from: low, through: high, by: step))) { v in
+                AxisGridLine(stroke: StrokeStyle(lineWidth: 1)).foregroundStyle(ChartInk.grid)
+                AxisValueLabel { if let d = v.as(Double.self) { Text(currency(d, code, decimals: axisDecimals)) } }
+                    .font(.system(size: 9)).foregroundStyle(ChartInk.label)
+            }
+        }
+        .modifier(HoverLayer(times: times, future: nil, hovered: $hovered))
+        .padding(.top, 6)
+        .frame(height: 110)
+        .accessibilityLabel("Money used over the day, \(title.lowercased())")
+    }
+
+    /// A scale around the day's amounts on round steps: two or three steps from just below the
+    /// lowest to just above the highest.
+    static func scale(_ values: [Double]) -> (low: Double, high: Double, step: Double) {
+        let lo = values.min() ?? 0, hi = values.max() ?? 0
+        let step = niceCeil(max((hi - lo) * 1.15, hi * 0.02, 1) / 2)
+        let low = max(0, (lo / step).rounded(.down) * step)
+        var high = (hi / step).rounded(.up) * step
+        if high - hi < step * 0.15 { high += step }   // room for the end label
+        return (low, max(high, low + step), step)
     }
 }
 

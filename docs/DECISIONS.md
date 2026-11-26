@@ -95,8 +95,15 @@ options that were ruled out, so they aren't tried again.
   squeezes a session into a sliver. The session is the point there: its resets are dashed lines (a recorded
   drop, or the current session's start from its reset time), and the dashed projection is the session's,
   not the week's. Only shown within the day: a session that runs out or resets after midnight shows its
-  projection from that day on. Not for the budget: Per day already gives a bar per day, and spending
-  within a day only goes up.
+  projection from that day on. For the budget too since 2026-11-26 (below).
+- **A Day view for the budget** (2026-11-26): ruled out at first (Per day already gives a bar per day, and
+  spending within a day only goes up), but a bar doesn't say when in the day the money went. The line
+  starts at what was already used at 00:00 (the last point before, moved there) and the scale fits the
+  day, so $16 on top of $397 isn't a sliver; "+$16.20" beside the title is what the day added (after a
+  reset, the new amount counts). Local days, like the Pro/Max Day view, not the UTC days of Per day: it's
+  the user's own day, so its total can differ from that day's bar. A monthly reset falls inside a local
+  day (00:00 UTC), so the line can drop there, with a dashed line. No projection (the budget's runs to its
+  reset). Not for a daily budget, whose Month view is already the day.
 - **Looking back: ‹ › through periods, and a long view as one line** (2026-11-19). The long view is the weekly
   % (or the budget's money) as one line over 8 weeks (6 months), a dashed rule at each reset and the value
   each period reached labelled before it, orange where it ran out. Tried first as one bar per period at its

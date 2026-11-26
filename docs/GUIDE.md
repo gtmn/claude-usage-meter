@@ -47,8 +47,8 @@ the settings, how the app gets its data, installing, and the command-line reader
 - **History graph** in the popup, a line over time like a temperature curve:
   - on an Enterprise/Team seat, money spent across the budget period, with a dashed
     projection to the reset (and the budget line once the curve gets near it): **Month** (or
-    **Week** for a weekly budget). Switch to **Per day** for a bar per day, in UTC days like
-    Claude's own usage page, or **Months** for the totals of recent months.
+    **Week** for a weekly budget). Switch to **Day** for one day, **Per day** for a bar per day, in
+    UTC days like Claude's own usage page, or **Months** for the totals of recent months.
   - on Pro/Max, the 5h and 7d percentages this week (from the last weekly reset to the next), plus a
     line for a model's own weekly limit (Fable) when the plan has one, with a
     dashed projection of the weekly limit to 100% or to the reset, matching the outlook line
@@ -59,6 +59,11 @@ the settings, how the app gets its data, installing, and the command-line reader
     week's, a dashed line where each 5h session reset, its limit hits, and the current session's
     dashed projection to 100% or to its reset, like its outlook line. ‹ › step through earlier
     days ("Yesterday", "Mon 23 Nov").
+  - **Day** on a budget (and for Pro/Max extra usage) shows one calendar day the same way: the
+    amount used from what it was at 00:00, on a scale that fits the day, with what the day added
+    beside the title ("+$16.20") and a dashed line where the budget reset. No projection: the
+    budget's runs to its reset, not to midnight. Its local day can differ from that day's Per day
+    bar, which is a UTC day.
   - **Weeks** (or **Months**) switches to the long view: the weekly % (or the money spent) as one
     line over several periods, a dashed line at each reset with its date, and what each period
     reached labelled just before its reset (an orange point where it ran out or reached the

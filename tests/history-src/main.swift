@@ -90,6 +90,29 @@ check("session resets: the first point after each drop",
       && sessions.resets(from: at("2026-11-18 00:00")) == [at("2026-11-18 19:00")])
 check("hits within a time span", sessions.limitHits(from: at("2026-11-18 00:00"), to: at("2026-11-19 00:00")).count == 1)
 
+// The budget's Day view: one day, starting at what was already used at its start.
+func bp(_ t: String, _ minor: Int64, estimated: Bool? = nil) -> HistoryPoint {
+    HistoryPoint(t: at(t), key: "extra_usage", percent: Double(minor) / 2000, usedMinor: minor, estimated: estimated)
+}
+let budgetPts = [bp("2026-11-17 22:00", 10000), bp("2026-11-18 09:00", 12000), bp("2026-11-18 15:00", 15000), bp("2026-11-19 01:00", 16000)]
+let oneDay = UsageHistory.budgetDay(budgetPts, from: at("2026-11-18 00:00"), to: at("2026-11-19 00:00"))
+check("budget day: starts at 00:00 with the amount used before",
+      oneDay.first?.t == at("2026-11-18 00:00") && oneDay.first?.usedMinor == 10000 && oneDay.count == 3 && oneDay.last?.usedMinor == 15000)
+check("budget day: what was spent that day", UsageHistory.spent(oneDay) == 5000)
+let resetDay = UsageHistory.budgetDay([bp("2026-11-30 22:00", 90000), bp("2026-12-01 00:30", 500), bp("2026-12-01 10:00", 3000)],
+                                      from: at("2026-11-30 23:00"), to: at("2026-12-01 23:00"))
+check("budget day across the reset: drops to the new period's amount",
+      resetDay.map(\.usedMinor) == [90000, 500, 3000] && UsageHistory.spent(resetDay) == 3000)
+let lateDay = UsageHistory.budgetDay([bp("2026-11-18 09:00", 12000), bp("2026-11-18 15:00", 15000)],
+                                     from: at("2026-11-18 00:00"), to: at("2026-11-19 00:00"))
+check("budget day without an earlier point starts at the first one", lateDay.first?.t == at("2026-11-18 09:00") && lateDay.count == 2)
+check("budget day with nothing recorded in it: only the amount at its start, or nothing",
+      UsageHistory.budgetDay([bp("2026-11-17 10:00", 100)], from: at("2026-11-18 00:00"), to: at("2026-11-19 00:00")).count == 1
+      && UsageHistory.budgetDay([], from: at("2026-11-18 00:00"), to: at("2026-11-19 00:00")).isEmpty)
+check("budget day: an estimated amount at the start stays estimated",
+      UsageHistory.budgetDay([bp("2026-11-17 23:40", 9000, estimated: true), bp("2026-11-18 01:00", 9500)],
+                             from: at("2026-11-18 00:00"), to: at("2026-11-19 00:00")).first?.estimated == true)
+
 let dir = FileManager.default.temporaryDirectory.appendingPathComponent("usagemeter-test-\(getpid())")
 let url = dir.appendingPathComponent("history.json")
 try! h.save(to: url)
