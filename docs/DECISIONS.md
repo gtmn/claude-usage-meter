@@ -62,8 +62,8 @@ options that were ruled out, so they aren't tried again.
   three sentences, and the project layout. Every feature and setting is in `docs/GUIDE.md`, building and
   releasing in `docs/DEVELOPMENT.md`: the full text was over 4,000 words before anyone saw how to install it.
   The menu bar previews are two sheets (2026-11-26), Pro/Max and Enterprise: one row per setting, named
-  as in the popup, with the item at real size on a dark menu bar (like the popups), and on Pro/Max beside
-  it without its labels. They replaced 18 separate strips in six tables, which said less (a name under
+  as in the popup, with the item at real size on a dark menu bar (like the popups); Labels off has two rows
+  (Bar, Dot), enough to show it, not a column for every row. They replaced 18 separate strips in six tables, which said less (a name under
   each image, no combinations) and took more room. Dark only: light added nothing. The Dot + Alerts rows
   say why no dot shows while nothing is projected to run out, with samples where it appears (`over`: the
   budget; `runout`: the session, with the week on track), and old numbers (offline, rate-limited, signed

@@ -2,8 +2,7 @@ import AppKit
 
 /// `--render-preview out.png sheet=pro-max|enterprise`: the README's overview of the menu bar
 /// settings in one image. Each row names its settings as the popup does and shows the item at its
-/// real size on a dark menu bar (like the popups' screenshots), from the sample numbers; the
-/// Pro/Max sheet shows each item with and without its 5h / 7d labels. Drawn at 2x.
+/// real size on a dark menu bar (like the popups' screenshots), from the sample numbers. Drawn at 2x.
 @MainActor
 enum MenuBarSheet {
     struct Row {
@@ -18,6 +17,8 @@ enum MenuBarSheet {
         Row(caption: "Indicator: Dot", args: ["dots"]),
         Row(caption: "Indicator: Gauge", args: ["icon"]),
         Row(caption: "Indicator: Off", args: ["text"], note: "The numbers alone."),
+        Row(caption: "Labels: Off", args: ["nolabels"], note: "Without 5h / 7d: the session on top, the week below."),
+        Row(caption: "Labels: Off · Indicator: Dot", args: ["dots", "nolabels"]),
         Row(caption: "Colours: Alerts", args: ["alerts"],
             note: "Colour only for a limit projected to run out: 7d here."),
         Row(caption: "Colours: Mono", args: ["mono"]),
@@ -59,18 +60,14 @@ enum MenuBarSheet {
         guard let rows = ["pro-max": proMax, "enterprise": enterprise][name] else {
             fputs("unknown sheet \(name): pro-max or enterprise\n", stderr); exit(1)
         }
-        let withoutLabels = name == "pro-max"
-        let title = withoutLabels ? "Menu bar item · Pro / Max" : "Menu bar item · Enterprise / Team budget"
+        let title = name == "pro-max" ? "Menu bar item · Pro / Max" : "Menu bar item · Enterprise / Team budget"
         NSApplication.shared.appearance = NSAppearance(named: .darkAqua)
-        let items: [(NSImage?, NSImage?)] = rows.map { row in
-            let model = UsageModel(preview: snapshot(row.args))
-            return (PreviewRenderer.labelImage(model: model, args: row.args),
-                    withoutLabels ? PreviewRenderer.labelImage(model: model, args: row.args + ["nolabels"]) : nil)
+        let items: [NSImage?] = rows.map { row in
+            PreviewRenderer.labelImage(model: UsageModel(preview: snapshot(row.args)), args: row.args)
         }
 
         let captionFont = NSFont.systemFont(ofSize: 12, weight: .medium)
         let noteFont = NSFont.systemFont(ofSize: 11)
-        let headFont = NSFont.systemFont(ofSize: 10, weight: .semibold)
         let titleFont = NSFont.systemFont(ofSize: 13, weight: .semibold)
         let ink = NSColor(white: 0.9, alpha: 1), muted = NSColor(white: 0.6, alpha: 1)
         func width(_ s: String, _ f: NSFont) -> CGFloat { ceil((s as NSString).size(withAttributes: [.font: f]).width) }
@@ -85,11 +82,10 @@ enum MenuBarSheet {
         }
         let (captionLine, inset): (CGFloat, CGFloat) = (17, 6)
         func blockHeight(_ row: Row) -> CGFloat { row.note == nil ? rowHeight : inset + captionLine + noteHeight(row.note) + inset }
-        let col1 = max(items.compactMap { $0.0?.size.width }.max() ?? 0, withoutLabels ? width("Labels", headFont) : 0)
-        let col2 = withoutLabels ? max(items.compactMap { $0.1?.size.width }.max() ?? 0, width("Labels off", headFont)) : 0
-        let columns = pad + captionWidth + gap + col1 + (withoutLabels ? gap + col2 : 0) + pad
+        let col1 = items.compactMap { $0?.size.width }.max() ?? 0
+        let columns = pad + captionWidth + gap + col1 + pad
         let size = NSSize(width: max(columns, pad + width(title, titleFont) + pad),
-                          height: pad + headHeight + (withoutLabels ? headHeight : 0)
+                          height: pad + headHeight
                               + rows.reduce(0) { $0 + blockHeight($1) } + pad)
 
         guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(size.width * 2), pixelsHigh: Int(size.height * 2),
@@ -110,13 +106,8 @@ enum MenuBarSheet {
             }
             text(title, titleFont, ink, x: pad, top: y, height: headHeight)
             y -= headHeight
-            let x1 = pad + captionWidth + gap, x2 = x1 + col1 + gap
-            if withoutLabels {
-                text("Labels", headFont, muted, x: x1, top: y, height: headHeight)
-                text("Labels off", headFont, muted, x: x2, top: y, height: headHeight)
-                y -= headHeight
-            }
-            for (row, (on, off)) in zip(rows, items) {
+            let x1 = pad + captionWidth + gap
+            for (row, image) in zip(rows, items) {
                 // A faint line between rows.
                 NSColor(white: 1, alpha: 0.08).setFill()
                 NSRect(x: pad, y: y - 0.5, width: size.width - 2 * pad, height: 0.5).fill()
@@ -131,9 +122,8 @@ enum MenuBarSheet {
                     text(row.caption, captionFont, ink, x: pad, top: y, height: rowHeight)
                 }
                 // The items sit level with the middle of the row, caption and note together.
-                for (image, x) in [(on, x1), (off, x2)] {
-                    guard let image else { continue }
-                    image.draw(in: NSRect(x: x, y: y - block + (block - image.size.height) / 2,
+                if let image {
+                    image.draw(in: NSRect(x: x1, y: y - block + (block - image.size.height) / 2,
                                           width: image.size.width, height: image.size.height))
                 }
                 y -= block
