@@ -36,9 +36,9 @@ Everything in detail, including all settings: the [guide](docs/GUIDE.md).
 
 Each row is a setting in the popup, shown at real size from sample numbers.
 
-<img src="docs/screenshots/menubar-pro-max.png" width="574" alt="Menu bar item settings on Pro/Max, with and without the 5h and 7d labels: Indicator Bar, Circle, Dot, Gauge or Off; Colours Alerts (colour only for the 7d limit, which is projected to run out) and Mono; Projection on (20% →35%, 60% →105%), also with Number off; Limits 5h only; Extra usage as an amount ($12); and Dot with Alerts and Projection on, where only 7d gets a dot">
+<img src="docs/screenshots/menubar-pro-max.png" width="605" alt="Menu bar item settings on Pro/Max, with and without the 5h and 7d labels: Indicator Bar, Circle, Dot, Gauge or Off; Colours Alerts (colour only for the 7d limit, which is projected to run out) and Mono; Projection on (20% →35%, 60% →105%), also with Number off; Limits 5h only; Extra usage as an amount ($12); Dot with Alerts and Projection on, where only 7d gets a dot, and again with the session projected to run out and the week on track, where only 5h gets one; and old numbers (offline, rate-limited or signed out): faded and grey, or in Dot one red dot">
 
-<img src="docs/screenshots/menubar-enterprise.png" width="479" alt="Menu bar item settings on an Enterprise/Team budget: Bar with 21%, with the amount $412, and with the projection $412 →$480; Dot with Colour (a green dot); Dot with Alerts (no dot, since the budget is on track); and the same while spending faster than the budget lasts ($1900 →$2220, an orange dot)">
+<img src="docs/screenshots/menubar-enterprise.png" width="446" alt="Menu bar item settings on an Enterprise/Team budget: Bar with 21%, with the amount $412, and with the projection $412 →$480; Dot with Colour (a green dot); Dot with Alerts (no dot, since the budget is on track); the same while spending faster than the budget lasts ($1900 →$2220, an orange dot); and old numbers: faded and grey, or in Dot a red dot">
 
 ## Install
 

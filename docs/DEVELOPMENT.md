@@ -56,16 +56,15 @@ $APP --render-preview $S/settings-enterprise.png settings enterprise amount
 # The menu bar settings, one sheet each (rows and captions: MenuBar/Sources/MenuBarSheet.swift).
 $APP --render-preview $S/menubar-pro-max.png sheet=pro-max
 $APP --render-preview $S/menubar-enterprise.png sheet=enterprise
-rm -f $S/*.label.png $S/*.bar.png
+rm -f $S/*.label.png
 ```
 
-Every render also writes `<name>.label.png`, the menu bar item enlarged 6 times, for checking details,
-and `<name>.bar.png`, the item at real size on a dark menu bar.
+Every render also writes `<name>.label.png`, the menu bar item enlarged 6 times, for checking details.
 
 Renders never read or change your own settings: they use the arguments, in a throwaway store.
 
 `scene` draws the whole popup opened under the item on a plain menu bar (the README's first image).
-Add `compact` for the Circle menu bar style, `dots` for Dots, `icon` for Gauge, `text` for Indicator off, `beside` for Projection on (`projected`: on, with Number off), `mono` or `alerts` for those palettes, `amount` for the budget's amount, `extra` for Pro/Max with extra usage (and its menu bar item), `only5h` or `only7d` for one limit in the menu bar, `fable` for a Fable weekly limit (and its line in the graph), `update` for a newer release offered, `signedout` for saved numbers while signed out of Claude Code (the menu bar item faded; with `panel`, the Sign in… row), `panel` for the whole popup or `settings` for its settings alone, `nolabels`, `nopercent`, `nopace` or `noahead` to leave those out, `left` or `early` for the time left or early, `daily` for the per-day bars, `overview` for the Weeks or Months view, `day` for the Day view (Pro/Max, or with `enterprise` or `extra` the budget's), `full` for the session at its limit, `burst` for 58% twenty minutes into a session, `over` for a budget spending faster than it lasts, `stale` for old numbers (faded, grey, a red dot in Dots), `back=2` for two periods (days, or overview pages) back, `hover` to show the graph's tooltip (`hover=1.5` halfway along the projection), `light` for light mode, or `live` to render your
+Add `compact` for the Circle menu bar style, `dots` for Dots, `icon` for Gauge, `text` for Indicator off, `beside` for Projection on (`projected`: on, with Number off), `mono` or `alerts` for those palettes, `amount` for the budget's amount, `extra` for Pro/Max with extra usage (and its menu bar item), `only5h` or `only7d` for one limit in the menu bar, `fable` for a Fable weekly limit (and its line in the graph), `update` for a newer release offered, `signedout` for saved numbers while signed out of Claude Code (the menu bar item faded; with `panel`, the Sign in… row), `panel` for the whole popup or `settings` for its settings alone, `nolabels`, `nopercent`, `nopace` or `noahead` to leave those out, `left` or `early` for the time left or early, `daily` for the per-day bars, `overview` for the Weeks or Months view, `day` for the Day view (Pro/Max, or with `enterprise` or `extra` the budget's), `full` for the session at its limit, `burst` for 58% twenty minutes into a session, `over` for a budget spending faster than it lasts, `runout` for the session projected to run out with the week on track, `stale` for old numbers (faded, grey, a red dot in Dots), `back=2` for two periods (days, or overview pages) back, `hover` to show the graph's tooltip (`hover=1.5` halfway along the projection), `light` for light mode, or `live` to render your
 own current numbers and recorded history instead (don't commit those).
 
 ## Releasing

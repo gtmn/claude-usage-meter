@@ -27,6 +27,12 @@ enum MenuBarSheet {
         Row(caption: "Extra usage: Amount", args: ["extra", "amount"]),
         Row(caption: "Indicator: Dot · Colours: Alerts · Projection: On", args: ["dots", "alerts", "beside"],
             note: "A dot only beside a limit projected to run out: 7d, not the session."),
+        Row(caption: "The same, the session projected to run out", args: ["dots", "alerts", "beside", "runout"],
+            note: "5h at 70% with 2 h left heads past 100%, so only it gets a dot: 7d at 40% lasts."),
+        Row(caption: "Old numbers: offline, rate-limited or signed out", args: ["stale"],
+            note: "No new numbers for 15 minutes, or signed out: faded and grey."),
+        Row(caption: "Old numbers · Indicator: Dot", args: ["dots", "stale"],
+            note: "Dot: one red dot instead of the pace colours."),
     ]
 
     static let enterprise: [Row] = [
@@ -42,6 +48,11 @@ enum MenuBarSheet {
         Row(caption: "The same, spending faster than the budget lasts",
             args: ["enterprise", "dots", "alerts", "amount", "beside", "over"],
             note: "Projected past the budget: the dot appears."),
+        Row(caption: "Old numbers: offline, rate-limited or signed out",
+            args: ["enterprise", "amount", "beside", "stale"],
+            note: "No new numbers for 15 minutes, or signed out: faded and grey."),
+        Row(caption: "Old numbers · Indicator: Dot", args: ["enterprise", "dots", "amount", "beside", "stale"],
+            note: "Dot: a red dot instead of the pace colour."),
     ]
 
     static func write(_ name: String, output: String) -> Never {
@@ -64,15 +75,22 @@ enum MenuBarSheet {
         let ink = NSColor(white: 0.9, alpha: 1), muted = NSColor(white: 0.6, alpha: 1)
         func width(_ s: String, _ f: NSFont) -> CGFloat { ceil((s as NSString).size(withAttributes: [.font: f]).width) }
 
-        let (pad, gap, rowHeight, noteHeight, headHeight): (CGFloat, CGFloat, CGFloat, CGFloat, CGFloat) = (16, 24, 26, 16, 20)
-        let captionWidth = rows.map { width($0.caption, captionFont) }.max() ?? 0
+        let (pad, gap, rowHeight, headHeight): (CGFloat, CGFloat, CGFloat, CGFloat) = (16, 24, 26, 20)
+        // Notes wrap under their caption, within its column (two lines at most at this width).
+        let captionWidth = max(rows.map { width($0.caption, captionFont) }.max() ?? 0, 300)
+        func noteHeight(_ s: String?) -> CGFloat {
+            guard let s else { return 0 }
+            return ceil((s as NSString).boundingRect(with: NSSize(width: captionWidth, height: 1000),
+                                                     options: .usesLineFragmentOrigin, attributes: [.font: noteFont]).height)
+        }
+        let (captionLine, inset): (CGFloat, CGFloat) = (17, 6)
+        func blockHeight(_ row: Row) -> CGFloat { row.note == nil ? rowHeight : inset + captionLine + noteHeight(row.note) + inset }
         let col1 = max(items.compactMap { $0.0?.size.width }.max() ?? 0, withoutLabels ? width("Labels", headFont) : 0)
         let col2 = withoutLabels ? max(items.compactMap { $0.1?.size.width }.max() ?? 0, width("Labels off", headFont)) : 0
         let columns = pad + captionWidth + gap + col1 + (withoutLabels ? gap + col2 : 0) + pad
-        let notes = rows.compactMap { $0.note.map { pad + width($0, noteFont) + pad } }.max() ?? 0
-        let size = NSSize(width: max(columns, notes, pad + width(title, titleFont) + pad),
+        let size = NSSize(width: max(columns, pad + width(title, titleFont) + pad),
                           height: pad + headHeight + (withoutLabels ? headHeight : 0)
-                              + rows.reduce(0) { $0 + rowHeight + ($1.note == nil ? 0 : noteHeight) } + pad)
+                              + rows.reduce(0) { $0 + blockHeight($1) } + pad)
 
         guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(size.width * 2), pixelsHigh: Int(size.height * 2),
                                          bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
@@ -102,17 +120,23 @@ enum MenuBarSheet {
                 // A faint line between rows.
                 NSColor(white: 1, alpha: 0.08).setFill()
                 NSRect(x: pad, y: y - 0.5, width: size.width - 2 * pad, height: 0.5).fill()
-                text(row.caption, captionFont, ink, x: pad, top: y, height: rowHeight)
+                let block = blockHeight(row)
+                if let note = row.note {
+                    text(row.caption, captionFont, ink, x: pad, top: y - inset, height: captionLine)
+                    let h = noteHeight(note)
+                    (note as NSString).draw(with: NSRect(x: pad, y: y - inset - captionLine - h, width: captionWidth, height: h),
+                                            options: .usesLineFragmentOrigin,
+                                            attributes: [.font: noteFont, .foregroundColor: muted])
+                } else {
+                    text(row.caption, captionFont, ink, x: pad, top: y, height: rowHeight)
+                }
+                // The items sit level with the middle of the row, caption and note together.
                 for (image, x) in [(on, x1), (off, x2)] {
                     guard let image else { continue }
-                    image.draw(in: NSRect(x: x, y: y - rowHeight + (rowHeight - image.size.height) / 2,
+                    image.draw(in: NSRect(x: x, y: y - block + (block - image.size.height) / 2,
                                           width: image.size.width, height: image.size.height))
                 }
-                y -= rowHeight
-                if let note = row.note {
-                    text(note, noteFont, muted, x: pad, top: y + 3, height: noteHeight)
-                    y -= noteHeight
-                }
+                y -= block
             }
         }
         NSGraphicsContext.restoreGraphicsState()
@@ -125,6 +149,6 @@ enum MenuBarSheet {
     /// The sample numbers a row's arguments ask for, as `--render-preview` picks them.
     private static func snapshot(_ args: [String]) -> UsageSnapshot {
         args.contains("enterprise") ? .sampleEnterprise(over: args.contains("over"))
-            : args.contains("extra") ? .sampleWithExtra : .sample
+            : args.contains("extra") ? .sampleWithExtra : .sample(args)
     }
 }

@@ -4,14 +4,20 @@ import Network
 
 extension UsageSnapshot {
     /// Fixed numbers for layout checks (`--sample`, `--render-preview`); needs no Keychain access.
-    static var sample: UsageSnapshot {
+    static var sample: UsageSnapshot { sample(CommandLine.arguments) }
+
+    /// `full`: the session at its limit, resetting in 1 h 10 min. `burst`: 58% twenty minutes in.
+    /// `runout`: the session at 70% with 2 h left, projected to run out, and the week on track (40%).
+    static func sample(_ args: [String]) -> UsageSnapshot {
         let now = Date()
-        // `full`: the session at its limit, resetting in 1 h 10 min. `burst`: 58% twenty minutes in.
-        let full = CommandLine.arguments.contains("full"), burst = CommandLine.arguments.contains("burst")
-        let session = full ? (100.0, 70.0 * 60) : burst ? (58, 280 * 60) : (20, 2 * 3600)
+        var session: (percent: Double, left: TimeInterval) = (20, 2 * 3600)
+        if args.contains("full") { session = (100, 70 * 60) }
+        if args.contains("burst") { session = (58, 280 * 60) }
+        if args.contains("runout") { session = (70, 2 * 3600) }
+        let week: Double = args.contains("runout") ? 40 : 60
         return UsageSnapshot(source: .oauth, capturedAt: now, windows: [
-            UsageWindow(key: "five_hour", percent: session.0, resetsAt: now.addingTimeInterval(session.1)),
-            UsageWindow(key: "seven_day", percent: 60, resetsAt: now.addingTimeInterval(3 * 86400)),
+            UsageWindow(key: "five_hour", percent: session.percent, resetsAt: now.addingTimeInterval(session.left)),
+            UsageWindow(key: "seven_day", percent: week, resetsAt: now.addingTimeInterval(3 * 86400)),
         ])
     }
 

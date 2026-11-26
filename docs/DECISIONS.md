@@ -65,8 +65,10 @@ options that were ruled out, so they aren't tried again.
   as in the popup, with the item at real size on a dark menu bar (like the popups), and on Pro/Max beside
   it without its labels. They replaced 18 separate strips in six tables, which said less (a name under
   each image, no combinations) and took more room. Dark only: light added nothing. The Dot + Alerts rows
-  say why no dot shows while nothing is projected to run out, with an over-budget sample (`over`) that
-  shows it appearing.
+  say why no dot shows while nothing is projected to run out, with samples where it appears (`over`: the
+  budget; `runout`: the session, with the week on track), and old numbers (offline, rate-limited, signed
+  out) have rows of their own. Each note wraps under its caption, clear of the items. The separate
+  real-size strip with a clock (`.bar.png`) went with them.
 - **No Labels setting and no `$` label on a $ budget.** There's only one bar, so a label tells nothing apart,
   and the amount (`$306`) carries its own `$`.
 - **The Projection setting is text only, rounded to 5% and not capped** (2026-11-24): the bars and colours
