@@ -3,7 +3,7 @@ import SwiftUI
 
 // Usage history as a line over time, like a temperature curve.
 // - Budget-only accounts (Enterprise/Team): money spent across the budget period,
-//   with a dashed projection to the reset, or per UTC day as bars. Stretches the app didn't
+//   with a dashed projection to the reset, or per local day as bars. Stretches the app didn't
 //   record are estimated from Claude Code's logs and drawn in grey (an unrecorded stretch
 //   with the same amount on both sides stays solid: nothing was spent in it).
 // - Pro/Max: the 5 h and 7 d percentages over this week (last reset to next), with a dashed
@@ -515,9 +515,12 @@ private let utc: TimeZone = TimeZone(identifier: "UTC")!
 private func utcFormatter(_ format: String) -> DateFormatter {
     let f = DateFormatter(); f.locale = HumanTime.en; f.timeZone = utc; f.dateFormat = format; return f
 }
-private let utcDay = utcFormatter("EEE d MMM")
-private let utcAxisDay = utcFormatter("d MMM")
-private let utcWeekday = utcFormatter("EEE")
+private func localFormatter(_ format: String) -> DateFormatter {
+    let f = DateFormatter(); f.locale = HumanTime.en; f.dateFormat = format; return f
+}
+private let localDay = localFormatter("EEE d MMM")
+private let localAxisDay = localFormatter("d MMM")
+private let localWeekday = localFormatter("EEE")
 private let localDayTime: DateFormatter = {
     let f = DateFormatter(); f.locale = HumanTime.en; f.dateFormat = "d MMM, HH:mm"; return f
 }()
@@ -612,7 +615,6 @@ struct BudgetHistoryChart: View {
                               canGoBack: mode == "overview" ? periods.count > (back + 1) * Self.page(period)
                                                             : oldest.map { $0 < start } ?? false,
                               back: $stepBack)
-                if mode == "daily" { Text("UTC days").font(.system(size: 10)).foregroundStyle(.secondary) }
                 if day, filled.count >= 2 {
                     let scale = pow(10, Double(spend.limit.exponent))
                     Text("+" + currency(Double(UsageHistory.spent(filled)) / scale, spend.limit.currency,
@@ -653,7 +655,14 @@ struct BudgetHistoryChart: View {
                               resets: dayResets(start: start, end: end, currentStart: currentStart),
                               limitName: extra ? "Limit" : "Budget", title: title)
             } else if mode == "daily" {
-                DailySpendBars(window: window, days: UsageHistory.dailySpend(filled), start: start, end: end,
+                // Local days, like Day: those the period covers for at least half the day, each
+                // counted in full (also across a reset), so a bar is the Day view's "+$…".
+                let dayStarts = UsageHistory.periodDays(start: start, end: end)
+                let from = dayStarts.first ?? start
+                let to = dayStarts.last.flatMap { Calendar.current.date(byAdding: .day, value: 1, to: $0) } ?? end
+                DailySpendBars(window: window,
+                               days: UsageHistory.dailySpend(dayPoints(start: from, end: to, currentStart: currentStart, spend: spend)),
+                               dayStarts: dayStarts, start: from, end: to,
                                now: back == 0 ? now : end)
             } else {
                 BudgetLine(window: window, points: filled, start: start, reset: end, now: back == 0 ? now : end,
@@ -952,10 +961,12 @@ private struct BudgetDayLine: View {
     }
 }
 
-/// Money spent per UTC day as bars; the estimated part of a day is the grey segment at the bottom.
+/// Money spent per local day as bars; the estimated part of a day is the grey segment at the bottom.
 private struct DailySpendBars: View {
     let window: UsageWindow
     let days: [DaySpend]
+    /// The days the period shows (`UsageHistory.periodDays`); `start`…`end` spans them.
+    let dayStarts: [Date]
     let start: Date, end: Date, now: Date
     @Environment(\.colorScheme) private var scheme
     @Environment(\.previewHover) private var previewHover
@@ -965,7 +976,7 @@ private struct DailySpendBars: View {
         let spend = window.spend!
         let code = spend.limit.currency
         let scale = pow(10, Double(spend.limit.exponent))
-        let shown = days.filter { $0.day.isAtOrAfter(start) && $0.day < end }
+        let shown = days.filter { dayStarts.contains($0.day) }
         let top = niceCeil((shown.map { Double($0.usedMinor) / scale }.max() ?? 0) * 1.15)
         let tint = ChartInk.series1(scheme)
         let mids = shown.map { $0.day.addingTimeInterval(43200) }
@@ -996,15 +1007,14 @@ private struct DailySpendBars: View {
         .chartXScale(domain: start...end)
         .chartYScale(domain: 0...top)
         .chartXAxis {
-            // Labels under the day they name (UTC), every day for a week, every 7 days for a month.
+            // Labels under the day they name, every day for a week, every 7 days for a month.
             let every = spend.period == "weekly" ? 1 : 7
             // For a month, leave out the last few days so the final label isn't clipped at the edge.
-            let dayCount = Int((end.timeIntervalSince(start) / 86400).rounded())
-            AxisMarks(values: stride(from: 0, to: every == 1 ? dayCount : dayCount - 3, by: every)
-                .map { start.addingTimeInterval(Double($0) * 86400 + 43200) }) { v in
+            AxisMarks(values: stride(from: 0, to: every == 1 ? dayStarts.count : dayStarts.count - 3, by: every)
+                .map { dayStarts[$0].addingTimeInterval(43200) }) { v in
                 AxisValueLabel {
                     if let d = v.as(Date.self) {
-                        Text((every == 1 ? utcWeekday : utcAxisDay).string(from: d))
+                        Text((every == 1 ? localWeekday : localAxisDay).string(from: d))
                     }
                 }
                 .font(.system(size: 9)).foregroundStyle(ChartInk.label)
@@ -1034,13 +1044,13 @@ private struct DailySpendBars: View {
     }
 
     static func tooltip(_ d: DaySpend, scale: Double, code: String, decimals: Int, now: Date) -> [String] {
-        var lines = ["\(utcDay.string(from: d.day)) (UTC)", currency(Double(d.usedMinor) / scale, code, decimals: decimals)]
+        var lines = [localDay.string(from: d.day), currency(Double(d.usedMinor) / scale, code, decimals: decimals)]
         if d.estimatedMinor > 0 {
             lines.append(d.estimatedMinor == d.usedMinor ? "estimated"
                          : "\(currency(Double(d.estimatedMinor) / scale, code, decimals: decimals)) of it estimated")
         }
-        if let from = d.countsFrom { lines.append("from \(utcFormatter("HH:mm").string(from: from)) UTC on") }
-        if let since = d.includesSince { lines.append("includes spending since \(utcDay.string(from: since))") }
+        if let from = d.countsFrom { lines.append("from \(HumanTime.clock(from)) on") }
+        if let since = d.includesSince { lines.append("includes spending since \(localDay.string(from: since))") }
         if now.timeIntervalSince(d.day) < 86400 { lines.append("so far today") }
         return lines
     }

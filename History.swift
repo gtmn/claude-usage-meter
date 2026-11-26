@@ -117,9 +117,10 @@ public struct HistoryGap: Equatable, Sendable {
     public let fromMinor: Int64, toMinor: Int64
 }
 
-/// Money spent on one UTC day (Claude's own usage page counts days in UTC too).
+/// Money spent on one day: a local day in the app, like the Day view (Claude's own usage page
+/// counts UTC days).
 public struct DaySpend: Equatable, Sendable {
-    public let day: Date               // 00:00 UTC
+    public let day: Date               // 00:00 in the calendar's time zone
     public var usedMinor: Int64 = 0
     /// The part of `usedMinor` that comes from estimated points.
     public var estimatedMinor: Int64 = 0
@@ -216,10 +217,9 @@ extension UsageHistory {
         }
     }
 
-    /// Money spent per UTC day. Each increase counts on the day it was seen; a reset (a drop)
-    /// counts the new amount as spent since the reset.
-    public static func dailySpend(_ pts: [HistoryPoint]) -> [DaySpend] {
-        var cal = Calendar(identifier: .gregorian); cal.timeZone = TimeZone(identifier: "UTC")!
+    /// Money spent per day of `calendar` (local by default). Each increase counts on the day it was
+    /// seen; a reset (a drop) counts the new amount as spent since the reset.
+    public static func dailySpend(_ pts: [HistoryPoint], calendar cal: Calendar = .current) -> [DaySpend] {
         let used = pts.filter { $0.usedMinor != nil }
         guard let first = used.first else { return [] }
         var days: [DaySpend] = []
@@ -246,6 +246,21 @@ extension UsageHistory {
             if b.estimated == true { days[i].estimatedMinor += delta }
         }
         return days.sorted { $0.day < $1.day }
+    }
+
+    /// The days of `calendar` a period shows in Per day: those it covers for at least half the day.
+    /// The budget resets at 00:00 UTC, so in Zurich a month runs from 01:00 on the 1st: 1 Dec
+    /// 00:00–01:00 still belongs to November but shows in 1 Dec's bar, and each day is in one month.
+    public static func periodDays(start: Date, end: Date, calendar cal: Calendar = .current) -> [Date] {
+        var out: [Date] = []
+        var day = cal.startOfDay(for: start)
+        while day < end {
+            guard let next = cal.date(byAdding: .day, value: 1, to: day) else { break }
+            let covered = min(next, end).timeIntervalSince(max(day, start))
+            if covered * 2 >= next.timeIntervalSince(day) { out.append(day) }
+            day = next
+        }
+        return out
     }
 }
 

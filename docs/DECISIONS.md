@@ -107,10 +107,15 @@ options that were ruled out, so they aren't tried again.
   spending within a day only goes up), but a bar doesn't say when in the day the money went. The line
   starts at what was already used at 00:00 (the last point before, moved there) and the scale fits the
   day, so $16 on top of $397 isn't a sliver; "+$16.20" beside the title is what the day added (after a
-  reset, the new amount counts). Local days, like the Pro/Max Day view, not the UTC days of Per day: it's
-  the user's own day, so its total can differ from that day's bar. A monthly reset falls inside a local
-  day (00:00 UTC), so the line can drop there, with a dashed line. No projection (the budget's runs to its
-  reset). Not for a daily budget, whose Month view is already the day.
+  reset, the new amount counts). Local days, like the Pro/Max Day view: it's the user's own day. A monthly
+  reset falls inside a local day (00:00 UTC), so the line can drop there, with a dashed line. No projection
+  (the budget's runs to its reset). Not for a daily budget, whose Month view is already the day.
+- **Per day in local days** (2026-11-26), like Day, so a bar is that day's Day total; it was UTC days, as on
+  Claude's own usage page, which no longer matches exactly. The budget resets at 00:00 UTC, so a period
+  doesn't start at local midnight: it shows the local days it covers for at least half the day (in Zurich
+  1 to 30 Nov; 1 Dec 00:00–01:00 still belongs to November's budget but sits in 1 Dec's bar; in New York,
+  with the reset at 19:00 on the 30th, 1 to 30 Nov too), so each day is in one period. A day across a reset
+  counts both sides, the new amount after the drop.
 - **Looking back: ‹ › through periods, and a long view as one line** (2026-11-19). The long view is the weekly
   % (or the budget's money) as one line over 8 weeks (6 months), a dashed rule at each reset and the value
   each period reached labelled before it, orange where it ran out. Tried first as one bar per period at its

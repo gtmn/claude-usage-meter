@@ -145,7 +145,7 @@ check("a gap with no log activity stays a gap", filled.allSatisfy { $0.t.isAtOrB
 check("recorded points are kept as they are", recorded.allSatisfy(filled.contains))
 check("no logs: nothing is filled", UsageHistory.filledBudget(recorded, periodStart: period, weights: [], limitMinor: 200000) == recorded)
 
-let days = UsageHistory.dailySpend(filled)
+let days = UsageHistory.dailySpend(filled, calendar: cal)
 func day(_ d: String) -> DaySpend? { days.first { $0.day == at("\(d) 00:00") } }
 check("daily totals follow the estimate", day("2026-11-02")?.usedMinor == 3250 && day("2026-11-05")?.usedMinor == 9750)
 check("…and say which part is estimated", day("2026-11-05")?.estimatedMinor == 9750 && day("2026-11-10")?.estimatedMinor == 0)
@@ -153,14 +153,29 @@ check("the recorded day adds up", day("2026-11-10")?.usedMinor == 1000)
 check("quiet days inside the estimate are known zeros", day("2026-11-03")?.usedMinor == 0)
 check("all days add up to the total", days.reduce(0) { $0 + $1.usedMinor } == 14000)
 
-let unfilled = UsageHistory.dailySpend(recorded)
+let unfilled = UsageHistory.dailySpend(recorded, calendar: cal)
 check("without an estimate, the first day counts only from the first record",
       unfilled.first?.countsFrom == at("2026-11-10 18:00") && unfilled.first?.usedMinor == 1000)
-let pause = UsageHistory.dailySpend([bp("2026-11-07 10:00", 1000), bp("2026-11-09 09:00", 2000)])
+let pause = UsageHistory.dailySpend([bp("2026-11-07 10:00", 1000), bp("2026-11-09 09:00", 2000)], calendar: cal)
 check("after days with no data, the next day says what it includes",
       pause.last?.day == at("2026-11-09 00:00") && pause.last?.includesSince == at("2026-11-07 10:00"))
-let reset = UsageHistory.dailySpend([bp("2026-11-30 22:00", 5000), bp("2026-11-30 23:00", 5200), bp("2026-12-01 01:00", 300)])
+let reset = UsageHistory.dailySpend([bp("2026-11-30 22:00", 5000), bp("2026-11-30 23:00", 5200), bp("2026-12-01 01:00", 300)], calendar: cal)
 check("after a reset, the new amount counts as spent since it", reset.last?.usedMinor == 300 && reset.first?.usedMinor == 200)
+
+// Per day in local days, like the Day view.
+var zrh = Calendar(identifier: .gregorian); zrh.timeZone = TimeZone(identifier: "Europe/Zurich")!
+var nyc = Calendar(identifier: .gregorian); nyc.timeZone = TimeZone(identifier: "America/New_York")!
+let localDays = UsageHistory.dailySpend([bp("2026-11-17 21:00", 1000), bp("2026-11-17 22:30", 1200), bp("2026-11-17 23:30", 1500)], calendar: zrh)
+check("per day: 23:30 UTC counts on the next local day in Zurich",
+      localDays.map(\.day) == [at("2026-11-16 23:00"), at("2026-11-17 23:00")] && localDays.map(\.usedMinor) == [200, 300])
+let zrhDays = UsageHistory.periodDays(start: at("2026-11-01 00:00"), end: at("2026-12-01 00:00"), calendar: zrh)
+check("a month's local days in Zurich: 1 to 30 Nov (1 Dec 00:00-01:00 belongs to 1 Dec's bar)",
+      zrhDays.count == 30 && zrhDays.first == at("2026-10-31 23:00") && zrhDays.last == at("2026-11-29 23:00"))
+let nycDays = UsageHistory.periodDays(start: at("2026-11-01 00:00"), end: at("2026-12-01 00:00"), calendar: nyc)
+check("a month's local days in New York: 1 to 30 Nov (the reset is at 19:00 on 30 Nov)",
+      nycDays.count == 30 && nycDays.first == at("2026-11-01 04:00") && nycDays.last == at("2026-11-30 05:00"))
+check("a month's UTC days are its calendar days",
+      UsageHistory.periodDays(start: at("2026-11-01 00:00"), end: at("2026-12-01 00:00"), calendar: cal).count == 30)
 
 // Seeing the budget reset: a fall close to 00:00 UTC on the 1st confirms the assumed date.
 func seen(_ pts: [HistoryPoint]) -> SeenReset { UsageHistory(points: pts).seenBudgetReset() }
