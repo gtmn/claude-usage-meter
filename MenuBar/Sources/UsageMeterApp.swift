@@ -10,7 +10,7 @@ struct UsageMeterApp: App {
     )
 
     init() {
-        // `UsageMeter --render-preview out.png [live] [offline] [enterprise] [hover] [light] [daily] [seen] [saved] [compact|dots|icon|text] [mono] [amount] [extra] [fable] [only5h|only7d] [beside|projected] [update] [signedout] [panel|settings|scene] [nolabels] [nopercent] [nopace] [noahead] [left|early] [overview|day] [back=N] [full|burst] [stale]` (`hover=0.85`: pointer at 85% of the times): render the panel rows (`panel`: the whole popup; `settings`: its menu bar settings; `scene`: the whole popup opened under the item on a plain menu bar) to a PNG and exit.
+        // `UsageMeter --render-preview out.png [live] [offline] [enterprise] [hover] [light] [daily] [seen] [saved] [compact|dots|icon|text] [mono] [amount] [extra] [fable] [only5h|only7d] [beside|projected] [update] [signedout] [panel|settings|scene] [nolabels] [nopercent] [nopace] [noahead] [left|early] [overview|day] [back=N] [full|burst] [stale] [over] [sheet=pro-max|enterprise]` (`hover=0.85`: pointer at 85% of the times): render the panel rows (`panel`: the whole popup; `settings`: its menu bar settings; `scene`: the whole popup opened under the item on a plain menu bar) to a PNG and exit.
         let args = CommandLine.arguments
         if args.contains("--check-update") { Updater.checkFromCommandLine() }
         if args.contains("--test-notification") { SignInNotifier.testFromCommandLine() }
@@ -34,6 +34,9 @@ struct UsageMeterApp: App {
 @MainActor
 enum PreviewRenderer {
     static func run(output: String, live: Bool, offline: Bool, enterprise: Bool = false) -> Never {
+        if let sheet = CommandLine.arguments.first(where: { $0.hasPrefix("sheet=") })?.dropFirst(6) {
+            MenuBarSheet.write(String(sheet), output: output)
+        }
         let snap: UsageSnapshot
         if live {
             let sem = DispatchSemaphore(value: 0)
@@ -228,8 +231,7 @@ enum PreviewRenderer {
     }
 
     /// The menu bar item as the arguments set it up.
-    private static func labelImage(model: UsageModel) -> NSImage? {
-        let args = CommandLine.arguments
+    static func labelImage(model: UsageModel, args: [String] = CommandLine.arguments) -> NSImage? {
         let options = MenuBarImage.Options(labels: !args.contains("nolabels") && model.snapshot?.isBudgetOnly != true,
                                            percent: !args.contains("nopercent") && !args.contains("projected"),
                                            pace: !args.contains("nopace"), ahead: !args.contains("noahead"),

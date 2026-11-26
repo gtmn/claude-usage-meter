@@ -61,8 +61,12 @@ options that were ruled out, so they aren't tried again.
 - **The README is short** (2026-11-24): what the app does, the menu bar at real size, install, how it works in
   three sentences, and the project layout. Every feature and setting is in `docs/GUIDE.md`, building and
   releasing in `docs/DEVELOPMENT.md`: the full text was over 4,000 words before anyone saw how to install it.
-  The menu bar previews are real-size strips, not enlarged: dark, like the popups, with a clock beside the
-  item (dark above light was dropped on 2026-11-26 as not needed).
+  The menu bar previews are two sheets (2026-11-26), Pro/Max and Enterprise: one row per setting, named
+  as in the popup, with the item at real size on a dark menu bar (like the popups), and on Pro/Max beside
+  it without its labels. They replaced 18 separate strips in six tables, which said less (a name under
+  each image, no combinations) and took more room. Dark only: light added nothing. The Dot + Alerts rows
+  say why no dot shows while nothing is projected to run out, with an over-budget sample (`over`) that
+  shows it appearing.
 - **No Labels setting and no `$` label on a $ budget.** There's only one bar, so a label tells nothing apart,
   and the amount (`$306`) carries its own `$`.
 - **The Projection setting is text only, rounded to 5% and not capped** (2026-11-24): the bars and colours

@@ -16,8 +16,16 @@ extension UsageSnapshot {
     }
 
     /// An Enterprise seat: only a monthly $ budget, no 5 h / 7 d windows (`--sample enterprise`).
-    static var sampleEnterprise: UsageSnapshot {
-        let spend = Spend(used: Money(minor: 41280, exponent: 2, currency: "USD"),
+    static var sampleEnterprise: UsageSnapshot { sampleEnterprise(over: CommandLine.arguments.contains("over")) }
+
+    /// `over`: spending at 1.3 times an even pace, so the budget is projected to run out before the
+    /// reset whatever the date (at least 20% used, so it's never too early to project).
+    static func sampleEnterprise(over: Bool) -> UsageSnapshot {
+        let now = Date(), reset = Spend.assumedReset(after: now)
+        let start = Spend.utc.date(byAdding: .month, value: -1, to: reset)!
+        let elapsed = now.timeIntervalSince(start) / reset.timeIntervalSince(start)
+        let used: Int64 = over ? Int64(200000 * min(max(elapsed * 1.3, 0.2), 0.95)) : 41280
+        let spend = Spend(used: Money(minor: used, exponent: 2, currency: "USD"),
                           limit: Money(minor: 200000, exponent: 2, currency: "USD"))
         return UsageSnapshot(source: .oauth, capturedAt: Date(), windows: [
             UsageWindow(key: "extra_usage", percent: spend.percent, resetsAt: Spend.assumedReset(after: Date()),

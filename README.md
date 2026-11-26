@@ -34,44 +34,11 @@ Everything in detail, including all settings: the [guide](docs/GUIDE.md).
 
 ### In the menu bar
 
-At real size, on a dark and a light menu bar. Each is a setting in the popup. The Pro/Max samples
-show the same numbers throughout (session 20%, week 60%), so only the setting changes.
+Each row is a setting in the popup, shown at real size from sample numbers.
 
-**Indicator**
+<img src="docs/screenshots/menubar-pro-max.png" width="574" alt="Menu bar item settings on Pro/Max, with and without the 5h and 7d labels: Indicator Bar, Circle, Dot, Gauge or Off; Colours Alerts (colour only for the 7d limit, which is projected to run out) and Mono; Projection on (20% →35%, 60% →105%), also with Number off; Limits 5h only; Extra usage as an amount ($12); and Dot with Alerts and Projection on, where only 7d gets a dot">
 
-| <img src="docs/screenshots/bar-bars.png" width="133" alt="Bars: 5h and 7d bars at 20% and 60% with their labels"> | <img src="docs/screenshots/bar-circle.png" width="124" alt="Circle: two rings with 5h 20% and 7d 60%"> | <img src="docs/screenshots/bar-dots.png" width="110" alt="Dots: 5h 20% and 7d 60%, each after a coloured dot"> | <img src="docs/screenshots/bar-gauge.png" width="124" alt="Gauge: a yellow gauge before 5h 20% and 7d 60%"> | <img src="docs/screenshots/bar-off.png" width="104" alt="Indicator off: 5h 20% and 7d 60% as text"> |
-|:-:|:-:|:-:|:-:|:-:|
-| Bars | Circle | Dots | Gauge | Off |
-
-**Without the 5h / 7d labels**
-
-| <img src="docs/screenshots/bar-bars-nolabels.png" width="118" alt="Bars with 20% and 60%, without the 5h and 7d labels"> | <img src="docs/screenshots/bar-circle-nolabels.png" width="109" alt="Rings with 20% and 60%, no labels"> | <img src="docs/screenshots/bar-dots-nolabels.png" width="95" alt="Dots with 20% and 60%, no labels"> | <img src="docs/screenshots/bar-gauge-nolabels.png" width="109" alt="A gauge with 20% and 60%, no labels"> |
-|:-:|:-:|:-:|:-:|
-| Bars | Circle | Dots | Gauge |
-
-**Colours**
-
-| <img src="docs/screenshots/bar-bars.png" width="133" alt="Bars: 5h and 7d bars at 20% and 60% with their labels"> | <img src="docs/screenshots/bar-mono.png" width="133" alt="Mono: bars in the text colour"> | <img src="docs/screenshots/bar-alerts.png" width="133" alt="Alerts: only the 7d bar coloured, as it is ahead of pace"> |
-|:-:|:-:|:-:|
-| Colour | Mono | Alerts |
-
-**Number and projection**
-
-| <img src="docs/screenshots/bar-bars.png" width="133" alt="Bars: 5h and 7d bars at 20% and 60% with their labels"> | <img src="docs/screenshots/bar-projection.png" width="172" alt="Bars with 20% →35% and 60% →105%"> | <img src="docs/screenshots/bar-projection-only.png" width="147" alt="Bars with →35% and →105% in place of the numbers"> |
-|:-:|:-:|:-:|
-| Percent | Projection | Projection, number off |
-
-**Limits**
-
-| <img src="docs/screenshots/bar-bars.png" width="133" alt="Bars: 5h and 7d bars at 20% and 60% with their labels"> | <img src="docs/screenshots/bar-only5h.png" width="133" alt="A single 5h bar at 20%"> | <img src="docs/screenshots/bar-extra.png" width="187" alt="The 5h and 7d bars, and beside them a $ bar with $12"> |
-|:-:|:-:|:-:|
-| Both | Only 5h | Extra usage beside them |
-
-**$ budget (Enterprise/Team)**
-
-| <img src="docs/screenshots/bar-budget.png" width="118" alt="A single budget bar at 21%"> | <img src="docs/screenshots/bar-budget-amount.png" width="121" alt="A budget bar with $412"> | <img src="docs/screenshots/bar-budget-projection.png" width="129" alt="A budget bar with $412 over →$520"> |
-|:-:|:-:|:-:|
-| Percent | Amount | Amount and projection |
+<img src="docs/screenshots/menubar-enterprise.png" width="479" alt="Menu bar item settings on an Enterprise/Team budget: Bar with 21%, with the amount $412, and with the projection $412 →$480; Dot with Colour (a green dot); Dot with Alerts (no dot, since the budget is on track); and the same while spending faster than the budget lasts ($1900 →$2220, an orange dot)">
 
 ## Install
 

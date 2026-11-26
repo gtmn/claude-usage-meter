@@ -53,40 +53,19 @@ $APP --render-preview $S/popup-pro-max-extra.png extra amount
 $APP --render-preview $S/popup-pro-max-fable.png fable
 $APP --render-preview $S/settings-pro-max.png settings extra
 $APP --render-preview $S/settings-enterprise.png settings enterprise amount
-# The menu bar at real size, in dark mode like the popups: one strip per name and its render
-# options (in bash: zsh doesn't split $flags into separate options).
-while read -r name flags; do
-  $APP --render-preview /tmp/um.png $flags
-  mv /tmp/um.png.bar.png "$S/bar-$name.png"
-done <<'LIST'
-bars
-circle compact
-dots dots
-gauge icon
-off text
-bars-nolabels nolabels
-circle-nolabels compact nolabels
-dots-nolabels dots nolabels
-gauge-nolabels icon nolabels
-mono mono
-alerts alerts
-projection beside
-projection-only projected
-only5h only5h
-budget enterprise
-budget-amount enterprise amount
-budget-projection enterprise amount beside
-extra extra amount
-LIST
-rm -f $S/*.label.png $S/*.bar.png /tmp/um.png*
+# The menu bar settings, one sheet each (rows and captions: MenuBar/Sources/MenuBarSheet.swift).
+$APP --render-preview $S/menubar-pro-max.png sheet=pro-max
+$APP --render-preview $S/menubar-enterprise.png sheet=enterprise
+rm -f $S/*.label.png $S/*.bar.png
 ```
 
-Every render also writes `<name>.label.png`, the menu bar item enlarged 6 times, for checking details.
+Every render also writes `<name>.label.png`, the menu bar item enlarged 6 times, for checking details,
+and `<name>.bar.png`, the item at real size on a dark menu bar.
 
 Renders never read or change your own settings: they use the arguments, in a throwaway store.
 
 `scene` draws the whole popup opened under the item on a plain menu bar (the README's first image).
-Add `compact` for the Circle menu bar style, `dots` for Dots, `icon` for Gauge, `text` for Indicator off, `beside` for Projection on (`projected`: on, with Number off), `mono` or `alerts` for those palettes, `amount` for the budget's amount, `extra` for Pro/Max with extra usage (and its menu bar item), `only5h` or `only7d` for one limit in the menu bar, `fable` for a Fable weekly limit (and its line in the graph), `update` for a newer release offered, `signedout` for saved numbers while signed out of Claude Code (the menu bar item faded; with `panel`, the Sign in… row), `panel` for the whole popup or `settings` for its settings alone, `nolabels`, `nopercent`, `nopace` or `noahead` to leave those out, `left` or `early` for the time left or early, `daily` for the per-day bars, `overview` for the Weeks or Months view, `day` for the Day view (Pro/Max, or with `enterprise` or `extra` the budget's), `full` for the session at its limit, `burst` for 58% twenty minutes into a session, `stale` for old numbers (faded, grey, a red dot in Dots), `back=2` for two periods (days, or overview pages) back, `hover` to show the graph's tooltip (`hover=1.5` halfway along the projection), `light` for light mode, or `live` to render your
+Add `compact` for the Circle menu bar style, `dots` for Dots, `icon` for Gauge, `text` for Indicator off, `beside` for Projection on (`projected`: on, with Number off), `mono` or `alerts` for those palettes, `amount` for the budget's amount, `extra` for Pro/Max with extra usage (and its menu bar item), `only5h` or `only7d` for one limit in the menu bar, `fable` for a Fable weekly limit (and its line in the graph), `update` for a newer release offered, `signedout` for saved numbers while signed out of Claude Code (the menu bar item faded; with `panel`, the Sign in… row), `panel` for the whole popup or `settings` for its settings alone, `nolabels`, `nopercent`, `nopace` or `noahead` to leave those out, `left` or `early` for the time left or early, `daily` for the per-day bars, `overview` for the Weeks or Months view, `day` for the Day view (Pro/Max, or with `enterprise` or `extra` the budget's), `full` for the session at its limit, `burst` for 58% twenty minutes into a session, `over` for a budget spending faster than it lasts, `stale` for old numbers (faded, grey, a red dot in Dots), `back=2` for two periods (days, or overview pages) back, `hover` to show the graph's tooltip (`hover=1.5` halfway along the projection), `light` for light mode, or `live` to render your
 own current numbers and recorded history instead (don't commit those).
 
 ## Releasing
