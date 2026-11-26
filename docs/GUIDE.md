@@ -123,7 +123,7 @@ into a session: *Runs out around 10:52*.
 
 The gear button at the top of the popup shows or hides the settings (open on first start;
 the app remembers when you close them). They sit under the graph: **Menu bar item**, one setting per row, then
-**Open at login**, **Check for updates** and **Quit** (⌘Q also quits while the popup is open).
+**Open at login**, **Check for updates**, **Notify when signed out** and **Quit** (⌘Q also quits while the popup is open).
 Hover over a control to see what it does.
 
 - **Indicator**: Bars, Circle, Dots, Gauge or Off (on a $ budget: Bar and Dot). With Dots or Off the
@@ -178,6 +178,10 @@ asks once from the command line.
      its numbers are old (below).
      The button opens Terminal running `claude auth login`, Claude Code's own sign-in; the app doesn't
      see it, and fetches again as soon as the new login is in the Keychain.
+   - **Notify when signed out** (on by default) also posts a macOS notification then, once per
+     sign-out (*The menu bar shows the numbers from 14:32. Sign in again to update them.*), with a
+     **Sign in…** button that does the same. macOS asks whether the app may send notifications the
+     first time one is due; signing in again takes it out of Notification Centre.
    - **Old numbers in the menu bar**: while signed out, or once no fetch has worked for over 15 minutes
      (offline, rate-limited, …), the item fades and drops its pace colours: bars, rings and the gauge
      turn grey, Dots gets a small red dot in place of its pace dots, and Off is just greyed out. Right after the Mac wakes it

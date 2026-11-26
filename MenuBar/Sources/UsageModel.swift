@@ -259,6 +259,7 @@ final class UsageModel: ObservableObject {
         }
         history = UsageHistory.load()
         persistsHistory = true
+        SignInNotifier.shared.start(model: self)
         seenReset = UserDefaults.standard.object(forKey: Self.seenResetKey) as? Date
         // The last good numbers, until the first fetch succeeds; the footer says how old they are.
         if let saved = LastUsage.load() {
@@ -333,6 +334,7 @@ final class UsageModel: ObservableObject {
                 showingSaved = snapshot != nil
                 error = oauthProblem ?? "No usage data"
             }
+            SignInNotifier.shared.update(signedOut: signedOut, savedAt: snapshot?.capturedAt)
             isLoading = false
         }
     }

@@ -30,6 +30,10 @@ the build changed since the last one; `./dev.sh --rebuild` builds anyway.
 Prints the outlook wording for fixed scenarios (in UTC, so the output is the same
 on any machine) and the short message for each kind of error.
 
+`MenuBar/build/UsageMeter.app/Contents/MacOS/UsageMeter --test-notification` posts the signed-out
+notification once (asking for permission the first time) and prints whether macOS took it;
+`--check-update` asks GitHub once for the latest version.
+
 ## Screenshots
 
 The images in [`screenshots/`](screenshots) are rendered from sample numbers (no Keychain access,

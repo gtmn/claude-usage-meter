@@ -13,6 +13,7 @@ struct UsageMeterApp: App {
         // `UsageMeter --render-preview out.png [live] [offline] [enterprise] [hover] [light] [daily] [seen] [saved] [compact|dots|icon|text] [mono] [amount] [extra] [fable] [only5h|only7d] [beside|projected] [update] [signedout] [panel|settings|scene] [nolabels] [nopercent] [nopace] [noahead] [left|early] [overview|day] [back=N] [full|burst] [stale]` (`hover=0.85`: pointer at 85% of the times): render the panel rows (`panel`: the whole popup; `settings`: its menu bar settings; `scene`: the whole popup opened under the item on a plain menu bar) to a PNG and exit.
         let args = CommandLine.arguments
         if args.contains("--check-update") { Updater.checkFromCommandLine() }
+        if args.contains("--test-notification") { SignInNotifier.testFromCommandLine() }
         if let i = args.firstIndex(of: "--render-preview"), i + 1 < args.count {
             PreviewRenderer.run(output: args[i + 1], live: args.contains("live"), offline: args.contains("offline"),
                                 enterprise: args.contains("enterprise"))

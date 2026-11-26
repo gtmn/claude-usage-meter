@@ -21,6 +21,13 @@ options that were ruled out, so they aren't tried again.
   Terminal can't be opened. The menu bar item fades while signed out, since its numbers are getting old.
   Tried for real on 2026-11-25 (worked; the refresh token lasts about four weeks). A long-lived
   `claude setup-token` token was ruled out on 2026-11-26: the usage endpoint answers 403 to it.
+- **A notification when signed out** (2026-11-26), "Notify when signed out", on by default: the faded item
+  is easy to miss, and nothing else gets the login back. Once per sign-out (saved, so restarts don't repeat
+  it; switching the setting on while signed out doesn't send it late), only once the nudge has failed
+  (`signedOut`), never for a fetch that merely failed. Its Sign in… button runs the popup's Sign in….
+  Clicking the notification itself does nothing more: a `MenuBarExtra` has no way to open its popup from
+  code. Permission is asked when the first one is due, not at launch, so nobody who is never signed out is
+  asked. Checked with `--test-notification`: an ad-hoc signed copy can post them.
 - **Old numbers show in the menu bar** (2026-11-25): signed out, or more than 15 minutes old with the
   latest fetch since then failed (three missed 5-minute fetches; after waking, the wake fetch comes
   first). The item fades and its fills turn grey: old numbers have no pace worth colouring. Dots has no fill

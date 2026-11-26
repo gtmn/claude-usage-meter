@@ -115,5 +115,21 @@ expect("never checked: due", UpdateCheck.isDue(last: nil, now: now))
 expect("checked 23 h ago: not due", !UpdateCheck.isDue(last: now.addingTimeInterval(-23 * 3600), now: now))
 expect("checked 24 h ago: due", UpdateCheck.isDue(last: now.addingTimeInterval(-24 * 3600), now: now))
 expect("last check in the future (clock moved back): due", UpdateCheck.isDue(last: now.addingTimeInterval(3600), now: now))
+// The notification when the login is gone: once per sign-out, only with the setting on.
+expect("signed out: notify once", LoginNudge.noticeStep(signedOut: true, notified: false, enabled: true) == (true, true))
+expect("still signed out: not again", LoginNudge.noticeStep(signedOut: true, notified: true, enabled: true) == (false, true))
+expect("setting off: no notification, and none later for this sign-out",
+       LoginNudge.noticeStep(signedOut: true, notified: false, enabled: false) == (false, true))
+expect("signed in again: the next sign-out notifies", LoginNudge.noticeStep(signedOut: false, notified: true, enabled: true) == (false, false))
+var zurich = Calendar(identifier: .gregorian); zurich.timeZone = TimeZone(identifier: "Europe/Zurich")!
+let noticeNow = Date(timeIntervalSince1970: 1_795_100_000)   // Thu 19 Nov 2026, 15:53 in Zurich
+expect("notice: numbers from today", LoginNudge.signedOutNotice(savedAt: noticeNow.addingTimeInterval(-3600), now: noticeNow, calendar: zurich)
+       == ("Signed out of Claude Code", "The menu bar shows the numbers from 14:53. Sign in again to update them."))
+expect("notice: numbers from yesterday", LoginNudge.signedOutNotice(savedAt: noticeNow.addingTimeInterval(-86400), now: noticeNow, calendar: zurich).body
+       == "The menu bar shows the numbers from yesterday, 15:53. Sign in again to update them.")
+expect("notice: older numbers", LoginNudge.signedOutNotice(savedAt: noticeNow.addingTimeInterval(-3 * 86400), now: noticeNow, calendar: zurich).body
+       == "The menu bar shows the numbers from Mon 16 Nov, 15:53. Sign in again to update them.")
+expect("notice: no numbers", LoginNudge.signedOutNotice(savedAt: nil, now: noticeNow, calendar: zurich).body
+       == "Sign in again to see your usage.")
 try? FileManager.default.removeItem(at: sumFile)
 exit(nudgeFailures == 0 ? 0 : 1)

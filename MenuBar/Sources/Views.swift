@@ -163,6 +163,7 @@ struct UsagePanel: View {
     @AppStorage(UsagePanel.settingsShownKey) private var settingsShown = true
     static let settingsShownKey = "settingsShown"
     @AppStorage(Updater.enabledKey) private var checkForUpdates = false
+    @AppStorage(SignInNotifier.enabledKey) private var notifySignedOut = true
     @ObservedObject private var updater = Updater.shared
 
     var body: some View {
@@ -225,7 +226,11 @@ struct UsagePanel: View {
                 }
                 Spacer(minLength: 0)
             }
-            HStack {
+            HStack(spacing: 8) {
+                Toggle("Notify when signed out", isOn: $notifySignedOut)
+                    .toggleStyle(.checkbox)
+                    .help("A notification when Claude Code's login can't be renewed and you need to sign in again, "
+                          + "with a Sign in… button. Once per sign-out.")
                 if let note = Install.loginNote {
                     Text(note).foregroundStyle(.secondary)
                 } else if !Install.byHomebrew {

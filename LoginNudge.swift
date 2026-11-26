@@ -133,3 +133,32 @@ public enum AppLog {
         }
     }
 }
+
+extension LoginNudge {
+    /// The notification when signing in again is the only way back: whether to post it, and whether
+    /// this sign-out counts as notified afterwards. Once per sign-out; with the setting off, a later
+    /// switch-on doesn't send it either. Signing in again starts over.
+    public static func noticeStep(signedOut: Bool, notified: Bool, enabled: Bool) -> (post: Bool, notified: Bool) {
+        guard signedOut else { return (false, false) }
+        return (!notified && enabled, true)
+    }
+
+    /// Its title and text: how old the numbers on show are.
+    public static func signedOutNotice(savedAt: Date?, now: Date = Date(),
+                                       calendar: Calendar = .current) -> (title: String, body: String) {
+        let title = "Signed out of Claude Code"
+        guard let savedAt else { return (title, "Sign in again to see your usage.") }
+        let clock = HumanTime.clock(savedAt, calendar.timeZone)
+        let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: savedAt),
+                                           to: calendar.startOfDay(for: now)).day ?? 0
+        let when: String
+        switch days {
+        case 0: when = clock
+        case 1: when = "yesterday, \(clock)"
+        default:
+            let f = DateFormatter(); f.locale = HumanTime.en; f.timeZone = calendar.timeZone; f.dateFormat = "EEE d MMM"
+            when = "\(f.string(from: savedAt)), \(clock)"
+        }
+        return (title, "The menu bar shows the numbers from \(when). Sign in again to update them.")
+    }
+}
