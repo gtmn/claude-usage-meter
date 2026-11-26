@@ -61,7 +61,8 @@ options that were ruled out, so they aren't tried again.
 - **The README is short** (2026-11-24): what the app does, the menu bar at real size, install, how it works in
   three sentences, and the project layout. Every feature and setting is in `docs/GUIDE.md`, building and
   releasing in `docs/DEVELOPMENT.md`: the full text was over 4,000 words before anyone saw how to install it.
-  The menu bar previews are real-size strips (dark and light, a clock beside the item), not enlarged.
+  The menu bar previews are real-size strips, not enlarged: dark, like the popups, with a clock beside the
+  item (dark above light was dropped on 2026-11-26 as not needed).
 - **No Labels setting and no `$` label on a $ budget.** There's only one bar, so a label tells nothing apart,
   and the amount (`$306`) carries its own `$`.
 - **The Projection setting is text only, rounded to 5% and not capped** (2026-11-24): the bars and colours

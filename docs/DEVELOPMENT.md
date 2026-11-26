@@ -53,7 +53,8 @@ $APP --render-preview $S/popup-pro-max-extra.png extra amount
 $APP --render-preview $S/popup-pro-max-fable.png fable
 $APP --render-preview $S/settings-pro-max.png settings extra
 $APP --render-preview $S/settings-enterprise.png settings enterprise amount
-# The menu bar at real size, dark above light: one strip per name and its render options.
+# The menu bar at real size, in dark mode like the popups: one strip per name and its render
+# options (in bash: zsh doesn't split $flags into separate options).
 while read -r name flags; do
   $APP --render-preview /tmp/um.png $flags
   mv /tmp/um.png.bar.png "$S/bar-$name.png"
